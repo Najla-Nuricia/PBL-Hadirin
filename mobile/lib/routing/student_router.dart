@@ -1,6 +1,8 @@
 import 'package:go_router/go_router.dart';
 
+import '../data/mhs/student_profile_preview.dart';
 import '../pages/mhs/page_placeholder.dart';
+import '../pages/mhs/profile_page.dart';
 import '../pages/mhs/surat_page.dart';
 import '../pages/mhs/student_navigation_shell.dart';
 
@@ -52,7 +54,7 @@ final studentRouter = GoRouter(
             GoRoute(
               path: StudentRoutePaths.profil,
               builder: (context, state) =>
-                  const StudentPagePlaceholder(title: 'Profil'),
+                  const ProfilePage(profile: studentProfilePreview),
             ),
           ],
         ),
