@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/main.dart';
 import 'package:mobile/routing/student_router.dart';
@@ -6,6 +7,11 @@ void main() {
   testWidgets('student navbar navigates between persistent branches', (
     tester,
   ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     await tester.pumpWidget(const HadirinApp());
     await tester.pumpAndSettle();
 
@@ -32,12 +38,17 @@ void main() {
     expect(find.text('Surat'), findsWidgets);
     expect(find.text('Profil'), findsWidgets);
 
-    await tester.tap(find.text('Profil').last);
+    await tester.tap(find.text('Profil').first);
     await tester.pumpAndSettle();
 
     expect(
       studentRouter.routeInformationProvider.value.uri.path,
       StudentRoutePaths.profil,
+    );
+    expect(find.text('Informasi Akun'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('profile-change-password')),
+      findsOneWidget,
     );
     expect(find.text('Beranda'), findsWidgets);
     expect(find.text('Riwayat'), findsWidgets);
@@ -45,7 +56,26 @@ void main() {
     expect(find.text('Surat'), findsWidgets);
     expect(find.text('Profil'), findsWidgets);
 
-    await tester.tap(find.text('Surat').last);
+    await tester.tap(find.byKey(const ValueKey('profile-change-password')));
+    await tester.pumpAndSettle();
+
+    expect(
+      studentRouter.routeInformationProvider.value.uri.path,
+      StudentRoutePaths.changePassword,
+    );
+    expect(find.text('Ubah Kata Sandi'), findsOneWidget);
+    expect(find.text('Kata Sandi Baru'), findsOneWidget);
+    expect(find.text('Konfirmasi Kata Sandi Baru'), findsOneWidget);
+    expect(find.text('Simpan'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Kembali'));
+    await tester.pumpAndSettle();
+    expect(
+      studentRouter.routeInformationProvider.value.uri.path,
+      StudentRoutePaths.profil,
+    );
+
+    await tester.tap(find.text('Surat').first);
     await tester.pumpAndSettle();
 
     expect(

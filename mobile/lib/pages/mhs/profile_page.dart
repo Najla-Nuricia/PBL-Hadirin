@@ -274,6 +274,7 @@ class _ProfileActionsCard extends StatelessWidget {
           ),
           Divider(height: 1, thickness: 1, color: colorScheme.outlineVariant),
           _ProfileActionRow(
+            key: const ValueKey('profile-change-password'),
             icon: Icons.key_outlined,
             label: 'Ubah Kata Sandi',
             iconBackground: colorScheme.tertiaryContainer,
@@ -298,6 +299,7 @@ class _ProfileActionsCard extends StatelessWidget {
 
 class _ProfileActionRow extends StatelessWidget {
   const _ProfileActionRow({
+    super.key,
     required this.icon,
     required this.label,
     required this.iconBackground,
