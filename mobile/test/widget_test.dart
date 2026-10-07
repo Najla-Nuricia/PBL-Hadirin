@@ -44,5 +44,20 @@ void main() {
     expect(find.text('Absensi'), findsWidgets);
     expect(find.text('Surat'), findsWidgets);
     expect(find.text('Profil'), findsWidgets);
+
+    await tester.tap(find.text('Surat').last);
+    await tester.pumpAndSettle();
+
+    expect(
+      studentRouter.routeInformationProvider.value.uri.path,
+      StudentRoutePaths.surat,
+    );
+    expect(find.text('Upload Surat'), findsOneWidget);
+    expect(find.text('Pilih mata kuliah...'), findsOneWidget);
+    expect(find.text('Kirim Surat'), findsOneWidget);
+
+    await tester.tap(find.text('Upload Surat Kompensasi'));
+    await tester.pumpAndSettle();
+    expect(find.text('Unggah surat kompensasi'), findsOneWidget);
   });
 }
