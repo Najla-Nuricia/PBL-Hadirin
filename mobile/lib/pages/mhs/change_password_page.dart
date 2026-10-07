@@ -80,96 +80,95 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   }
 
   Widget _buildHeader(BuildContext context, ColorScheme colorScheme) {
-  return Container(
-    color: colorScheme.surface,
-    child: SizedBox(
-      height: 52,
-      child: Row(
-        children: [
-          IconButton(
-            onPressed: () => context.go('/mhs/beranda'),
-            icon: const Icon(Icons.chevron_left),
-            color: colorScheme.onSurfaceVariant,
-            tooltip: 'Kembali',
-          ),
-          Text(
-            'Ubah Kata Sandi',
-            style: TextStyle(
-              color: colorScheme.onSurface,
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
+    return Container(
+      color: colorScheme.surface,
+      child: SizedBox(
+        height: 52,
+        child: Row(
+          children: [
+            IconButton(
+              onPressed: () => context.go('/mhs/beranda'),
+              icon: const Icon(Icons.chevron_left),
+              color: colorScheme.onSurfaceVariant,
+              tooltip: 'Kembali',
             ),
-          ),
-        ],
+            Text(
+              'Ubah Kata Sandi',
+              style: TextStyle(
+                color: colorScheme.onSurface,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
       ),
-    ),
-  );
-}
-  }
-
-  Widget _buildPasswordField({
-    required ColorScheme colorScheme,
-    required String label,
-    required String hint,
-    required bool isVisible,
-    required ValueChanged<bool> onVisibilityChanged,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: colorScheme.onSurface,
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 7),
-        SizedBox(
-          height: 38,
-          child: TextField(
-            obscureText: !isVisible,
-            style: TextStyle(color: colorScheme.onSurface, fontSize: 11),
-            decoration: InputDecoration(
-              hintText: hint,
-              hintStyle: TextStyle(
-                color: colorScheme.onSurfaceVariant,
-                fontSize: 14,
-              ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-              suffixIconConstraints: const BoxConstraints(
-                minWidth: 38,
-                minHeight: 38,
-              ),
-              suffixIcon: IconButton(
-                onPressed: () => onVisibilityChanged(!isVisible),
-                padding: EdgeInsets.zero,
-                icon: Icon(
-                  isVisible ? Icons.visibility_outlined : Icons.visibility_off,
-                  size: 15,
-                  color: colorScheme.onSurfaceVariant,
-                ),
-                tooltip: isVisible
-                    ? 'Sembunyikan kata sandi'
-                    : 'Tampilkan kata sandi',
-              ),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: colorScheme.outline),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: colorScheme.outline),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: colorScheme.primary),
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
+}
 
+Widget _buildPasswordField({
+  required ColorScheme colorScheme,
+  required String label,
+  required String hint,
+  required bool isVisible,
+  required ValueChanged<bool> onVisibilityChanged,
+}) {
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        label,
+        style: TextStyle(
+          color: colorScheme.onSurface,
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      const SizedBox(height: 7),
+      SizedBox(
+        height: 38,
+        child: TextField(
+          obscureText: !isVisible,
+          style: TextStyle(color: colorScheme.onSurface, fontSize: 11),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: TextStyle(
+              color: colorScheme.onSurfaceVariant,
+              fontSize: 14,
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+            suffixIconConstraints: const BoxConstraints(
+              minWidth: 38,
+              minHeight: 38,
+            ),
+            suffixIcon: IconButton(
+              onPressed: () => onVisibilityChanged(!isVisible),
+              padding: EdgeInsets.zero,
+              icon: Icon(
+                isVisible ? Icons.visibility_outlined : Icons.visibility_off,
+                size: 15,
+                color: colorScheme.onSurfaceVariant,
+              ),
+              tooltip: isVisible
+                  ? 'Sembunyikan kata sandi'
+                  : 'Tampilkan kata sandi',
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: colorScheme.outline),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: colorScheme.outline),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide(color: colorScheme.primary),
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
+}
