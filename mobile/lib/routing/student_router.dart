@@ -1,12 +1,37 @@
 import 'package:go_router/go_router.dart';
 
+import '../data/mhs/student_account.dart';
+import '../pages/mhs/auth/student_face_scan_page.dart';
+import '../pages/mhs/auth/student_login_page.dart';
+import '../pages/mhs/auth/student_register_page.dart';
 import '../pages/mhs/page_placeholder.dart';
 import '../pages/mhs/surat_page.dart';
 import '../pages/mhs/student_navigation_shell.dart';
 
-final studentRouter = GoRouter(
-  initialLocation: StudentRoutePaths.beranda,
+final studentRouter = createStudentRouter();
+
+GoRouter createStudentRouter() => GoRouter(
+  initialLocation: StudentRoutePaths.login,
   routes: [
+    GoRoute(
+      path: StudentRoutePaths.login,
+      builder: (context, state) => const StudentLoginPage(),
+    ),
+    GoRoute(
+      path: StudentRoutePaths.register,
+      builder: (context, state) => const StudentRegisterPage(),
+      routes: [
+        GoRoute(
+          path: StudentRoutePaths.registerFaceScanSegment,
+          redirect: (context, state) => state.extra is StudentRegistrationDraft
+              ? null
+              : StudentRoutePaths.register,
+          builder: (context, state) => StudentFaceScanPage(
+            draft: state.extra! as StudentRegistrationDraft,
+          ),
+        ),
+      ],
+    ),
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) {
         return StudentNavigationShell(navigationShell: navigationShell);
@@ -62,6 +87,10 @@ final studentRouter = GoRouter(
 );
 
 abstract final class StudentRoutePaths {
+  static const login = '/mhs/login';
+  static const register = '/mhs/register';
+  static const registerFaceScanSegment = 'scan-wajah';
+  static const registerFaceScan = '$register/$registerFaceScanSegment';
   static const beranda = '/mhs/beranda';
   static const riwayat = '/mhs/riwayat';
   static const absensi = '/mhs/absensi';

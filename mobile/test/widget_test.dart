@@ -1,4 +1,6 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/data/mhs/dummy_student_auth_repository.dart';
 import 'package:mobile/main.dart';
 import 'package:mobile/routing/student_router.dart';
 
@@ -7,6 +9,22 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(const HadirinApp());
+    await tester.pumpAndSettle();
+
+    expect(
+      studentRouter.routeInformationProvider.value.uri.path,
+      StudentRoutePaths.login,
+    );
+    final loginFields = find.byType(TextFormField);
+    await tester.enterText(
+      loginFields.at(0),
+      DummyStudentAuthRepository.demoAccount.nim,
+    );
+    await tester.enterText(
+      loginFields.at(1),
+      DummyStudentAuthRepository.demoAccount.password,
+    );
+    await tester.tap(find.text('Masuk'));
     await tester.pumpAndSettle();
 
     expect(find.text('Beranda'), findsWidgets);
