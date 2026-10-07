@@ -16,6 +16,17 @@ void main() {
 
     expect(
       studentRouter.routeInformationProvider.value.uri.path,
+      StudentRoutePaths.login,
+    );
+
+    final loginFields = find.byType(TextFormField);
+    await tester.enterText(loginFields.at(0), '2341720001');
+    await tester.enterText(loginFields.at(1), 'mahasiswa123');
+    await tester.tap(find.text('Masuk'));
+    await tester.pumpAndSettle();
+
+    expect(
+      studentRouter.routeInformationProvider.value.uri.path,
       StudentRoutePaths.beranda,
     );
     expect(find.text('Beranda'), findsWidgets);
@@ -43,12 +54,13 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.byKey(const ValueKey('profile-change-password')));
-    await tester.pumpAndSettle();
-    expect(
-      studentRouter.routeInformationProvider.value.uri.path,
-      StudentRoutePaths.changePassword,
+    final changePasswordAction = find.byKey(
+      const ValueKey('profile-change-password'),
     );
+    await tester.ensureVisible(changePasswordAction);
+    await tester.tap(find.text('Ubah Kata Sandi').last);
+    await tester.pumpAndSettle();
+
     expect(find.text('Kata Sandi Baru'), findsOneWidget);
     expect(find.text('Konfirmasi Kata Sandi Baru'), findsOneWidget);
     expect(find.text('Simpan'), findsOneWidget);
