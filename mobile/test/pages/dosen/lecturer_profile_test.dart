@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/routing/lecturer_route_paths.dart';
-import 'package:mobile/routing/student_router.dart';
+import 'package:mobile/routing/lecturer_router.dart';
 import 'package:mobile/theme/app_theme.dart';
 
 void main() {
@@ -11,7 +11,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    final router = createStudentRouter();
+    final router = createLecturerRouter();
     addTearDown(router.dispose);
     router.go(LecturerRoutePaths.profil);
 
