@@ -10,6 +10,7 @@ import '../pages/mhs/student_navigation_shell.dart';
 import '../pages/mhs/auth/student_face_scan_page.dart';
 import '../pages/mhs/auth/student_login_page.dart';
 import '../pages/mhs/auth/student_register_page.dart';
+import 'student_route_paths.dart';
 
 final GoRouter studentRouter = createStudentRouter();
 
@@ -98,16 +99,3 @@ GoRouter createStudentRouter() => GoRouter(
     ),
   ],
 );
-
-abstract final class StudentRoutePaths {
-  static const login = '/mhs/login';
-  static const register = '/mhs/register';
-  static const registerFaceScanSegment = 'scan-wajah';
-  static const registerFaceScan = '$register/$registerFaceScanSegment';
-  static const beranda = '/mhs/beranda';
-  static const riwayat = '/mhs/riwayat';
-  static const absensi = '/mhs/absensi';
-  static const surat = '/mhs/surat';
-  static const profil = '/mhs/profil';
-  static const changePassword = '/mhs/profil/ubah-kata-sandi';
-}

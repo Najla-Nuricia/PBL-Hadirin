@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile/data/mhs/dummy_student_auth_repository.dart';
 import 'package:mobile/routing/student_router.dart';
+import 'package:mobile/routing/student_route_paths.dart';
 import 'package:mobile/theme/app_theme.dart';
 
 void main() {
