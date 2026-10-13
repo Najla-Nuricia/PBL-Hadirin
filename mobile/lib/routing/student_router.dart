@@ -1,17 +1,22 @@
 import 'package:go_router/go_router.dart';
 
 import '../data/mhs/student_account.dart';
+import '../data/mhs/student_profile_preview.dart';
 import '../pages/mhs/absensi_page.dart';
 import '../pages/mhs/auth/student_face_scan_page.dart';
 import '../pages/mhs/auth/student_login_page.dart';
 import '../pages/mhs/auth/student_register_page.dart';
 import '../pages/mhs/beranda_page.dart';
+import '../pages/mhs/change_password_page.dart';
 import '../pages/mhs/page_placeholder.dart';
-import '../pages/mhs/profil_page.dart';
-import '../pages/mhs/surat_page.dart';
+import '../pages/mhs/profile_page.dart';
 import '../pages/mhs/student_navigation_shell.dart';
+import '../pages/mhs/surat_page.dart';
+import 'student_route_paths.dart';
 
-final studentRouter = createStudentRouter();
+export 'student_route_paths.dart';
+
+final GoRouter studentRouter = createStudentRouter();
 
 GoRouter createStudentRouter() => GoRouter(
   initialLocation: StudentRoutePaths.login,
@@ -37,7 +42,10 @@ GoRouter createStudentRouter() => GoRouter(
     ),
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) {
-        return StudentNavigationShell(navigationShell: navigationShell);
+        return StudentNavigationShell(
+          navigationShell: navigationShell,
+          showNavbar: state.uri.path != StudentRoutePaths.changePassword,
+        );
       },
       branches: [
         StatefulShellBranch(
@@ -77,23 +85,19 @@ GoRouter createStudentRouter() => GoRouter(
           routes: [
             GoRoute(
               path: StudentRoutePaths.profil,
-              builder: (context, state) => const ProfilPage(),
+              builder: (context, state) => ProfilePage(
+                profile: studentProfilePreview,
+                onChangePassword: () =>
+                    context.push(StudentRoutePaths.changePassword),
+              ),
             ),
           ],
         ),
       ],
     ),
+    GoRoute(
+      path: StudentRoutePaths.changePassword,
+      builder: (context, state) => const ChangePasswordPage(),
+    ),
   ],
 );
-
-abstract final class StudentRoutePaths {
-  static const login = '/mhs/login';
-  static const register = '/mhs/register';
-  static const registerFaceScanSegment = 'scan-wajah';
-  static const registerFaceScan = '$register/$registerFaceScanSegment';
-  static const beranda = '/mhs/beranda';
-  static const riwayat = '/mhs/riwayat';
-  static const absensi = '/mhs/absensi';
-  static const surat = '/mhs/surat';
-  static const profil = '/mhs/profil';
-}

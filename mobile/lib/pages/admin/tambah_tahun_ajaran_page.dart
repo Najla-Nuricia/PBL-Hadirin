@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../../data/admin/tahun_ajaran.dart';
+import '../../data/admin/tahun_ajaran.dart';
 
 class TambahTahunAjaranPage extends StatefulWidget {
   const TambahTahunAjaranPage({super.key});

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../data/mhs/dummy_student_auth_repository.dart';
-import '../../../routing/student_router.dart';
+import '../../data/mhs/dummy_student_auth_repository.dart';
+import '../../routing/student_route_paths.dart';
 
 class ProfilPage extends StatelessWidget {
   const ProfilPage({super.key});

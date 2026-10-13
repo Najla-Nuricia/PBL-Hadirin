@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../routing/student_router.dart';
+import '../../routing/student_route_paths.dart';
 
 class AbsensiPage extends StatefulWidget {
   const AbsensiPage({super.key});

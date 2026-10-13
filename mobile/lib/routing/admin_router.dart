@@ -1,13 +1,24 @@
 import 'package:go_router/go_router.dart';
 
+import '../pages/admin/admin_navigation_shell.dart';
+import '../pages/admin/admin_placeholder_page.dart';
+import '../pages/admin/auth/admin_login_page.dart';
+import '../pages/admin/data_academic_page.dart';
 import '../pages/admin/tahun_ajaran_list_page.dart';
 import '../pages/admin/tambah_tahun_ajaran_page.dart';
+import 'admin_route_paths.dart';
 
-final adminRouter = createAdminRouter();
+export 'admin_route_paths.dart';
+
+final GoRouter adminRouter = createAdminRouter();
 
 GoRouter createAdminRouter() => GoRouter(
-  initialLocation: AdminRoutePaths.tahunAjaran,
+  initialLocation: AdminRoutePaths.login,
   routes: [
+    GoRoute(
+      path: AdminRoutePaths.login,
+      builder: (context, state) => const AdminLoginPage(),
+    ),
     GoRoute(
       path: AdminRoutePaths.tahunAjaran,
       builder: (context, state) => const TahunAjaranListPage(),
@@ -18,11 +29,37 @@ GoRouter createAdminRouter() => GoRouter(
         ),
       ],
     ),
+    StatefulShellRoute.indexedStack(
+      builder: (context, state, navigationShell) =>
+          AdminNavigationShell(navigationShell: navigationShell),
+      branches: [
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: AdminRoutePaths.dataAkademik,
+              builder: (context, state) => const DataAcademicPage(),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: AdminRoutePaths.tambahJadwal,
+              builder: (context, state) =>
+                  const AdminPlaceholderPage(title: 'Tambah Jadwal'),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: AdminRoutePaths.jadwal,
+              builder: (context, state) =>
+                  const AdminPlaceholderPage(title: 'Jadwal'),
+            ),
+          ],
+        ),
+      ],
+    ),
   ],
 );
-
-abstract final class AdminRoutePaths {
-  static const tahunAjaran = '/admin/tahun-ajaran';
-  static const tambahTahunAjaranSegment = 'tambah';
-  static const tambahTahunAjaran = '$tahunAjaran/$tambahTahunAjaranSegment';
-}

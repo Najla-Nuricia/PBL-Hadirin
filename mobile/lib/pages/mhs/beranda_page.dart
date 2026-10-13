@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../data/mhs/dummy_student_auth_repository.dart';
-import '../../../data/mhs/student_attendance.dart';
-import '../../../data/mhs/student_schedule.dart';
-import '../../../routing/student_router.dart';
+import '../../data/mhs/dummy_student_auth_repository.dart';
+import '../../data/mhs/student_attendance.dart';
+import '../../data/mhs/student_schedule.dart';
+import '../../routing/student_route_paths.dart';
 
 class BerandaPage extends StatefulWidget {
   const BerandaPage({super.key});
@@ -81,35 +81,38 @@ class _BerandaPageState extends State<BerandaPage> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Selamat datang,',
-                style: TextStyle(
-                  color: colorScheme.onSurfaceVariant,
-                  fontSize: 12,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Selamat datang,',
+                  style: TextStyle(
+                    color: colorScheme.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                _account.fullName,
-                style: TextStyle(
-                  color: colorScheme.onSurface,
-                  fontSize: 20,
-                  fontWeight: FontWeight.w800,
+                const SizedBox(height: 2),
+                Text(
+                  _account.fullName,
+                  style: TextStyle(
+                    color: colorScheme.onSurface,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                '${_account.nim} · ${_account.className}',
-                style: TextStyle(
-                  color: colorScheme.onSurfaceVariant,
-                  fontSize: 12,
+                const SizedBox(height: 2),
+                Text(
+                  '${_account.nim} · ${_account.className}',
+                  style: TextStyle(
+                    color: colorScheme.onSurfaceVariant,
+                    fontSize: 12,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
+          const SizedBox(width: 8),
           Text(
             timeStr,
             style: TextStyle(
@@ -257,25 +260,27 @@ class _ActionCard extends StatelessWidget {
             children: [
               Icon(icon, color: iconColor ?? foregroundColor, size: 26),
               const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: TextStyle(
-                      color: foregroundColor,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14,
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: TextStyle(
+                        color: foregroundColor,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
                     ),
-                  ),
-                  Text(
-                    sublabel,
-                    style: TextStyle(
-                      color: foregroundColor.withValues(alpha: 0.75),
-                      fontSize: 11,
+                    Text(
+                      sublabel,
+                      style: TextStyle(
+                        color: foregroundColor.withValues(alpha: 0.75),
+                        fontSize: 11,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ],
           ),
@@ -309,12 +314,14 @@ class _AttendanceSummaryCard extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Rekap Kehadiran',
-                style: TextStyle(
-                  color: colorScheme.onSurface,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
+              Expanded(
+                child: Text(
+                  'Rekap Kehadiran',
+                  style: TextStyle(
+                    color: colorScheme.onSurface,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
               TextButton(
@@ -574,28 +581,40 @@ class _ScheduleItem extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Row(
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 2,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        Icon(Icons.access_time,
-                            size: 12, color: colorScheme.onSurfaceVariant),
-                        const SizedBox(width: 4),
-                        Text(
-                          '${schedule.startTime} – ${schedule.endTime}',
-                          style: TextStyle(
-                            color: colorScheme.onSurfaceVariant,
-                            fontSize: 11,
-                          ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.access_time,
+                                size: 12, color: colorScheme.onSurfaceVariant),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${schedule.startTime} – ${schedule.endTime}',
+                              style: TextStyle(
+                                color: colorScheme.onSurfaceVariant,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 10),
-                        Icon(Icons.location_on_outlined,
-                            size: 12, color: colorScheme.onSurfaceVariant),
-                        const SizedBox(width: 4),
-                        Text(
-                          schedule.room,
-                          style: TextStyle(
-                            color: colorScheme.onSurfaceVariant,
-                            fontSize: 11,
-                          ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.location_on_outlined,
+                                size: 12, color: colorScheme.onSurfaceVariant),
+                            const SizedBox(width: 4),
+                            Text(
+                              schedule.room,
+                              style: TextStyle(
+                                color: colorScheme.onSurfaceVariant,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
