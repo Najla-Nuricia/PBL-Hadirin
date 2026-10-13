@@ -2,15 +2,19 @@ import 'package:go_router/go_router.dart';
 
 import '../data/mhs/student_account.dart';
 import '../data/mhs/student_profile_preview.dart';
-import '../pages/mhs/change_password_page.dart';
-import '../pages/mhs/page_placeholder.dart';
-import '../pages/mhs/profile_page.dart';
-import '../pages/mhs/surat_page.dart';
-import '../pages/mhs/student_navigation_shell.dart';
+import '../pages/mhs/absensi_page.dart';
 import '../pages/mhs/auth/student_face_scan_page.dart';
 import '../pages/mhs/auth/student_login_page.dart';
 import '../pages/mhs/auth/student_register_page.dart';
+import '../pages/mhs/beranda_page.dart';
+import '../pages/mhs/change_password_page.dart';
+import '../pages/mhs/page_placeholder.dart';
+import '../pages/mhs/profile_page.dart';
+import '../pages/mhs/student_navigation_shell.dart';
+import '../pages/mhs/surat_page.dart';
 import 'student_route_paths.dart';
+
+export 'student_route_paths.dart';
 
 final GoRouter studentRouter = createStudentRouter();
 
@@ -48,8 +52,7 @@ GoRouter createStudentRouter() => GoRouter(
           routes: [
             GoRoute(
               path: StudentRoutePaths.beranda,
-              builder: (context, state) =>
-                  const StudentPagePlaceholder(title: 'Beranda'),
+              builder: (context, state) => const BerandaPage(),
             ),
           ],
         ),
@@ -66,8 +69,7 @@ GoRouter createStudentRouter() => GoRouter(
           routes: [
             GoRoute(
               path: StudentRoutePaths.absensi,
-              builder: (context, state) =>
-                  const StudentPagePlaceholder(title: 'Absensi'),
+              builder: (context, state) => const AbsensiPage(),
             ),
           ],
         ),

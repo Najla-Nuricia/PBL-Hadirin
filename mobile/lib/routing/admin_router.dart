@@ -4,7 +4,11 @@ import '../pages/admin/admin_navigation_shell.dart';
 import '../pages/admin/admin_placeholder_page.dart';
 import '../pages/admin/auth/admin_login_page.dart';
 import '../pages/admin/data_academic_page.dart';
+import '../pages/admin/tahun_ajaran_list_page.dart';
+import '../pages/admin/tambah_tahun_ajaran_page.dart';
 import 'admin_route_paths.dart';
+
+export 'admin_route_paths.dart';
 
 final GoRouter adminRouter = createAdminRouter();
 
@@ -14,6 +18,16 @@ GoRouter createAdminRouter() => GoRouter(
     GoRoute(
       path: AdminRoutePaths.login,
       builder: (context, state) => const AdminLoginPage(),
+    ),
+    GoRoute(
+      path: AdminRoutePaths.tahunAjaran,
+      builder: (context, state) => const TahunAjaranListPage(),
+      routes: [
+        GoRoute(
+          path: AdminRoutePaths.tambahTahunAjaranSegment,
+          builder: (context, state) => const TambahTahunAjaranPage(),
+        ),
+      ],
     ),
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) =>
