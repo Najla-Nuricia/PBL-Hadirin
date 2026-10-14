@@ -1,4 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../../routing/admin_route_paths.dart';
+
+
+void _openModule(BuildContext context, String title) {
+  switch (title) {
+    case 'Tahun Ajaran':
+      context.go(AdminRoutePaths.tahunAjaran);
+      break;
+    case 'Kelas':
+      context.go(AdminRoutePaths.tambahKelas);
+      break;
+    default:
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Halaman $title akan segera tersedia'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+  }
+}
 
 class DataAcademicPage extends StatelessWidget {
   const DataAcademicPage({super.key});
@@ -141,6 +162,7 @@ class DataAcademicPage extends StatelessWidget {
                       subtitle: item.subtitle,
                       color: item.color,
                       background: item.background,
+                      onTap: () => _openModule(context, item.title),
                     ),
                     const SizedBox(height: 10),
                   ],
@@ -223,6 +245,7 @@ class _MasterDataCard extends StatelessWidget {
     required this.subtitle,
     required this.color,
     required this.background,
+    required this.onTap,
   });
 
   final IconData icon;
@@ -230,12 +253,19 @@ class _MasterDataCard extends StatelessWidget {
   final String subtitle;
   final Color color;
   final Color background;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Container(
+    return Material(
+      color: colorScheme.surface,
+      borderRadius: BorderRadius.circular(13),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(13),
+        child: Container(
       height: 63,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
@@ -293,6 +323,8 @@ class _MasterDataCard extends StatelessWidget {
             size: 20,
           ),
         ],
+      ),
+      ),
       ),
     );
   }

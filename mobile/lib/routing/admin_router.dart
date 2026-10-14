@@ -7,6 +7,7 @@ import '../pages/admin/jadwal_list_page.dart';
 import '../pages/admin/tahun_ajaran_list_page.dart';
 import '../pages/admin/tambah_jadwal_page.dart';
 import '../pages/admin/tambah_tahun_ajaran_page.dart';
+import '../pages/admin/tambah_kelas_page.dart';
 import 'admin_route_paths.dart';
 
 export 'admin_route_paths.dart';
@@ -29,6 +30,10 @@ GoRouter createAdminRouter() => GoRouter(
           builder: (context, state) => const TambahTahunAjaranPage(),
         ),
       ],
+    ),
+    GoRoute(
+      path: AdminRoutePaths.tambahKelas,
+      builder: (context, state) => const TambahKelasPage(),
     ),
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) =>
