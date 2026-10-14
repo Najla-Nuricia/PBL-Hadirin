@@ -105,7 +105,6 @@ class JadwalKuliah {
     required this.hari,
     required this.sesiMulai,
     required this.sesiSelesai,
-    this.isAktif = true,
   });
 
   final String id;
@@ -120,7 +119,6 @@ class JadwalKuliah {
   final HariKuliah hari;
   final SesiKuliah sesiMulai;
   final SesiKuliah sesiSelesai;
-  final bool isAktif;
 
   SemesterPeriode get semester => mataKuliah.periode;
 
@@ -133,22 +131,6 @@ class JadwalKuliah {
         hari == other.hari &&
         sesiMulai.nomor <= other.sesiSelesai.nomor &&
         other.sesiMulai.nomor <= sesiSelesai.nomor;
-  }
-
-  JadwalKuliah copyWith({bool? isAktif}) {
-    return JadwalKuliah(
-      id: id,
-      tahunAjaran: tahunAjaran,
-      mataKuliah: mataKuliah,
-      dosen: dosen,
-      programStudi: programStudi,
-      kelas: kelas,
-      ruangan: ruangan,
-      hari: hari,
-      sesiMulai: sesiMulai,
-      sesiSelesai: sesiSelesai,
-      isAktif: isAktif ?? this.isAktif,
-    );
   }
 }
 
@@ -318,13 +300,6 @@ class JadwalRepository extends ChangeNotifier {
       }
     }
     _items.add(jadwal);
-    notifyListeners();
-  }
-
-  void setAktif(String id, {required bool isAktif}) {
-    final index = _items.indexWhere((item) => item.id == id);
-    if (index == -1) return;
-    _items[index] = _items[index].copyWith(isAktif: isAktif);
     notifyListeners();
   }
 

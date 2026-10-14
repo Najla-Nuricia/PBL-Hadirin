@@ -410,69 +410,45 @@ class _JadwalTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final mutedColor = colorScheme.onSurfaceVariant;
-    final opacity = jadwal.isAktif ? 1.0 : 0.5;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Opacity(
-              opacity: opacity,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    jadwal.mataKuliah.nama,
-                    style: TextStyle(
-                      color: colorScheme.onSurface,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(Icons.schedule, size: 14, color: mutedColor),
-                      const SizedBox(width: 4),
-                      Text(
-                        jadwal.rentangWaktu,
-                        style: TextStyle(color: mutedColor, fontSize: 12),
-                      ),
-                      const SizedBox(width: 14),
-                      Icon(
-                        Icons.location_on_outlined,
-                        size: 14,
-                        color: mutedColor,
-                      ),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
-                          jadwal.ruangan.nama,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: mutedColor, fontSize: 12),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    jadwal.isAktif
-                        ? jadwal.dosen.nama
-                        : '${jadwal.dosen.nama} · Nonaktif',
-                    style: TextStyle(color: mutedColor, fontSize: 12),
-                  ),
-                ],
-              ),
+          Text(
+            jadwal.mataKuliah.nama,
+            style: TextStyle(
+              color: colorScheme.onSurface,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
             ),
           ),
-          Semantics(
-            label: 'Jadwal ${jadwal.mataKuliah.nama} aktif',
-            child: Switch(
-              value: jadwal.isAktif,
-              onChanged: (isAktif) =>
-                  jadwalRepository.setAktif(jadwal.id, isAktif: isAktif),
-            ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Icon(Icons.schedule, size: 14, color: mutedColor),
+              const SizedBox(width: 4),
+              Text(
+                jadwal.rentangWaktu,
+                style: TextStyle(color: mutedColor, fontSize: 12),
+              ),
+              const SizedBox(width: 14),
+              Icon(Icons.location_on_outlined, size: 14, color: mutedColor),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  jadwal.ruangan.nama,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: mutedColor, fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 3),
+          Text(
+            jadwal.dosen.nama,
+            style: TextStyle(color: mutedColor, fontSize: 12),
           ),
         ],
       ),

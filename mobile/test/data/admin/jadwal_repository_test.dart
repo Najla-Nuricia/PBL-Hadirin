@@ -141,13 +141,17 @@ void main() {
     expect(repository.getAll(), hasLength(3));
   });
 
-  test('setAktif updates the schedule and notifies listeners', () {
+  test('add notifies listeners only when the schedule is saved', () {
     var notified = 0;
     repository.addListener(() => notified++);
 
-    repository.setAktif('seed', isAktif: false);
+    repository.add(jadwal(id: 'jumat', hari: HariKuliah.jumat));
+    expect(notified, 1);
 
-    expect(repository.getAll().single.isAktif, isFalse);
+    expect(
+      () => repository.add(jadwal(id: 'bentrok', hari: HariKuliah.jumat)),
+      throwsA(isA<JadwalConflictException>()),
+    );
     expect(notified, 1);
   });
 }

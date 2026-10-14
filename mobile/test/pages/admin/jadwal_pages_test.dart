@@ -75,16 +75,46 @@ void main() {
       expect(find.text('Ruang J301'), findsOneWidget);
     });
 
-    testWidgets('toggling a schedule marks it as inactive', (tester) async {
+    testWidgets('schedule cards are read-only without an active toggle', (
+      tester,
+    ) async {
       await pumpAdminPage(tester, AdminRoutePaths.jadwal);
 
-      await tapVisible(tester, find.byType(Switch).first);
+      expect(find.byType(Switch), findsNothing);
+      expect(find.text('Budi Santoso, S.T., M.T.'), findsWidgets);
+    });
 
-      expect(find.textContaining('Nonaktif'), findsOneWidget);
-      expect(jadwalRepository.getAll().first.isAktif, isFalse);
+    testWidgets('a newly added schedule appears without reloading', (
+      tester,
+    ) async {
+      await pumpAdminPage(tester, AdminRoutePaths.jadwal);
+      expect(find.text('Sabtu'), findsNothing);
 
-      await tapVisible(tester, find.byType(Switch).first);
-      expect(jadwalRepository.getAll().first.isAktif, isTrue);
+      jadwalRepository.add(
+        JadwalKuliah(
+          id: jadwalRepository.generateId(),
+          tahunAjaran: '2026/2027',
+          mataKuliah: JadwalMasterData.mataKuliah.firstWhere(
+            (item) => item.kode == 'TI505',
+          ),
+          dosen: JadwalMasterData.dosen.last,
+          programStudi: JadwalMasterData.programStudi.first,
+          kelas: JadwalMasterData.kelas.firstWhere(
+            (item) => item.nama == 'TI-3A',
+          ),
+          ruangan: JadwalMasterData.ruangan.firstWhere(
+            (item) => item.kode == 'J302',
+          ),
+          hari: HariKuliah.sabtu,
+          sesiMulai: JadwalMasterData.sesi[10],
+          sesiSelesai: JadwalMasterData.sesi[11],
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(find.text('Sabtu'), 200);
+
+      expect(find.text('Sabtu'), findsOneWidget);
+      expect(find.text('16:20 – 18:00'), findsOneWidget);
     });
 
     testWidgets('filter changes the displayed class and semester', (
