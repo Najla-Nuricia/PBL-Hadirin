@@ -1,10 +1,11 @@
 import 'package:go_router/go_router.dart';
 
 import '../pages/admin/admin_navigation_shell.dart';
-import '../pages/admin/admin_placeholder_page.dart';
 import '../pages/admin/auth/admin_login_page.dart';
 import '../pages/admin/data_academic_page.dart';
+import '../pages/admin/jadwal_list_page.dart';
 import '../pages/admin/tahun_ajaran_list_page.dart';
+import '../pages/admin/tambah_jadwal_page.dart';
 import '../pages/admin/tambah_tahun_ajaran_page.dart';
 import 'admin_route_paths.dart';
 
@@ -45,8 +46,7 @@ GoRouter createAdminRouter() => GoRouter(
           routes: [
             GoRoute(
               path: AdminRoutePaths.tambahJadwal,
-              builder: (context, state) =>
-                  const AdminPlaceholderPage(title: 'Tambah Jadwal'),
+              builder: (context, state) => const TambahJadwalPage(),
             ),
           ],
         ),
@@ -54,8 +54,7 @@ GoRouter createAdminRouter() => GoRouter(
           routes: [
             GoRoute(
               path: AdminRoutePaths.jadwal,
-              builder: (context, state) =>
-                  const AdminPlaceholderPage(title: 'Jadwal'),
+              builder: (context, state) => const JadwalListPage(),
             ),
           ],
         ),
