@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../routing/admin_route_paths.dart';
 
+import '../../routing/admin_route_paths.dart';
 
 void _openModule(BuildContext context, String title) {
   switch (title) {
@@ -10,6 +10,9 @@ void _openModule(BuildContext context, String title) {
       break;
     case 'Kelas':
       context.go(AdminRoutePaths.tambahKelas);
+      break;
+    case 'Ruangan':
+      context.go(AdminRoutePaths.tambahRuangan);
       break;
     default:
       ScaffoldMessenger.of(context).showSnackBar(
@@ -200,11 +203,7 @@ class _NoticeCard extends StatelessWidget {
               color: const Color(0xFFFEF3C7),
               borderRadius: BorderRadius.circular(9),
             ),
-            child: const Icon(
-              Icons.error_outline,
-              color: accent,
-              size: 16,
-            ),
+            child: const Icon(Icons.error_outline, color: accent, size: 16),
           ),
           const SizedBox(width: 9),
           Expanded(
@@ -266,65 +265,65 @@ class _MasterDataCard extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(13),
         child: Container(
-      height: 63,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(13),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.onSurface.withValues(alpha: 0.035),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
+          height: 63,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: colorScheme.surface,
+            borderRadius: BorderRadius.circular(13),
+            boxShadow: [
+              BoxShadow(
+                color: colorScheme.onSurface.withValues(alpha: 0.035),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: background,
-              borderRadius: BorderRadius.circular(11),
-            ),
-            child: Icon(icon, color: color, size: 19),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: colorScheme.onSurface,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
+          child: Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: background,
+                  borderRadius: BorderRadius.circular(11),
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: colorScheme.onSurfaceVariant,
-                    fontSize: 9,
-                  ),
+                child: Icon(icon, color: color, size: 19),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        color: colorScheme.onSurface,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: colorScheme.onSurfaceVariant,
+                        fontSize: 9,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              Icon(
+                Icons.chevron_right,
+                color: colorScheme.primary.withValues(alpha: 0.55),
+                size: 20,
+              ),
+            ],
           ),
-          Icon(
-            Icons.chevron_right,
-            color: colorScheme.primary.withValues(alpha: 0.55),
-            size: 20,
-          ),
-        ],
-      ),
-      ),
+        ),
       ),
     );
   }
