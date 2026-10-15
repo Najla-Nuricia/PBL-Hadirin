@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../data/admin/tahun_ajaran.dart';
+import '../../routing/admin_route_paths.dart';
 import 'tambah_tahun_ajaran_page.dart';
 
 class TahunAjaranListPage extends StatefulWidget {
@@ -38,6 +40,14 @@ class _TahunAjaranListPageState extends State<TahunAjaranListPage> {
     setState(() {
       _displayed = tahunAjaranRepository.search(_searchController.text);
     });
+  }
+
+  void _back() {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go(AdminRoutePaths.dataAkademik);
+    }
   }
 
   Future<void> _openTambah() async {
@@ -87,15 +97,25 @@ class _TahunAjaranListPageState extends State<TahunAjaranListPage> {
 
   Widget _buildHeader(ColorScheme colorScheme) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 16, 16),
+      padding: const EdgeInsets.fromLTRB(4, 12, 16, 12),
       child: Row(
         children: [
+          IconButton(
+            onPressed: _back,
+            icon: Icon(
+              Icons.arrow_back_ios_new_rounded,
+              size: 20,
+              color: colorScheme.primary,
+            ),
+            tooltip: 'Kembali',
+          ),
+          const SizedBox(width: 4),
           Expanded(
             child: Text(
               'Tahun Ajaran',
               style: TextStyle(
                 color: colorScheme.onSurface,
-                fontSize: 22,
+                fontSize: 20,
                 fontWeight: FontWeight.w800,
               ),
             ),
