@@ -11,6 +11,15 @@ import '../pages/admin/tambah_jadwal_page.dart';
 import '../pages/admin/tambah_kelas_page.dart';
 import '../pages/admin/tambah_ruangan_page.dart';
 import '../pages/admin/tambah_tahun_ajaran_page.dart';
+import '../pages/dosen/auth/lecturer_login_page.dart';
+import '../pages/dosen/auth/lecturer_register_page.dart';
+import '../pages/dosen/attendance_list_page.dart';
+import '../pages/dosen/cek_presensi_page.dart';
+import '../pages/dosen/lecturer_navigation_shell.dart';
+import '../pages/dosen/lecturer_profile_page.dart';
+import '../pages/dosen/lecturer_change_password_page.dart';
+import '../pages/dosen/student_detail_page.dart';
+import '../data/dosen/lecturer_profile_preview.dart';
 import '../pages/mhs/absensi_page.dart';
 import '../pages/mhs/auth/student_face_scan_page.dart';
 import '../pages/mhs/auth/student_login_page.dart';
@@ -23,6 +32,7 @@ import '../pages/mhs/student_navigation_shell.dart';
 import '../pages/onboarding_page.dart';
 import '../pages/mhs/surat_page.dart';
 import 'admin_route_paths.dart';
+import 'lecturer_route_paths.dart';
 import 'student_route_paths.dart';
 
 export 'student_route_paths.dart';
@@ -42,8 +52,71 @@ GoRouter createStudentRouter({bool showOnboarding = false}) => GoRouter(
           path: 'peran',
           builder: (context, state) => OnboardingRolePage(
             onStudentPressed: () => context.go(StudentRoutePaths.login),
+            onLecturerPressed: () => context.go(LecturerRoutePaths.login),
             onAdminPressed: () => context.go(AdminRoutePaths.login),
           ),
+        ),
+      ],
+    ),
+    GoRoute(
+      path: LecturerRoutePaths.login,
+      builder: (context, state) => const LecturerLoginPage(),
+    ),
+    GoRoute(
+      path: LecturerRoutePaths.register,
+      builder: (context, state) => const LecturerRegisterPage(),
+    ),
+    StatefulShellRoute.indexedStack(
+      builder: (context, state, navigationShell) => LecturerNavigationShell(
+        navigationShell: navigationShell,
+        showNavbar: LecturerRoutePaths.showsNavbar(state.uri.path),
+      ),
+      branches: [
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: LecturerRoutePaths.beranda,
+              builder: (context, state) => const CekPresensiPage(),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: LecturerRoutePaths.kehadiran,
+              builder: (context, state) => const CekPresensiPage(),
+              routes: [
+                GoRoute(
+                  path: LecturerRoutePaths.daftarSegment,
+                  builder: (context, state) => const AttendanceListPage(),
+                  routes: [
+                    GoRoute(
+                      path: ':studentId',
+                      builder: (context, state) => StudentDetailPage(
+                        studentId: state.pathParameters['studentId']!,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: LecturerRoutePaths.profil,
+              builder: (context, state) =>
+                  LecturerProfilePage(profile: lecturerProfilePreview),
+              routes: [
+                GoRoute(
+                  path: 'ubah-kata-sandi',
+                  builder: (context, state) =>
+                      const LecturerChangePasswordPage(),
+                ),
+              ],
+            ),
+          ],
         ),
       ],
     ),
