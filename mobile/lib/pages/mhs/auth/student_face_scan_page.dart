@@ -6,7 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../data/mhs/dummy_student_auth_repository.dart';
 import '../../../data/mhs/student_account.dart';
-import '../../../routing/student_router.dart';
+import '../../../routing/student_route_paths.dart';
 import '../../../theme/style/auth_style.dart';
 import 'widgets/auth_buttons.dart';
 import 'widgets/auth_header.dart';
