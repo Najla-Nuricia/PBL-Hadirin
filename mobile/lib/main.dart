@@ -22,9 +22,9 @@ class HadirinApp extends StatelessWidget {
       title: 'Hadirin',
       theme: AppTheme.light,
       routerConfig: switch (_appRole) {
-        'student' => studentRouter,
-        'lecturer' => lecturerRouter,
-        _ => adminRouter,
+        'student' => createStudentRouter(showOnboarding: true),
+        'lecturer' => createLecturerRouter(showOnboarding: true),
+        _ => createAdminRouter(showOnboarding: true),
       },
     );
   }

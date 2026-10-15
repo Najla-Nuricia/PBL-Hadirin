@@ -11,6 +11,7 @@ import '../pages/mhs/change_password_page.dart';
 import '../pages/mhs/page_placeholder.dart';
 import '../pages/mhs/profile_page.dart';
 import '../pages/mhs/student_navigation_shell.dart';
+import '../pages/onboarding_page.dart';
 import '../pages/mhs/surat_page.dart';
 import 'student_route_paths.dart';
 
@@ -18,9 +19,23 @@ export 'student_route_paths.dart';
 
 final GoRouter studentRouter = createStudentRouter();
 
-GoRouter createStudentRouter() => GoRouter(
-  initialLocation: StudentRoutePaths.login,
+GoRouter createStudentRouter({bool showOnboarding = false}) => GoRouter(
+  initialLocation: showOnboarding
+      ? StudentRoutePaths.onboarding
+      : StudentRoutePaths.login,
   routes: [
+    GoRoute(
+      path: StudentRoutePaths.onboarding,
+      builder: (context, state) => const OnboardingWelcomePage(),
+      routes: [
+        GoRoute(
+          path: 'peran',
+          builder: (context, state) => OnboardingRolePage(
+            onStudentPressed: () => context.go(StudentRoutePaths.login),
+          ),
+        ),
+      ],
+    ),
     GoRoute(
       path: StudentRoutePaths.login,
       builder: (context, state) => const StudentLoginPage(),

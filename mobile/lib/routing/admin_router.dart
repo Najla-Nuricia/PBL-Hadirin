@@ -9,15 +9,28 @@ import '../pages/admin/tambah_jadwal_page.dart';
 import '../pages/admin/tambah_tahun_ajaran_page.dart';
 import '../pages/admin/tambah_kelas_page.dart';
 import '../pages/admin/tambah_ruangan_page.dart';
+import '../pages/onboarding_page.dart';
 import 'admin_route_paths.dart';
 
 export 'admin_route_paths.dart';
 
 final GoRouter adminRouter = createAdminRouter();
 
-GoRouter createAdminRouter() => GoRouter(
-  initialLocation: AdminRoutePaths.login,
+GoRouter createAdminRouter({bool showOnboarding = false}) => GoRouter(
+  initialLocation: showOnboarding ? '/onboarding' : AdminRoutePaths.login,
   routes: [
+    GoRoute(
+      path: '/onboarding',
+      builder: (context, state) => const OnboardingWelcomePage(),
+      routes: [
+        GoRoute(
+          path: 'peran',
+          builder: (context, state) => OnboardingRolePage(
+            onAdminPressed: () => context.go(AdminRoutePaths.login),
+          ),
+        ),
+      ],
+    ),
     GoRoute(
       path: AdminRoutePaths.login,
       builder: (context, state) => const AdminLoginPage(),

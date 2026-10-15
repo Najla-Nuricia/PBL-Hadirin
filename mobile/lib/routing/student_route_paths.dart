@@ -1,4 +1,6 @@
 abstract final class StudentRoutePaths {
+  static const onboarding = '/onboarding';
+  static const onboardingRole = '$onboarding/peran';
   static const login = '/mhs/login';
   static const register = '/mhs/register';
   static const registerFaceScanSegment = 'scan-wajah';

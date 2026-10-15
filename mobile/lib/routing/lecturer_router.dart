@@ -9,13 +9,28 @@ import '../pages/dosen/lecturer_navigation_shell.dart';
 import '../pages/dosen/lecturer_profile_page.dart';
 import '../pages/dosen/student_detail_page.dart';
 import '../pages/mhs/page_placeholder.dart';
+import '../pages/onboarding_page.dart';
 import 'lecturer_route_paths.dart';
 
 final GoRouter lecturerRouter = createLecturerRouter();
 
-GoRouter createLecturerRouter() => GoRouter(
-  initialLocation: LecturerRoutePaths.beranda,
+GoRouter createLecturerRouter({bool showOnboarding = false}) => GoRouter(
+  initialLocation: showOnboarding
+      ? '/onboarding'
+      : LecturerRoutePaths.beranda,
   routes: [
+    GoRoute(
+      path: '/onboarding',
+      builder: (context, state) => const OnboardingWelcomePage(),
+      routes: [
+        GoRoute(
+          path: 'peran',
+          builder: (context, state) => OnboardingRolePage(
+            onLecturerPressed: () => context.go(LecturerRoutePaths.beranda),
+          ),
+        ),
+      ],
+    ),
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) {
         return LecturerNavigationShell(
