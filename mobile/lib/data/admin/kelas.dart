@@ -1,4 +1,3 @@
-// lib/data/admin/kelas.dart
 enum KelasStatus { aktif, nonAktif }
 
 extension KelasStatusLabel on KelasStatus {
@@ -28,7 +27,37 @@ class Kelas {
 
 /// In-memory repository untuk Kelas (dummy, sampai backend siap).
 class KelasRepository {
-  final List<Kelas> _items = [];
+  KelasRepository() : _items = List.of(_seed);
+
+  // Data awal agar dropdown Kelas tidak kosong.
+  static const _seed = [
+    Kelas(
+      id: 's1',
+      tahunAjaran: '2026/2027',
+      programStudi: 'D4 Teknik Informatika',
+      nama: 'TI-3A',
+      kapasitas: 30,
+      status: KelasStatus.aktif,
+    ),
+    Kelas(
+      id: 's2',
+      tahunAjaran: '2026/2027',
+      programStudi: 'D4 Teknik Informatika',
+      nama: 'TI-3B',
+      kapasitas: 30,
+      status: KelasStatus.aktif,
+    ),
+    Kelas(
+      id: 's3',
+      tahunAjaran: '2026/2027',
+      programStudi: 'D4 Sistem Informasi Bisnis',
+      nama: 'SIB-2C',
+      kapasitas: 28,
+      status: KelasStatus.aktif,
+    ),
+  ];
+
+  final List<Kelas> _items;
 
   List<Kelas> getAll() => List.unmodifiable(_items);
 
