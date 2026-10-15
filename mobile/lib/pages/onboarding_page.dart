@@ -6,43 +6,57 @@ class OnboardingWelcomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Scaffold(
-      backgroundColor: colorScheme.primary,
+      backgroundColor: const Color(0xFF0870F8),
       body: SafeArea(
-        child: Stack(
-          children: [
-            const Positioned.fill(child: _OnboardingCircles()),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(28, 24, 28, 20),
-              child: Column(
-                children: [
-                  const Spacer(),
-                  const Text(
-                    'HADIR.IN',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 25,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.5,
-                    ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final colorScheme = Theme.of(context).colorScheme;
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                const CustomPaint(painter: _WelcomePatternPainter()),
+                const Align(
+                  alignment: Alignment(0, 0.015),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'HADIR.IN',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          height: 1,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                      SizedBox(height: 3),
+                      Text(
+                        'Absensi Mahasiswa Berbasis Face Recognition',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 6,
+                          height: 1,
+                        ),
+                      ),
+                    ],
                   ),
-                  const Text(
-                    'Absensi Mahasiswa Berbasis Face Recognition',
-                    style: TextStyle(color: Colors.white, fontSize: 7),
-                  ),
-                  const Spacer(flex: 2),
-                  _OnboardingButton(
+                ),
+                Positioned(
+                  left: constraints.maxWidth * 0.085,
+                  right: constraints.maxWidth * 0.085,
+                  bottom: constraints.maxHeight * 0.055,
+                  child: _OnboardingButton(
                     label: 'Next',
                     onPressed: () => context.push('/onboarding/peran'),
                     backgroundColor: Colors.white,
                     foregroundColor: colorScheme.primary,
                   ),
-                ],
-              ),
-            ),
-          ],
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -153,6 +167,33 @@ class OnboardingRolePage extends StatelessWidget {
   }
 }
 
+class _WelcomePatternPainter extends CustomPainter {
+  const _WelcomePatternPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final scale = size.width / 210;
+    final paint = Paint()
+      ..color = const Color(0xFF0064E8)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 29 * scale;
+
+    final topCenter = Offset(29 * scale, 72 * scale);
+    canvas.drawCircle(topCenter, 103 * scale, paint);
+    canvas.drawCircle(topCenter, 140 * scale, paint);
+    canvas.drawCircle(topCenter, 177 * scale, paint);
+
+    final bottomCenter = Offset(194 * scale, size.height - 21 * scale);
+    paint.strokeWidth = 20 * scale;
+    canvas.drawCircle(bottomCenter, 55 * scale, paint);
+    canvas.drawCircle(bottomCenter, 80 * scale, paint);
+    canvas.drawCircle(bottomCenter, 105 * scale, paint);
+  }
+
+  @override
+  bool shouldRepaint(_WelcomePatternPainter oldDelegate) => false;
+}
+
 class _OnboardingButton extends StatelessWidget {
   const _OnboardingButton({
     required this.label,
@@ -169,18 +210,18 @@ class _OnboardingButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 42,
+      height: 27,
       child: FilledButton(
         onPressed: onPressed,
         style: FilledButton.styleFrom(
           backgroundColor: backgroundColor,
           foregroundColor: foregroundColor,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(7)),
           padding: EdgeInsets.zero,
         ),
         child: Text(
           label,
-          style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w600),
+          style: const TextStyle(fontSize: 8, fontWeight: FontWeight.w600),
         ),
       ),
     );
@@ -189,12 +230,18 @@ class _OnboardingButton extends StatelessWidget {
 
 class _OnboardingCircles extends StatelessWidget {
   const _OnboardingCircles({
+    this.size = 220,
     this.color = const Color(0xFF0870F8),
     this.alignment = Alignment.topLeft,
+    this.strokeWidth = 22,
+    this.filled = false,
   });
 
+  final double size;
   final Color color;
   final Alignment alignment;
+  final double strokeWidth;
+  final bool filled;
 
   @override
   Widget build(BuildContext context) {
@@ -202,8 +249,12 @@ class _OnboardingCircles extends StatelessWidget {
       alignment: alignment,
       child: IgnorePointer(
         child: CustomPaint(
-          size: const Size(220, 220),
-          painter: _CirclePatternPainter(color),
+          size: Size.square(size),
+          painter: _CirclePatternPainter(
+            color,
+            strokeWidth: strokeWidth,
+            filled: filled,
+          ),
         ),
       ),
     );
@@ -211,24 +262,44 @@ class _OnboardingCircles extends StatelessWidget {
 }
 
 class _CirclePatternPainter extends CustomPainter {
-  const _CirclePatternPainter(this.color);
+  const _CirclePatternPainter(
+    this.color, {
+    required this.strokeWidth,
+    required this.filled,
+  });
 
   final Color color;
+  final double strokeWidth;
+  final bool filled;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width * 0.1, size.height * 0.1);
+    final center = filled
+        ? Offset(size.width * 0.37, size.height * 0.37)
+        : Offset(size.width * 0.1, size.height * 0.1);
     final strokePaint = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 22;
+      ..strokeWidth = strokeWidth;
 
-    canvas.drawCircle(center, 82, strokePaint);
-    canvas.drawCircle(center, 124, strokePaint);
-    canvas.drawCircle(center, 166, strokePaint);
+    if (filled) {
+      canvas.drawCircle(
+        center,
+        size.width * 0.48,
+        Paint()
+          ..color = color.withValues(alpha: 0.72)
+          ..style = PaintingStyle.fill,
+      );
+    }
+
+    canvas.drawCircle(center, size.width * 0.48, strokePaint);
+    canvas.drawCircle(center, size.width * 0.66, strokePaint);
+    canvas.drawCircle(center, size.width * 0.84, strokePaint);
   }
 
   @override
   bool shouldRepaint(_CirclePatternPainter oldDelegate) =>
-      oldDelegate.color != color;
+      oldDelegate.color != color ||
+      oldDelegate.strokeWidth != strokeWidth ||
+      oldDelegate.filled != filled;
 }
