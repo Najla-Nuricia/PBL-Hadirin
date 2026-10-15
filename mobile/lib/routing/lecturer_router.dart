@@ -4,18 +4,40 @@ import 'package:go_router/go_router.dart';
 import '../data/dosen/lecturer_profile_preview.dart';
 import '../pages/dosen/attendance_list_page.dart';
 import '../pages/dosen/cek_presensi_page.dart';
+import '../pages/dosen/auth/lecturer_login_page.dart';
+import '../pages/dosen/auth/lecturer_register_page.dart';
 import '../pages/dosen/lecturer_change_password_page.dart';
 import '../pages/dosen/lecturer_navigation_shell.dart';
 import '../pages/dosen/lecturer_profile_page.dart';
 import '../pages/dosen/student_detail_page.dart';
-import '../pages/mhs/page_placeholder.dart';
+import '../pages/onboarding_page.dart';
 import 'lecturer_route_paths.dart';
 
 final GoRouter lecturerRouter = createLecturerRouter();
 
-GoRouter createLecturerRouter() => GoRouter(
-  initialLocation: LecturerRoutePaths.beranda,
+GoRouter createLecturerRouter({bool showOnboarding = false}) => GoRouter(
+  initialLocation: showOnboarding ? '/onboarding' : LecturerRoutePaths.beranda,
   routes: [
+    GoRoute(
+      path: '/onboarding',
+      builder: (context, state) => const OnboardingWelcomePage(),
+      routes: [
+        GoRoute(
+          path: 'peran',
+          builder: (context, state) => OnboardingRolePage(
+            onLecturerPressed: () => context.go(LecturerRoutePaths.login),
+          ),
+        ),
+      ],
+    ),
+    GoRoute(
+      path: LecturerRoutePaths.login,
+      builder: (context, state) => const LecturerLoginPage(),
+    ),
+    GoRoute(
+      path: LecturerRoutePaths.register,
+      builder: (context, state) => const LecturerRegisterPage(),
+    ),
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) {
         return LecturerNavigationShell(
@@ -28,8 +50,7 @@ GoRouter createLecturerRouter() => GoRouter(
           routes: [
             GoRoute(
               path: LecturerRoutePaths.beranda,
-              builder: (context, state) =>
-                  const StudentPagePlaceholder(title: 'Beranda'),
+              builder: (context, state) => const CekPresensiPage(),
             ),
           ],
         ),
