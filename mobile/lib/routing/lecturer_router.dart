@@ -1,7 +1,9 @@
+// lib/routing/lecturer_router.dart
 import 'package:go_router/go_router.dart';
 
 import '../data/dosen/lecturer_profile_preview.dart';
 import '../pages/dosen/attendance_list_page.dart';
+import '../pages/dosen/cek_presensi_page.dart';
 import '../pages/dosen/lecturer_change_password_page.dart';
 import '../pages/dosen/lecturer_navigation_shell.dart';
 import '../pages/dosen/lecturer_profile_page.dart';
@@ -35,14 +37,21 @@ GoRouter createLecturerRouter() => GoRouter(
           routes: [
             GoRoute(
               path: LecturerRoutePaths.kehadiran,
-              builder: (context, state) => const AttendanceListPage(),
+              builder: (context, state) => const CekPresensiPage(),
               routes: [
-                // Full path: /dosen/kehadiran/:studentId
+                // Full path: /dosen/kehadiran/daftar
                 GoRoute(
-                  path: ':studentId',
-                  builder: (context, state) => StudentDetailPage(
-                    studentId: state.pathParameters['studentId']!,
-                  ),
+                  path: LecturerRoutePaths.daftarSegment,
+                  builder: (context, state) => const AttendanceListPage(),
+                  routes: [
+                    // Full path: /dosen/kehadiran/daftar/:studentId
+                    GoRoute(
+                      path: ':studentId',
+                      builder: (context, state) => StudentDetailPage(
+                        studentId: state.pathParameters['studentId']!,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
