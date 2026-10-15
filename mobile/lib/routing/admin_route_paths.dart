@@ -7,4 +7,5 @@ abstract final class AdminRoutePaths {
   static const tambahTahunAjaranSegment = 'tambah';
   static const tambahTahunAjaran = '$tahunAjaran/$tambahTahunAjaranSegment';
   static const tambahKelas = '/admin/kelas/tambah';
+  static const tambahRuangan = '/admin/ruangan/tambah';
 }
