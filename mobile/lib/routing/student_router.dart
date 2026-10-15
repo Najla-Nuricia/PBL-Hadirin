@@ -28,8 +28,8 @@ import '../pages/mhs/auth/student_login_page.dart';
 import '../pages/mhs/auth/student_register_page.dart';
 import '../pages/mhs/beranda_page.dart';
 import '../pages/mhs/change_password_page.dart';
-import '../pages/mhs/page_placeholder.dart';
 import '../pages/mhs/profile_page.dart';
+import '../pages/mhs/riwayat_page.dart';
 import '../pages/mhs/student_navigation_shell.dart';
 import '../pages/onboarding_page.dart';
 import '../pages/mhs/surat_page.dart';
@@ -221,8 +221,7 @@ GoRouter createStudentRouter({bool showOnboarding = false}) => GoRouter(
           routes: [
             GoRoute(
               path: StudentRoutePaths.riwayat,
-              builder: (context, state) =>
-                  const StudentPagePlaceholder(title: 'Riwayat'),
+              builder: (context, state) => const RiwayatPage(),
             ),
           ],
         ),
