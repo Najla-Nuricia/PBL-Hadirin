@@ -1,5 +1,7 @@
 // lib/routing/lecturer_route_paths.dart
 abstract final class LecturerRoutePaths {
+  static const login = '/dosen/login';
+  static const register = '/dosen/register';
   static const beranda = '/dosen/beranda';
   static const kehadiran = '/dosen/kehadiran';
   static const profil = '/dosen/profil';

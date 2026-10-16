@@ -14,6 +14,12 @@ void _openModule(BuildContext context, String title) {
     case 'Ruangan':
       context.go(AdminRoutePaths.tambahRuangan);
       break;
+    case 'Mata Kuliah':
+      context.go(AdminRoutePaths.tambahMataKuliah);
+      break;
+    case 'Dosen':
+      context.go(AdminRoutePaths.tambahDosen);
+      break;
     default:
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

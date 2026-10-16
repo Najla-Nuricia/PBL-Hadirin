@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../data/admin/tahun_ajaran.dart';
+import '../../routing/admin_route_paths.dart';
 
 class TambahTahunAjaranPage extends StatefulWidget {
   const TambahTahunAjaranPage({super.key});
@@ -102,7 +104,19 @@ class _TambahTahunAjaranPageState extends State<TambahTahunAjaranPage> {
     setState(() => _isSubmitting = false);
 
     if (!mounted) return;
-    Navigator.of(context).pop(true);
+    if (context.canPop()) {
+      context.pop(true);
+    } else {
+      context.go(AdminRoutePaths.tahunAjaran);
+    }
+  }
+
+  void _back() {
+    if (context.canPop()) {
+      context.pop(false);
+    } else {
+      context.go(AdminRoutePaths.tahunAjaran);
+    }
   }
 
   void _showError(String msg) {
@@ -117,18 +131,45 @@ class _TambahTahunAjaranPageState extends State<TambahTahunAjaranPage> {
 
     return Scaffold(
       backgroundColor: colorScheme.surface,
+      appBar: AppBar(
+        backgroundColor: colorScheme.surface,
+        surfaceTintColor: Colors.transparent,
+        scrolledUnderElevation: 0,
+        centerTitle: true,
+        leading: IconButton(
+          onPressed: _back,
+          icon: Icon(
+            Icons.arrow_back_ios_new_rounded,
+            size: 20,
+            color: colorScheme.primary,
+          ),
+          tooltip: 'Kembali',
+        ),
+        title: Text(
+          'Tambah Tahun Ajaran',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: colorScheme.onSurface,
+          ),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(1),
+          child: Divider(
+            height: 1,
+            thickness: 1,
+            color: colorScheme.outlineVariant,
+          ),
+        ),
+      ),
       body: SafeArea(
         child: Form(
           key: _formKey,
-          child: Column(
-            children: [
-              _buildAppBar(colorScheme),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
                       // ── Section 01 ──────────────────────────
                       _SectionHeader(
                         number: '01',
@@ -250,9 +291,7 @@ class _TambahTahunAjaranPageState extends State<TambahTahunAjaranPage> {
                         children: [
                           Expanded(
                             child: OutlinedButton(
-                              onPressed: _isSubmitting
-                                  ? null
-                                  : () => Navigator.of(context).pop(false),
+                              onPressed: _isSubmitting ? null : _back,
                               style: OutlinedButton.styleFrom(
                                 padding:
                                     const EdgeInsets.symmetric(vertical: 14),
@@ -308,41 +347,8 @@ class _TambahTahunAjaranPageState extends State<TambahTahunAjaranPage> {
                   ),
                 ),
               ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAppBar(ColorScheme colorScheme) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(4, 10, 16, 10),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        border: Border(
-          bottom: BorderSide(color: colorScheme.outlineVariant),
-        ),
-      ),
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.chevron_left),
-            color: colorScheme.onSurfaceVariant,
-            onPressed: () => Navigator.of(context).pop(false),
-            tooltip: 'Kembali',
-          ),
-          Text(
-            'Tambah Tahun Ajaran',
-            style: TextStyle(
-              color: colorScheme.onSurface,
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
             ),
-          ),
-        ],
-      ),
-    );
+          );
   }
 
   InputDecoration _fieldDecoration(
