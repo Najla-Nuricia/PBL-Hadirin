@@ -12,9 +12,14 @@ const _studentNavbarItems = [
 ];
 
 class StudentNavigationShell extends StatelessWidget {
-  const StudentNavigationShell({required this.navigationShell, super.key});
+  const StudentNavigationShell({
+    required this.navigationShell,
+    this.showNavbar = true,
+    super.key,
+  });
 
   final StatefulNavigationShell navigationShell;
+  final bool showNavbar;
 
   @override
   Widget build(BuildContext context) {
@@ -22,15 +27,17 @@ class StudentNavigationShell extends StatelessWidget {
     return Scaffold(
       backgroundColor: colorScheme.surfaceContainerHighest,
       body: navigationShell,
-      bottomNavigationBar: _StudentBottomNavigationBar(
-        currentIndex: navigationShell.currentIndex,
-        onTap: (index) {
-          navigationShell.goBranch(
-            index,
-            initialLocation: index == navigationShell.currentIndex,
-          );
-        },
-      ),
+      bottomNavigationBar: showNavbar
+          ? _StudentBottomNavigationBar(
+              currentIndex: navigationShell.currentIndex,
+              onTap: (index) {
+                navigationShell.goBranch(
+                  index,
+                  initialLocation: index == navigationShell.currentIndex,
+                );
+              },
+            )
+          : null,
     );
   }
 }
