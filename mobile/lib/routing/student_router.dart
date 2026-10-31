@@ -1,7 +1,7 @@
 import 'package:go_router/go_router.dart';
 
+import '../data/mhs/dummy_student_auth_repository.dart';
 import '../data/mhs/student_account.dart';
-import '../data/mhs/student_profile_preview.dart';
 import '../pages/admin/admin_navigation_shell.dart';
 import '../pages/admin/auth/admin_login_page.dart';
 import '../pages/admin/data_academic_page.dart';
@@ -28,7 +28,7 @@ import '../pages/mhs/auth/student_login_page.dart';
 import '../pages/mhs/auth/student_register_page.dart';
 import '../pages/mhs/beranda_page.dart';
 import '../pages/mhs/change_password_page.dart';
-import '../pages/mhs/profile_page.dart';
+import '../pages/mhs/profil_page.dart';
 import '../pages/mhs/riwayat_page.dart';
 import '../pages/mhs/student_navigation_shell.dart';
 import '../pages/onboarding_page.dart';
@@ -245,11 +245,12 @@ GoRouter createStudentRouter({bool showOnboarding = false}) => GoRouter(
           routes: [
             GoRoute(
               path: StudentRoutePaths.profil,
-              builder: (context, state) => ProfilePage(
-                profile: studentProfilePreview,
-                onChangePassword: () =>
-                    context.push(StudentRoutePaths.changePassword),
-              ),
+              redirect: (context, state) =>
+                  studentAuthRepository.currentAccount == null
+                  ? StudentRoutePaths.login
+                  : null,
+              builder: (context, state) =>
+                  ProfilPage(account: studentAuthRepository.currentAccount!),
             ),
           ],
         ),
@@ -257,7 +258,11 @@ GoRouter createStudentRouter({bool showOnboarding = false}) => GoRouter(
     ),
     GoRoute(
       path: StudentRoutePaths.changePassword,
-      builder: (context, state) => const ChangePasswordPage(),
+      redirect: (context, state) => studentAuthRepository.currentAccount == null
+          ? StudentRoutePaths.login
+          : null,
+      builder: (context, state) =>
+          ChangePasswordPage(nim: studentAuthRepository.currentAccount!.nim),
     ),
   ],
 );

@@ -1,19 +1,91 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/mhs/dummy_student_auth_repository.dart';
+import '../../data/mhs/student_account.dart';
 import '../../routing/student_route_paths.dart';
 
-class ProfilPage extends StatelessWidget {
-  const ProfilPage({super.key});
+class ProfilPage extends StatefulWidget {
+  const ProfilPage({required this.account, super.key});
 
-  static const _demoEmail = 'ahmad.fauzi@student.polinema.ac.id';
-  static const _demoPhone = '0812 3456 7890';
+  final StudentAccount account;
+
+  @override
+  State<ProfilPage> createState() => _ProfilPageState();
+}
+
+class _ProfilPageState extends State<ProfilPage> {
+  Uint8List? _profilePhoto;
+  late String _fullName;
+  late String _nim;
+  String _email = '';
+  late String _phoneNumber;
+
+  @override
+  void initState() {
+    super.initState();
+    _fullName = widget.account.fullName;
+    _nim = widget.account.nim;
+    _phoneNumber = 'Belum diisi';
+  }
+
+  Future<void> _editProfile() async {
+    final updatedProfile = await showDialog<_StudentProfileEdit>(
+      context: context,
+      builder: (context) => _EditStudentProfileDialog(
+        fullName: _fullName,
+        nim: _nim,
+        email: _email,
+        phoneNumber: _phoneNumber,
+      ),
+    );
+    if (!mounted || updatedProfile == null) return;
+
+    setState(() {
+      _fullName = updatedProfile.fullName;
+      _nim = updatedProfile.nim;
+      _email = updatedProfile.email;
+      _phoneNumber = updatedProfile.phoneNumber;
+    });
+    _showMessage('Profil berhasil diperbarui.');
+  }
+
+  Future<void> _pickProfilePhoto() async {
+    try {
+      final pickedFile = await FilePicker.pickFile(type: FileType.image);
+      if (!mounted || pickedFile == null) return;
+
+      final photo = await pickedFile.readAsBytes();
+      if (!mounted) return;
+      if (photo.isEmpty) {
+        _showMessage('Foto tidak dapat dibaca. Silakan pilih gambar lain.');
+        return;
+      }
+
+      setState(() => _profilePhoto = photo);
+      _showMessage('Foto profil berhasil diperbarui.');
+    } on PlatformException catch (error) {
+      if (!mounted) return;
+      final detail = error.message;
+      _showMessage(
+        detail == null
+            ? 'Gagal memilih foto profil.'
+            : 'Gagal memilih foto profil: $detail',
+      );
+    }
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final account = DummyStudentAuthRepository.demoAccount;
 
     return Scaffold(
       backgroundColor: colorScheme.surfaceContainerHighest,
@@ -59,26 +131,39 @@ class ProfilPage extends StatelessWidget {
                       ),
                       child: Column(
                         children: [
-                          Container(
-                            width: 80,
-                            height: 80,
-                            decoration: BoxDecoration(
-                              color: colorScheme.surfaceContainerHighest,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: colorScheme.outlineVariant,
-                                width: 1.5,
+                          Tooltip(
+                            message: 'Ubah foto profil',
+                            child: InkWell(
+                              onTap: _pickProfilePhoto,
+                              customBorder: const CircleBorder(),
+                              child: Container(
+                                width: 80,
+                                height: 80,
+                                clipBehavior: Clip.antiAlias,
+                                decoration: BoxDecoration(
+                                  color: colorScheme.surfaceContainerHighest,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: colorScheme.outlineVariant,
+                                    width: 1.5,
+                                  ),
+                                ),
+                                child: _profilePhoto == null
+                                    ? Icon(
+                                        Icons.person,
+                                        size: 44,
+                                        color: colorScheme.onSurfaceVariant,
+                                      )
+                                    : Image.memory(
+                                        _profilePhoto!,
+                                        fit: BoxFit.cover,
+                                      ),
                               ),
-                            ),
-                            child: Icon(
-                              Icons.person,
-                              size: 44,
-                              color: colorScheme.onSurfaceVariant,
                             ),
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            account.fullName,
+                            _fullName,
                             style: TextStyle(
                               color: colorScheme.onSurface,
                               fontSize: 18,
@@ -120,21 +205,21 @@ class ProfilPage extends StatelessWidget {
                           _InfoRow(
                             icon: Icons.badge_outlined,
                             label: 'NIM/NIDN',
-                            value: account.nim,
+                            value: _nim,
                             colorScheme: colorScheme,
                           ),
                           _Divider(colorScheme: colorScheme),
                           _InfoRow(
                             icon: Icons.email_outlined,
                             label: 'Email',
-                            value: _demoEmail,
+                            value: _email.isEmpty ? 'Belum diisi' : _email,
                             colorScheme: colorScheme,
                           ),
                           _Divider(colorScheme: colorScheme),
                           _InfoRow(
                             icon: Icons.phone_outlined,
                             label: 'Nomor HP',
-                            value: _demoPhone,
+                            value: _phoneNumber,
                             colorScheme: colorScheme,
                           ),
                           _Divider(colorScheme: colorScheme),
@@ -163,16 +248,18 @@ class ProfilPage extends StatelessWidget {
                             iconBg: colorScheme.primaryContainer,
                             label: 'Ubah Profil',
                             colorScheme: colorScheme,
-                            onTap: () {},
+                            onTap: _editProfile,
                           ),
                           _Divider(colorScheme: colorScheme),
                           _ActionRow(
+                            key: const ValueKey('profile-change-password'),
                             icon: Icons.key_outlined,
                             iconColor: const Color(0xFFF5A623),
                             iconBg: const Color(0xFFFEF3C7),
                             label: 'Ubah Kata Sandi',
                             colorScheme: colorScheme,
-                            onTap: () {},
+                            onTap: () =>
+                                context.push(StudentRoutePaths.changePassword),
                           ),
                           _Divider(colorScheme: colorScheme),
                           _ActionRow(
@@ -183,7 +270,10 @@ class ProfilPage extends StatelessWidget {
                             labelColor: colorScheme.error,
                             colorScheme: colorScheme,
                             showChevron: false,
-                            onTap: () => _showLogoutDialog(context, colorScheme),
+                            onTap: () {
+                              studentAuthRepository.logout();
+                              context.go(StudentRoutePaths.login);
+                            },
                             isLast: true,
                           ),
                         ],
@@ -198,29 +288,144 @@ class ProfilPage extends StatelessWidget {
       ),
     );
   }
+}
 
-  void _showLogoutDialog(BuildContext context, ColorScheme colorScheme) {
-    showDialog<void>(
-      context: context,
-      builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Keluar', style: TextStyle(fontWeight: FontWeight.w700)),
-        content: const Text('Apakah Anda yakin ingin keluar dari akun ini?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Batal'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(context);
-              context.go(StudentRoutePaths.login);
-            },
-            style: FilledButton.styleFrom(backgroundColor: colorScheme.error),
-            child: const Text('Keluar'),
-          ),
-        ],
+class _StudentProfileEdit {
+  const _StudentProfileEdit({
+    required this.fullName,
+    required this.nim,
+    required this.email,
+    required this.phoneNumber,
+  });
+
+  final String fullName;
+  final String nim;
+  final String email;
+  final String phoneNumber;
+}
+
+class _EditStudentProfileDialog extends StatefulWidget {
+  const _EditStudentProfileDialog({
+    required this.fullName,
+    required this.nim,
+    required this.email,
+    required this.phoneNumber,
+  });
+
+  final String fullName;
+  final String nim;
+  final String email;
+  final String phoneNumber;
+
+  @override
+  State<_EditStudentProfileDialog> createState() =>
+      _EditStudentProfileDialogState();
+}
+
+class _EditStudentProfileDialogState extends State<_EditStudentProfileDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _fullNameController;
+  late final TextEditingController _nimController;
+  late final TextEditingController _emailController;
+  late final TextEditingController _phoneNumberController;
+
+  @override
+  void initState() {
+    super.initState();
+    _fullNameController = TextEditingController(text: widget.fullName);
+    _nimController = TextEditingController(text: widget.nim);
+    _emailController = TextEditingController(text: widget.email);
+    _phoneNumberController = TextEditingController(text: widget.phoneNumber);
+  }
+
+  @override
+  void dispose() {
+    _fullNameController.dispose();
+    _nimController.dispose();
+    _emailController.dispose();
+    _phoneNumberController.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    if (!_formKey.currentState!.validate()) return;
+
+    Navigator.of(context).pop(
+      _StudentProfileEdit(
+        fullName: _fullNameController.text.trim(),
+        nim: _nimController.text.trim(),
+        email: _emailController.text.trim(),
+        phoneNumber: _phoneNumberController.text.trim(),
       ),
+    );
+  }
+
+  String? _requiredField(String? value) {
+    if (value == null || value.trim().isEmpty) {
+      return 'Bagian ini wajib diisi.';
+    }
+    return null;
+  }
+
+  String? _validateEmail(String? value) {
+    final email = value?.trim() ?? '';
+    if (email.isEmpty) return 'Email wajib diisi.';
+    if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
+      return 'Format email tidak valid.';
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Ubah Profil'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                key: const ValueKey('edit-profile-name'),
+                controller: _fullNameController,
+                decoration: const InputDecoration(labelText: 'Nama'),
+                textCapitalization: TextCapitalization.words,
+                validator: _requiredField,
+              ),
+              TextFormField(
+                key: const ValueKey('edit-profile-nim'),
+                controller: _nimController,
+                decoration: const InputDecoration(labelText: 'NIM/NIDN'),
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                validator: _requiredField,
+              ),
+              TextFormField(
+                key: const ValueKey('edit-profile-phone'),
+                controller: _phoneNumberController,
+                decoration: const InputDecoration(labelText: 'Nomor HP'),
+                keyboardType: TextInputType.phone,
+                validator: _requiredField,
+              ),
+              TextFormField(
+                key: const ValueKey('edit-profile-email'),
+                controller: _emailController,
+                decoration: const InputDecoration(labelText: 'Email'),
+                keyboardType: TextInputType.emailAddress,
+                validator: _validateEmail,
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Batal'),
+        ),
+        FilledButton(onPressed: _save, child: const Text('Simpan')),
+      ],
     );
   }
 }
@@ -251,26 +456,30 @@ class _InfoRow extends StatelessWidget {
         children: [
           Icon(icon, color: colorScheme.onSurfaceVariant, size: 20),
           const SizedBox(width: 14),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  color: colorScheme.onSurfaceVariant,
-                  fontSize: 11,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: colorScheme.onSurfaceVariant,
+                    fontSize: 11,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: TextStyle(
-                  color: colorScheme.onSurface,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: colorScheme.onSurface,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
@@ -283,6 +492,7 @@ class _InfoRow extends StatelessWidget {
 // ─────────────────────────────────────────────────────────
 class _ActionRow extends StatelessWidget {
   const _ActionRow({
+    super.key,
     required this.icon,
     required this.iconColor,
     required this.iconBg,
@@ -337,8 +547,11 @@ class _ActionRow extends StatelessWidget {
               ),
             ),
             if (showChevron)
-              Icon(Icons.chevron_right,
-                  color: colorScheme.onSurfaceVariant, size: 20),
+              Icon(
+                Icons.chevron_right,
+                color: colorScheme.onSurfaceVariant,
+                size: 20,
+              ),
           ],
         ),
       ),
