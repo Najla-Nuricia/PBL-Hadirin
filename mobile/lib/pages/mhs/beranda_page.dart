@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/mhs/dummy_student_auth_repository.dart';
+import '../../data/mhs/student_account.dart';
 import '../../data/mhs/student_attendance.dart';
 import '../../data/mhs/student_schedule.dart';
 import '../../routing/student_route_paths.dart';
@@ -22,8 +23,9 @@ class _BerandaPageState extends State<BerandaPage> {
 
   bool _showReminder = true;
 
-  // Demo: gunakan data demo account
-  final _account = DummyStudentAuthRepository.demoAccount;
+  StudentAccount get _account =>
+      studentAuthRepository.currentAccount ??
+      DummyStudentAuthRepository.demoAccount;
 
   @override
   Widget build(BuildContext context) {

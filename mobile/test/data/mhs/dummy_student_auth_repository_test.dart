@@ -23,6 +23,21 @@ void main() {
     );
 
     expect(account?.nim, DummyStudentAuthRepository.demoAccount.nim);
+    expect(repository.currentAccount?.nim, account?.nim);
+  });
+
+  test('tracks the authenticated account and clears it on logout', () async {
+    final nim = DummyStudentAuthRepository.demoAccount.nim;
+    await repository.login(
+      nim: nim,
+      password: DummyStudentAuthRepository.demoAccount.password,
+    );
+
+    expect(repository.currentAccount?.nim, nim);
+
+    repository.logout();
+
+    expect(repository.currentAccount, isNull);
   });
 
   test('rejects an unknown NIM or a wrong password', () async {
@@ -36,6 +51,33 @@ void main() {
         password: 'salah',
       ),
       isNull,
+    );
+  });
+
+  test('changes the password after verifying the current password', () async {
+    final nim = DummyStudentAuthRepository.demoAccount.nim;
+    final currentPassword = DummyStudentAuthRepository.demoAccount.password;
+
+    expect(
+      await repository.changePassword(
+        nim: nim,
+        currentPassword: 'wrong-password',
+        newPassword: 'password-baru',
+      ),
+      isFalse,
+    );
+    expect(
+      await repository.changePassword(
+        nim: nim,
+        currentPassword: currentPassword,
+        newPassword: 'password-baru',
+      ),
+      isTrue,
+    );
+    expect(await repository.login(nim: nim, password: currentPassword), isNull);
+    expect(
+      (await repository.login(nim: nim, password: 'password-baru'))?.nim,
+      nim,
     );
   });
 
