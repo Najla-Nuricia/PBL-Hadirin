@@ -59,13 +59,14 @@ class DummyStudentAuthRepository {
           final userData = data['user'] as Map<String, dynamic>?;
 
           final account = StudentAccount(
-            nim: (userData?['nim'] as String?) ?? nim,
-            fullName: (userData?['name'] as String?) ?? 'Mahasiswa Demo',
-            className: '3F-TI',
+            nim: (userData?['nim'] as String?) ?? (data['nim'] as String?) ?? nim,
+            fullName: (userData?['name'] as String?) ?? (data['name'] as String?) ?? 'Mahasiswa Demo',
+            className: (data['className'] as String?) ?? (data['kelas'] as String?) ?? '3F-TI',
             password: password,
             token: currentAccessToken,
           );
           _accounts[account.nim] = account;
+          _currentAccount = account;
           return account;
         } else if (response.statusCode == 401 || response.statusCode == 422) {
           // Kredensial tidak valid di backend
