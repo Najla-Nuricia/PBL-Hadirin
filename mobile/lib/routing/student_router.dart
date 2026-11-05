@@ -245,12 +245,8 @@ GoRouter createStudentRouter({bool showOnboarding = false}) => GoRouter(
           routes: [
             GoRoute(
               path: StudentRoutePaths.profil,
-              redirect: (context, state) =>
-                  studentAuthRepository.currentAccount == null
-                  ? StudentRoutePaths.login
-                  : null,
               builder: (context, state) =>
-                  ProfilPage(account: studentAuthRepository.currentAccount!),
+                  ProfilPage(account: studentAuthRepository.currentAccount ?? DummyStudentAuthRepository.demoAccount),
             ),
           ],
         ),
@@ -258,11 +254,8 @@ GoRouter createStudentRouter({bool showOnboarding = false}) => GoRouter(
     ),
     GoRoute(
       path: StudentRoutePaths.changePassword,
-      redirect: (context, state) => studentAuthRepository.currentAccount == null
-          ? StudentRoutePaths.login
-          : null,
       builder: (context, state) =>
-          ChangePasswordPage(nim: studentAuthRepository.currentAccount!.nim),
+          ChangePasswordPage(nim: (studentAuthRepository.currentAccount ?? DummyStudentAuthRepository.demoAccount).nim),
     ),
   ],
 );
