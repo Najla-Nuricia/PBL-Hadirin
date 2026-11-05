@@ -47,4 +47,43 @@ void main() {
       LecturerRoutePaths.kehadiran,
     );
   });
+
+  testWidgets('tapping Keluar asks for confirmation before logging out', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final router = createLecturerRouter();
+    addTearDown(router.dispose);
+    router.go(LecturerRoutePaths.profil);
+
+    await tester.pumpWidget(
+      MaterialApp.router(routerConfig: router, theme: AppTheme.light),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('lecturer-logout')));
+    await tester.pumpAndSettle();
+    expect(find.text('Keluar dari akun?'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('lecturer-logout-cancel')));
+    await tester.pumpAndSettle();
+    expect(find.text('Keluar dari akun?'), findsNothing);
+    expect(
+      router.routeInformationProvider.value.uri.path,
+      LecturerRoutePaths.profil,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('lecturer-logout')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('lecturer-logout-confirm')));
+    await tester.pumpAndSettle();
+    expect(
+      router.routeInformationProvider.value.uri.path,
+      LecturerRoutePaths.login,
+    );
+  });
 }
