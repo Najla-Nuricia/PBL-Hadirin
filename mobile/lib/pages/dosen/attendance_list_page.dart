@@ -71,7 +71,7 @@ class AttendanceListPage extends ConsumerWidget {
                 ),
                 sliver: SliverList.separated(
                   itemCount: students.length,
-                  separatorBuilder: (_, __) =>
+                  separatorBuilder: (_, _) =>
                       const SizedBox(height: LecturerStyle.listGap),
                   itemBuilder: (context, i) {
                     final s = students[i];

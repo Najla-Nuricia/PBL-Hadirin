@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mobile/routing/admin_route_paths.dart';
 import 'package:mobile/routing/admin_router.dart';
 import 'package:mobile/theme/app_theme.dart';
 
