@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile/data/mhs/dummy_student_auth_repository.dart';
+import 'package:mobile/data/mhs/student_account.dart';
 import 'package:mobile/routing/student_router.dart';
 import 'package:mobile/theme/app_theme.dart';
 
@@ -65,6 +66,36 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(currentPath(), StudentRoutePaths.beranda);
+  });
+
+  testWidgets('beranda shows the account that logged in', (tester) async {
+    const account = StudentAccount(
+      nim: '9876501234',
+      fullName: 'Nama Mahasiswa Terdaftar',
+      className: '4A-TI',
+      password: 'rahasia123',
+    );
+    await tester.runAsync(
+      () => studentAuthRepository.register(
+        StudentRegistrationDraft(
+          fullName: account.fullName,
+          nim: account.nim,
+          className: account.className,
+          password: account.password,
+        ),
+        facePhotoPaths: const [],
+      ),
+    );
+    await pumpApp(tester);
+
+    await tester.enterText(field('NIM'), account.nim);
+    await tester.enterText(field('Password'), account.password);
+    await tester.tap(find.text('Masuk'));
+    await tester.pumpAndSettle();
+
+    expect(currentPath(), StudentRoutePaths.beranda);
+    expect(find.text(account.fullName), findsOneWidget);
+    expect(find.text('${account.nim} · ${account.className}'), findsOneWidget);
   });
 
   testWidgets('register validates the form before the face scan', (

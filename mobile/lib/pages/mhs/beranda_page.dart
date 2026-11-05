@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/mhs/dummy_student_auth_repository.dart';
+import '../../data/mhs/student_account.dart';
 import '../../data/mhs/student_attendance.dart';
 import '../../data/mhs/student_data_service.dart';
 import '../../data/mhs/student_schedule.dart';
@@ -24,8 +25,21 @@ class _BerandaPageState extends State<BerandaPage> {
 
   bool _showReminder = true;
 
-  // Demo: gunakan data demo account
-  final _account = DummyStudentAuthRepository.demoAccount;
+  StudentAccount get _account =>
+      studentAuthRepository.currentAccount ??
+      DummyStudentAuthRepository.demoAccount;
+
+  String get _displayName {
+    final current = studentAuthRepository.currentAccount;
+    if (current != null) return current.fullName;
+    return _profile?.fullName ?? _account.fullName;
+  }
+
+  String get _displaySubtitle {
+    final current = studentAuthRepository.currentAccount;
+    if (current != null) return '${current.nim} · ${current.className}';
+    return '${_profile?.studentId ?? _account.nim} · ${_account.className}';
+  }
 
   StudentProfile? _profile;
   StudentAttendanceSummary _summary = dummyAttendanceSummary;
@@ -77,14 +91,21 @@ class _BerandaPageState extends State<BerandaPage> {
                         onDismiss: () => setState(() => _showReminder = false),
                       ),
                     const SizedBox(height: 12),
-                    _QuickActions(onAbsensiTap: () => context.go(StudentRoutePaths.absensi)),
+                    _QuickActions(
+                      onAbsensiTap: () => context.go(StudentRoutePaths.absensi),
+                      onSuratTap: () => context.go(StudentRoutePaths.surat),
+                    ),
                     const SizedBox(height: 16),
-                    _AttendanceSummaryCard(summary: _summary),
+                    _AttendanceSummaryCard(
+                      summary: _summary,
+                      onViewAll: () => context.go(StudentRoutePaths.riwayat),
+                    ),
                     const SizedBox(height: 16),
                     _ScheduleSection(
                       selectedDay: _selectedDay,
                       schedules: _schedules,
-                      onDaySelected: (day) => setState(() => _selectedDay = day),
+                      onDaySelected: (day) =>
+                          setState(() => _selectedDay = day),
                       alarmToggles: _alarmToggles,
                       onAlarmToggle: (index, val) =>
                           setState(() => _alarmToggles[index] = val),
@@ -125,7 +146,7 @@ class _BerandaPageState extends State<BerandaPage> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  _profile?.fullName ?? _account.fullName,
+                  _displayName,
                   style: TextStyle(
                     color: colorScheme.onSurface,
                     fontSize: 20,
@@ -134,7 +155,7 @@ class _BerandaPageState extends State<BerandaPage> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${_profile?.studentId ?? _account.nim} · ${_account.className}',
+                  _displaySubtitle,
                   style: TextStyle(
                     color: colorScheme.onSurfaceVariant,
                     fontSize: 12,
@@ -180,8 +201,11 @@ class _ReminderBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.notifications_active_outlined,
-              color: colorScheme.onTertiaryContainer, size: 20),
+          Icon(
+            Icons.notifications_active_outlined,
+            color: colorScheme.onTertiaryContainer,
+            size: 20,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -209,8 +233,11 @@ class _ReminderBanner extends StatelessWidget {
           ),
           GestureDetector(
             onTap: onDismiss,
-            child: Icon(Icons.close,
-                color: colorScheme.onTertiaryContainer, size: 18),
+            child: Icon(
+              Icons.close,
+              color: colorScheme.onTertiaryContainer,
+              size: 18,
+            ),
           ),
         ],
       ),
@@ -222,8 +249,10 @@ class _ReminderBanner extends StatelessWidget {
 // Quick Actions (Absensi & Surat)
 // ─────────────────────────────────────────────────────────
 class _QuickActions extends StatelessWidget {
-  const _QuickActions({required this.onAbsensiTap});
+  const _QuickActions({required this.onAbsensiTap, required this.onSuratTap});
+
   final VoidCallback onAbsensiTap;
+  final VoidCallback onSuratTap;
 
   @override
   Widget build(BuildContext context) {
@@ -250,7 +279,7 @@ class _QuickActions extends StatelessWidget {
             backgroundColor: colorScheme.surface,
             foregroundColor: colorScheme.onSurface,
             iconColor: colorScheme.primary,
-            onTap: () {},
+            onTap: onSuratTap,
           ),
         ),
       ],
@@ -325,9 +354,13 @@ class _ActionCard extends StatelessWidget {
 // Rekap Kehadiran Card
 // ─────────────────────────────────────────────────────────
 class _AttendanceSummaryCard extends StatelessWidget {
-  const _AttendanceSummaryCard({required this.summary});
+  const _AttendanceSummaryCard({
+    required this.summary,
+    required this.onViewAll,
+  });
 
   final StudentAttendanceSummary summary;
+  final VoidCallback onViewAll;
 
   @override
   Widget build(BuildContext context) {
@@ -356,7 +389,7 @@ class _AttendanceSummaryCard extends StatelessWidget {
                 ),
               ),
               TextButton(
-                onPressed: () {},
+                onPressed: onViewAll,
                 style: TextButton.styleFrom(
                   padding: EdgeInsets.zero,
                   minimumSize: const Size(0, 24),
@@ -433,10 +466,7 @@ class _AttendanceStat extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(color: color, fontSize: 11),
-            ),
+            Text(label, style: TextStyle(color: color, fontSize: 11)),
           ],
         ),
       ),
@@ -623,8 +653,11 @@ class _ScheduleItem extends StatelessWidget {
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.access_time,
-                                size: 12, color: colorScheme.onSurfaceVariant),
+                            Icon(
+                              Icons.access_time,
+                              size: 12,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               '${schedule.startTime} – ${schedule.endTime}',
@@ -638,8 +671,11 @@ class _ScheduleItem extends StatelessWidget {
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.location_on_outlined,
-                                size: 12, color: colorScheme.onSurfaceVariant),
+                            Icon(
+                              Icons.location_on_outlined,
+                              size: 12,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               schedule.room,
@@ -692,8 +728,11 @@ class _AlarmInfoBanner extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       child: Row(
         children: [
-          Icon(Icons.info_outline,
-              size: 14, color: colorScheme.onSurfaceVariant),
+          Icon(
+            Icons.info_outline,
+            size: 14,
+            color: colorScheme.onSurfaceVariant,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(

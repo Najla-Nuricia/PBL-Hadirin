@@ -84,6 +84,16 @@ void main() {
     await tester.tap(find.text('Upload Surat Kompensasi'));
     await tester.pumpAndSettle();
     expect(find.text('Unggah surat kompensasi'), findsOneWidget);
+
+    await tester.tap(find.text('Profil').first);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Keluar'));
+    await tester.tap(find.text('Keluar'));
+    await tester.pumpAndSettle();
+    expect(
+      studentRouter.routeInformationProvider.value.uri.path,
+      StudentRoutePaths.login,
+    );
   });
 
   testWidgets('counter demo still increments', (tester) async {
