@@ -1,16 +1,84 @@
+﻿import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../models/dosen/lecturer_profile.dart';
 import '../../routing/lecturer_route_paths.dart';
+import 'widgets/logout_confirmation_dialog.dart';
 
-class LecturerProfilePage extends StatelessWidget {
+const _maxPhotoSizeInBytes = 5 * 1024 * 1024;
+
+class LecturerProfilePage extends StatefulWidget {
   const LecturerProfilePage({
     required this.profile,
     super.key,
   });
 
   final LecturerProfile profile;
+
+  @override
+  State<LecturerProfilePage> createState() => _LecturerProfilePageState();
+}
+
+class _LecturerProfilePageState extends State<LecturerProfilePage> {
+  Uint8List? _photoBytes;
+  bool _isUpdatingPhoto = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _photoBytes = widget.profile.photoBytes;
+  }
+
+  Future<void> _confirmLogout() async {
+    final shouldLogout = await showLecturerLogoutDialog(
+      context,
+      fullName: widget.profile.fullName,
+      email: widget.profile.email,
+    );
+    if (!shouldLogout || !mounted) return;
+    context.go(LecturerRoutePaths.login);
+  }
+
+  Future<void> _pickPhoto() async {
+    if (_isUpdatingPhoto) return;
+
+    setState(() => _isUpdatingPhoto = true);
+    try {
+      final file = await FilePicker.pickFile(type: FileType.image);
+      if (file == null) {
+        if (mounted) setState(() => _isUpdatingPhoto = false);
+        return;
+      }
+
+      final bytes = await file.readAsBytes();
+      if (!mounted) return;
+
+      if (bytes.length > _maxPhotoSizeInBytes) {
+        setState(() => _isUpdatingPhoto = false);
+        _showPhotoMessage('Ukuran foto maksimal 5 MB.');
+        return;
+      }
+
+      setState(() {
+        _photoBytes = bytes;
+        _isUpdatingPhoto = false;
+      });
+      _showPhotoMessage('Foto profil diperbarui.');
+    } on Exception {
+      if (!mounted) return;
+      setState(() => _isUpdatingPhoto = false);
+      _showPhotoMessage('Gagal memuat foto. Coba lagi.');
+    }
+  }
+
+  void _showPhotoMessage(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -22,17 +90,24 @@ class LecturerProfilePage extends StatelessWidget {
         bottom: false,
         child: Column(
           children: [
-            _LecturerProfileHeader(profile: profile),
+            _LecturerProfileHeader(
+              profile: widget.profile,
+              photoBytes: _photoBytes,
+              isUpdatingPhoto: _isUpdatingPhoto,
+              onPickPhoto: _pickPhoto,
+            ),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(14, 14, 14, 20),
                 child: Column(
                   children: [
-                    _LecturerInformationCard(profile: profile),
+                    _LecturerInformationCard(profile: widget.profile),
                     const SizedBox(height: 14),
                     _LecturerActionsCard(
+                      onPickPhoto: _pickPhoto,
                       onChangePassword: () =>
                           context.push(LecturerRoutePaths.changePassword),
+                      onLogout: _confirmLogout,
                     ),
                   ],
                 ),
@@ -46,9 +121,17 @@ class LecturerProfilePage extends StatelessWidget {
 }
 
 class _LecturerProfileHeader extends StatelessWidget {
-  const _LecturerProfileHeader({required this.profile});
+  const _LecturerProfileHeader({
+    required this.profile,
+    required this.photoBytes,
+    required this.isUpdatingPhoto,
+    required this.onPickPhoto,
+  });
 
   final LecturerProfile profile;
+  final Uint8List? photoBytes;
+  final bool isUpdatingPhoto;
+  final VoidCallback onPickPhoto;
 
   @override
   Widget build(BuildContext context) {
@@ -85,14 +168,10 @@ class _LecturerProfileHeader extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-          CircleAvatar(
-            radius: 33,
-            backgroundColor: colorScheme.primaryContainer,
-            child: Icon(
-              Icons.person,
-              size: 42,
-              color: colorScheme.primary.withValues(alpha: 0.25),
-            ),
+          _LecturerAvatar(
+            photoBytes: photoBytes,
+            isUpdating: isUpdatingPhoto,
+            onTap: onPickPhoto,
           ),
           const SizedBox(height: 10),
           Padding(
@@ -125,6 +204,102 @@ class _LecturerProfileHeader extends StatelessWidget {
           ),
           const SizedBox(height: 12),
         ],
+      ),
+    );
+  }
+}
+
+class _LecturerAvatar extends StatelessWidget {
+  const _LecturerAvatar({
+    required this.photoBytes,
+    required this.isUpdating,
+    required this.onTap,
+  });
+
+  static const _avatarSize = 76.0;
+  static const _badgeSize = 26.0;
+
+  final Uint8List? photoBytes;
+  final bool isUpdating;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final photo = photoBytes;
+
+    return Semantics(
+      button: true,
+      label: 'Ubah foto profil',
+      child: SizedBox(
+        width: _avatarSize + _badgeSize / 2,
+        height: _avatarSize + _badgeSize / 2,
+        child: Stack(
+          children: [
+            Material(
+              color: colorScheme.primaryContainer,
+              shape: const CircleBorder(),
+              clipBehavior: Clip.antiAlias,
+              child: InkWell(
+                onTap: isUpdating ? null : onTap,
+                child: SizedBox(
+                  width: _avatarSize,
+                  height: _avatarSize,
+                  child: photo == null
+                      ? Icon(
+                          Icons.person,
+                          size: 48,
+                          color: colorScheme.primary.withValues(alpha: 0.35),
+                        )
+                      : Image.memory(
+                          photo,
+                          fit: BoxFit.cover,
+                          gaplessPlayback: true,
+                        ),
+                ),
+              ),
+            ),
+            if (isUpdating)
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: colorScheme.onSurface.withValues(alpha: 0.28),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Center(
+                    child: SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          colorScheme.onPrimary,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: Container(
+                width: _badgeSize,
+                height: _badgeSize,
+                decoration: BoxDecoration(
+                  color: colorScheme.primary,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: colorScheme.surface, width: 2),
+                ),
+                child: Icon(
+                  Icons.photo_camera_outlined,
+                  size: 13,
+                  color: colorScheme.onPrimary,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -245,13 +420,20 @@ class _LecturerInformationRow extends StatelessWidget {
 }
 
 class _LecturerActionsCard extends StatelessWidget {
-  const _LecturerActionsCard({required this.onChangePassword});
+  const _LecturerActionsCard({
+    required this.onPickPhoto,
+    required this.onChangePassword,
+    required this.onLogout,
+  });
 
+  final VoidCallback onPickPhoto;
   final VoidCallback onChangePassword;
+  final VoidCallback onLogout;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    const neutralIconBackground = Color(0xFFEEEEEE);
 
     return Container(
       decoration: BoxDecoration(
@@ -261,28 +443,32 @@ class _LecturerActionsCard extends StatelessWidget {
       ),
       child: Column(
         children: [
-          const _LecturerActionRow(
-            icon: Icons.person_outline,
-            label: 'Ubah Profil',
-            iconBackground: Color(0xFFEEEEEE),
-            iconColor: Color(0xFF0066FF),
+          _LecturerActionRow(
+            key: const ValueKey('lecturer-change-photo'),
+            icon: Icons.photo_camera_outlined,
+            label: 'Ubah Foto Profil',
+            iconBackground: neutralIconBackground,
+            iconColor: colorScheme.primary,
+            onTap: onPickPhoto,
           ),
           Divider(height: 1, thickness: 1, color: colorScheme.outlineVariant),
           _LecturerActionRow(
             key: const ValueKey('lecturer-change-password'),
             icon: Icons.key_outlined,
             label: 'Ubah Kata Sandi',
-            iconBackground: const Color(0xFFEEEEEE),
+            iconBackground: neutralIconBackground,
             iconColor: colorScheme.primary,
             onTap: onChangePassword,
           ),
           Divider(height: 1, thickness: 1, color: colorScheme.outlineVariant),
           _LecturerActionRow(
+            key: const ValueKey('lecturer-logout'),
             icon: Icons.logout,
             label: 'Keluar',
             iconBackground: colorScheme.errorContainer,
             iconColor: colorScheme.error,
             labelColor: colorScheme.error,
+            onTap: onLogout,
           ),
         ],
       ),
