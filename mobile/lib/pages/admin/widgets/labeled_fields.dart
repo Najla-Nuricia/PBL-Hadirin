@@ -74,7 +74,7 @@ class LabeledDropdown extends StatelessWidget {
       children: [
         _FieldLabel(label, required),
         DropdownButtonFormField<String>(
-          value: value,
+          initialValue: value,
           isExpanded: true,
           icon: Icon(Icons.keyboard_arrow_down_rounded,
               color: cs.onSurfaceVariant),

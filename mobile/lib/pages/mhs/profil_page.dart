@@ -1,19 +1,115 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../data/mhs/dummy_student_auth_repository.dart';
+import '../../data/mhs/student_data_service.dart';
+import '../../models/mhs/student_profile.dart';
 import '../../routing/student_route_paths.dart';
 
-class ProfilPage extends StatelessWidget {
+class ProfilPage extends StatefulWidget {
   const ProfilPage({super.key});
 
-  static const _demoEmail = 'ahmad.fauzi@student.polinema.ac.id';
-  static const _demoPhone = '0812 3456 7890';
+  @override
+  State<ProfilPage> createState() => _ProfilPageState();
+}
+
+class _ProfilPageState extends State<ProfilPage> {
+  StudentProfile _profile = const StudentProfile(
+    fullName: 'Mahasiswa Demo',
+    studentId: '2341720001',
+    email: 'ahmad.fauzi@student.polinema.ac.id',
+    phoneNumber: '0812 3456 7890',
+    role: 'Mahasiswa',
+  );
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfileData();
+  }
+
+  Future<void> _loadProfileData() async {
+    try {
+      final p = await studentDataService.loadProfile();
+      if (mounted) {
+        setState(() {
+          _profile = p;
+          _isLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _showEditProfileDialog(ColorScheme colorScheme) {
+    final nameController = TextEditingController(text: _profile.fullName);
+    final emailController = TextEditingController(text: _profile.email);
+    final phoneController = TextEditingController(text: _profile.phoneNumber);
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('Ubah Profil Mahasiswa', style: TextStyle(fontWeight: FontWeight.w700)),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: nameController,
+                decoration: const InputDecoration(labelText: 'Nama Lengkap'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: emailController,
+                decoration: const InputDecoration(labelText: 'Email'),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: phoneController,
+                decoration: const InputDecoration(labelText: 'Nomor HP'),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              final success = await studentDataService.updateMahasiswa(
+                _profile.studentId,
+                namaLengkap: nameController.text.trim(),
+                email: emailController.text.trim(),
+                noHp: phoneController.text.trim(),
+              );
+              if (mounted) {
+                if (success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Profil berhasil diperbarui.')),
+                  );
+                  _loadProfileData();
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Gagal memperbarui profil.')),
+                  );
+                }
+              }
+            },
+            child: const Text('Simpan'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final account = DummyStudentAuthRepository.demoAccount;
 
     return Scaffold(
       backgroundColor: colorScheme.surfaceContainerHighest,
@@ -45,7 +141,9 @@ class ProfilPage extends StatelessWidget {
               ),
             ),
             Expanded(
-              child: SingleChildScrollView(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : SingleChildScrollView(
                 padding: const EdgeInsets.all(12),
                 child: Column(
                   children: [
@@ -78,7 +176,7 @@ class ProfilPage extends StatelessWidget {
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            account.fullName,
+                            _profile.fullName,
                             style: TextStyle(
                               color: colorScheme.onSurface,
                               fontSize: 18,
@@ -96,7 +194,7 @@ class ProfilPage extends StatelessWidget {
                               borderRadius: BorderRadius.circular(20),
                             ),
                             child: Text(
-                              'MAHASISWA',
+                              _profile.role.toUpperCase(),
                               style: TextStyle(
                                 color: colorScheme.onPrimaryContainer,
                                 fontSize: 11,
@@ -119,29 +217,29 @@ class ProfilPage extends StatelessWidget {
                         children: [
                           _InfoRow(
                             icon: Icons.badge_outlined,
-                            label: 'NIM/NIDN',
-                            value: account.nim,
+                            label: 'NIM',
+                            value: _profile.studentId,
                             colorScheme: colorScheme,
                           ),
                           _Divider(colorScheme: colorScheme),
                           _InfoRow(
                             icon: Icons.email_outlined,
                             label: 'Email',
-                            value: _demoEmail,
+                            value: _profile.email,
                             colorScheme: colorScheme,
                           ),
                           _Divider(colorScheme: colorScheme),
                           _InfoRow(
                             icon: Icons.phone_outlined,
                             label: 'Nomor HP',
-                            value: _demoPhone,
+                            value: _profile.phoneNumber,
                             colorScheme: colorScheme,
                           ),
                           _Divider(colorScheme: colorScheme),
                           _InfoRow(
                             icon: Icons.person_outline,
                             label: 'Role',
-                            value: 'Mahasiswa',
+                            value: _profile.role,
                             colorScheme: colorScheme,
                             isLast: true,
                           ),
@@ -161,9 +259,9 @@ class ProfilPage extends StatelessWidget {
                             icon: Icons.manage_accounts_outlined,
                             iconColor: colorScheme.primary,
                             iconBg: colorScheme.primaryContainer,
-                            label: 'Ubah Profil',
+                            label: 'Ubah Profil (CRUD Update)',
                             colorScheme: colorScheme,
-                            onTap: () {},
+                            onTap: () => _showEditProfileDialog(colorScheme),
                           ),
                           _Divider(colorScheme: colorScheme),
                           _ActionRow(
@@ -258,7 +356,7 @@ class _InfoRow extends StatelessWidget {
                 label,
                 style: TextStyle(
                   color: colorScheme.onSurfaceVariant,
-                  fontSize: 11,
+                  fontSize: 12,
                 ),
               ),
               const SizedBox(height: 2),
@@ -266,7 +364,7 @@ class _InfoRow extends StatelessWidget {
                 value,
                 style: TextStyle(
                   color: colorScheme.onSurface,
-                  fontSize: 13,
+                  fontSize: 14,
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -274,6 +372,26 @@ class _InfoRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// Divider widget
+// ─────────────────────────────────────────────────────────
+class _Divider extends StatelessWidget {
+  const _Divider({required this.colorScheme});
+
+  final ColorScheme colorScheme;
+
+  @override
+  Widget build(BuildContext context) {
+    return Divider(
+      height: 1,
+      thickness: 1,
+      color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+      indent: 16,
+      endIndent: 16,
     );
   }
 }
@@ -298,9 +416,9 @@ class _ActionRow extends StatelessWidget {
   final Color iconColor;
   final Color iconBg;
   final String label;
-  final Color? labelColor;
   final ColorScheme colorScheme;
   final VoidCallback onTap;
+  final Color? labelColor;
   final bool showChevron;
   final bool isLast;
 
@@ -309,11 +427,10 @@ class _ActionRow extends StatelessWidget {
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.vertical(
-        top: isLast ? Radius.zero : Radius.zero,
         bottom: isLast ? const Radius.circular(14) : Radius.zero,
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
           children: [
             Container(
@@ -321,7 +438,7 @@ class _ActionRow extends StatelessWidget {
               height: 36,
               decoration: BoxDecoration(
                 color: iconBg,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(icon, color: iconColor, size: 18),
             ),
@@ -337,30 +454,14 @@ class _ActionRow extends StatelessWidget {
               ),
             ),
             if (showChevron)
-              Icon(Icons.chevron_right,
-                  color: colorScheme.onSurfaceVariant, size: 20),
+              Icon(
+                Icons.chevron_right,
+                color: colorScheme.onSurfaceVariant,
+                size: 20,
+              ),
           ],
         ),
       ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────
-// Divider helper
-// ─────────────────────────────────────────────────────────
-class _Divider extends StatelessWidget {
-  const _Divider({required this.colorScheme});
-  final ColorScheme colorScheme;
-
-  @override
-  Widget build(BuildContext context) {
-    return Divider(
-      height: 1,
-      thickness: 1,
-      color: colorScheme.outlineVariant,
-      indent: 16,
-      endIndent: 16,
     );
   }
 }

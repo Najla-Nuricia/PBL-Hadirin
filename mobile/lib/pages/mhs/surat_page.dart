@@ -4,6 +4,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../data/mhs/student_data_service.dart';
+
 class SuratPage extends StatefulWidget {
   const SuratPage({super.key});
 
@@ -13,17 +15,69 @@ class SuratPage extends StatefulWidget {
 
 class _SuratPageState extends State<SuratPage> {
   static const _courses = [
-    'Matakuliah 1',
-    'Matakuliah 2',
-    'Matakuliah 3',
-    'Matakuliah 4',
-    'Matakuliah 5',
+    'Pemrograman Web',
+    'Basis Data',
+    'Interaksi Manusia Komputer',
+    'Kecerdasan Buatan',
+    'Jaringan Komputer',
   ];
 
   int _selectedType = 0;
   String? _fileName;
   String? _selectedCourse;
   DateTime? _selectedDate;
+  bool _isSubmitting = false;
+  final _notesController = TextEditingController();
+
+  @override
+  void dispose() {
+    _notesController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submitSurat() async {
+    if (_selectedCourse == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Pilih mata kuliah terlebih dahulu.')),
+      );
+      return;
+    }
+    setState(() => _isSubmitting = true);
+    try {
+      final jenis = _selectedType == 0 ? 'izin' : 'sakit';
+      final tanggal = (_selectedDate ?? DateTime.now()).toIso8601String().split('T').first;
+      final alasan = _notesController.text.trim().isNotEmpty
+          ? _notesController.text.trim()
+          : 'Pengajuan surat ${_selectedType == 0 ? "izin" : "sakit"}';
+
+      await studentDataService.submitPengajuan(
+        jenis: jenis,
+        alasan: alasan,
+        matakuliah: _selectedCourse!,
+        tanggal: tanggal,
+        dokumenPath: _fileName ?? '',
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Pengajuan surat berhasil dikirim!')),
+        );
+        setState(() {
+          _fileName = null;
+          _selectedCourse = null;
+          _notesController.clear();
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal mengirim surat: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
 
   Future<void> _pickFile() async {
     final result = await FilePicker.pickFiles(
@@ -170,7 +224,7 @@ class _SuratPageState extends State<SuratPage> {
           SizedBox(
             height: 42,
             child: FilledButton(
-              onPressed: null,
+              onPressed: _isSubmitting ? null : _submitSurat,
               style: FilledButton.styleFrom(
                 backgroundColor: colorScheme.primary,
                 disabledBackgroundColor: colorScheme.primary.withValues(
@@ -182,10 +236,16 @@ class _SuratPageState extends State<SuratPage> {
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              child: const Text(
-                'Kirim Surat',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-              ),
+              child: _isSubmitting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text(
+                      'Kirim Surat',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
             ),
           ),
         ],
@@ -312,6 +372,7 @@ class _SuratPageState extends State<SuratPage> {
 
   Widget _buildNotesField(ColorScheme colorScheme) {
     return TextFormField(
+      controller: _notesController,
       maxLines: 3,
       minLines: 3,
       decoration: _fieldDecoration(colorScheme)

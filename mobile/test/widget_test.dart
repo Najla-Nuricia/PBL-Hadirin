@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/demo_counter_app.dart';
 import 'package:mobile/routing/student_router.dart';
-import 'package:mobile/routing/student_route_paths.dart';
 
 void main() {
   testWidgets('student navbar and pages navigate correctly', (tester) async {

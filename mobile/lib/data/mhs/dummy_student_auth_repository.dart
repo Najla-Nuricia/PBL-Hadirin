@@ -1,3 +1,7 @@
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+
+import '../api_config.dart';
 import 'student_account.dart';
 
 class NimAlreadyRegisteredException implements Exception {
@@ -9,13 +13,15 @@ class NimAlreadyRegisteredException implements Exception {
   String toString() => 'NimAlreadyRegisteredException: $nim';
 }
 
-/// In-memory stand-in for the student auth API until the backend is ready.
-/// Registered accounts are lost when the app restarts.
+/// Stand-in & Real HTTP repository for student auth.
 class DummyStudentAuthRepository {
   DummyStudentAuthRepository({
     Iterable<StudentAccount> seedAccounts = const [demoAccount],
     this.latency = const Duration(milliseconds: 600),
-  }) : _accounts = {for (final account in seedAccounts) account.nim: account};
+    http.Client? httpClient,
+    this.useRemoteApi = false,
+  })  : _accounts = {for (final account in seedAccounts) account.nim: account},
+        _client = httpClient ?? http.Client();
 
   static const demoAccount = StudentAccount(
     nim: '2341720001',
@@ -25,12 +31,49 @@ class DummyStudentAuthRepository {
   );
 
   final Duration latency;
+  final bool useRemoteApi;
   final Map<String, StudentAccount> _accounts;
+  final http.Client _client;
+  String? currentAccessToken;
 
   Future<StudentAccount?> login({
     required String nim,
     required String password,
   }) async {
+    // 1. Coba koneksi ke Backend API Hadirin jika useRemoteApi aktif
+    if (useRemoteApi) {
+      try {
+        final uri = Uri.parse('${ApiConfig.baseUrl}/auth/login');
+        final response = await _client.post(
+          uri,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'nim': nim, 'password': password}),
+        ).timeout(const Duration(milliseconds: 1500));
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body) as Map<String, dynamic>;
+          currentAccessToken = data['access_token'] as String?;
+          final userData = data['user'] as Map<String, dynamic>?;
+
+          final account = StudentAccount(
+            nim: (userData?['nim'] as String?) ?? nim,
+            fullName: (userData?['name'] as String?) ?? 'Mahasiswa Demo',
+            className: '3F-TI',
+            password: password,
+            token: currentAccessToken,
+          );
+          _accounts[account.nim] = account;
+          return account;
+        } else if (response.statusCode == 401 || response.statusCode == 422) {
+          // Kredensial tidak valid di backend
+          return null;
+        }
+      } catch (_) {
+        // Backend offline atau sedang unit test tanpa server, gunakan fallback
+      }
+    }
+
+    // 2. Fallback in-memory
     await Future<void>.delayed(latency);
     final account = _accounts[nim];
     if (account == null || account.password != password) return null;
@@ -46,6 +89,31 @@ class DummyStudentAuthRepository {
     StudentRegistrationDraft draft, {
     required List<String> facePhotoPaths,
   }) async {
+    // 1. Coba register ke Backend API jika useRemoteApi aktif
+    if (useRemoteApi) {
+      try {
+        final uri = Uri.parse('${ApiConfig.baseUrl}/auth/register');
+        final response = await _client.post(
+          uri,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'nim': draft.nim,
+            'name': draft.fullName,
+            'password': draft.password,
+          }),
+        ).timeout(const Duration(milliseconds: 1500));
+
+        if (response.statusCode == 409) {
+          throw NimAlreadyRegisteredException(draft.nim);
+        }
+      } on NimAlreadyRegisteredException {
+        rethrow;
+      } catch (_) {
+        // Backend offline, lanjutkan validasi in-memory
+      }
+    }
+
+    // 2. In-memory check
     await Future<void>.delayed(latency);
     if (_accounts.containsKey(draft.nim)) {
       throw NimAlreadyRegisteredException(draft.nim);
@@ -63,4 +131,4 @@ class DummyStudentAuthRepository {
   }
 }
 
-final studentAuthRepository = DummyStudentAuthRepository();
+final studentAuthRepository = DummyStudentAuthRepository(useRemoteApi: true);

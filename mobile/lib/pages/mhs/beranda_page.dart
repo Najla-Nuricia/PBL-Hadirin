@@ -3,7 +3,9 @@ import 'package:go_router/go_router.dart';
 
 import '../../data/mhs/dummy_student_auth_repository.dart';
 import '../../data/mhs/student_attendance.dart';
+import '../../data/mhs/student_data_service.dart';
 import '../../data/mhs/student_schedule.dart';
+import '../../models/mhs/student_profile.dart';
 import '../../routing/student_route_paths.dart';
 
 class BerandaPage extends StatefulWidget {
@@ -25,6 +27,34 @@ class _BerandaPageState extends State<BerandaPage> {
   // Demo: gunakan data demo account
   final _account = DummyStudentAuthRepository.demoAccount;
 
+  StudentProfile? _profile;
+  StudentAttendanceSummary _summary = dummyAttendanceSummary;
+  List<StudentSchedule> _schedules = dummySchedules;
+  ClassReminder _reminder = dummyClassReminder;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    try {
+      final p = await studentDataService.loadProfile();
+      final sum = await studentDataService.loadAttendanceSummary();
+      final sched = await studentDataService.loadSchedules();
+      final rem = await studentDataService.loadClassReminder();
+      if (mounted) {
+        setState(() {
+          _profile = p;
+          _summary = sum;
+          _schedules = sched;
+          _reminder = rem;
+        });
+      }
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -43,16 +73,17 @@ class _BerandaPageState extends State<BerandaPage> {
                   children: [
                     if (_showReminder)
                       _ReminderBanner(
-                        reminder: dummyClassReminder,
+                        reminder: _reminder,
                         onDismiss: () => setState(() => _showReminder = false),
                       ),
                     const SizedBox(height: 12),
                     _QuickActions(onAbsensiTap: () => context.go(StudentRoutePaths.absensi)),
                     const SizedBox(height: 16),
-                    _AttendanceSummaryCard(summary: dummyAttendanceSummary),
+                    _AttendanceSummaryCard(summary: _summary),
                     const SizedBox(height: 16),
                     _ScheduleSection(
                       selectedDay: _selectedDay,
+                      schedules: _schedules,
                       onDaySelected: (day) => setState(() => _selectedDay = day),
                       alarmToggles: _alarmToggles,
                       onAlarmToggle: (index, val) =>
@@ -94,7 +125,7 @@ class _BerandaPageState extends State<BerandaPage> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  _account.fullName,
+                  _profile?.fullName ?? _account.fullName,
                   style: TextStyle(
                     color: colorScheme.onSurface,
                     fontSize: 20,
@@ -103,7 +134,7 @@ class _BerandaPageState extends State<BerandaPage> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${_account.nim} · ${_account.className}',
+                  '${_profile?.studentId ?? _account.nim} · ${_account.className}',
                   style: TextStyle(
                     color: colorScheme.onSurfaceVariant,
                     fontSize: 12,
@@ -422,12 +453,14 @@ class _ScheduleSection extends StatelessWidget {
     required this.onDaySelected,
     required this.alarmToggles,
     required this.onAlarmToggle,
+    this.schedules,
   });
 
   final int selectedDay;
   final ValueChanged<int> onDaySelected;
   final Map<int, bool> alarmToggles;
   final void Function(int index, bool val) onAlarmToggle;
+  final List<StudentSchedule>? schedules;
 
   static const _dayLabels = ['SEN', 'SEL', 'RAB', 'KAM', 'JUM', 'SAB', 'MIN'];
   // hari ini tanggal 14 (Rabu), demo start dari 12 (Senin)
@@ -436,7 +469,8 @@ class _ScheduleSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final filteredSchedules = dummySchedules
+    final sourceSchedules = schedules ?? dummySchedules;
+    final filteredSchedules = sourceSchedules
         .where((s) => s.dayOfWeek == selectedDay)
         .toList();
 
