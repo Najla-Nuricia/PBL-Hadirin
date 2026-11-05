@@ -98,18 +98,30 @@ void main() {
     expect(currentPath(), LecturerRoutePaths.profil);
     expect(find.text('Informasi Akun'), findsOneWidget);
 
-    expect(
-      await lecturerAuthRepository.login(
-        email: DummyLecturerAuthRepository.demoAccount.email,
-        password: newPassword,
-      ),
-      isNotNull,
-    );
+    // The page talks to the global repository, so verify the new password
+    // against it outside the fake-async zone and then restore the demo account.
+    await tester.runAsync(() async {
+      expect(
+        await lecturerAuthRepository.login(
+          email: DummyLecturerAuthRepository.demoAccount.email,
+          password: newPassword,
+        ),
+        isNotNull,
+      );
 
-    await lecturerAuthRepository.changePassword(
-      email: DummyLecturerAuthRepository.demoAccount.email,
-      currentPassword: newPassword,
-      newPassword: DummyLecturerAuthRepository.demoAccount.password,
-    );
+      await lecturerAuthRepository.changePassword(
+        email: DummyLecturerAuthRepository.demoAccount.email,
+        currentPassword: newPassword,
+        newPassword: DummyLecturerAuthRepository.demoAccount.password,
+      );
+
+      expect(
+        await lecturerAuthRepository.login(
+          email: DummyLecturerAuthRepository.demoAccount.email,
+          password: DummyLecturerAuthRepository.demoAccount.password,
+        ),
+        isNotNull,
+      );
+    });
   });
 }

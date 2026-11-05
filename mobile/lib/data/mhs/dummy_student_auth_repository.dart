@@ -1,4 +1,4 @@
-﻿import 'student_account.dart';
+import 'student_account.dart';
 
 class NimAlreadyRegisteredException implements Exception {
   const NimAlreadyRegisteredException(this.nim);
@@ -7,13 +7,6 @@ class NimAlreadyRegisteredException implements Exception {
 
   @override
   String toString() => 'NimAlreadyRegisteredException: $nim';
-}
-
-class WrongPasswordException implements Exception {
-  const WrongPasswordException();
-
-  @override
-  String toString() => 'WrongPasswordException';
 }
 
 /// In-memory stand-in for the student auth API until the backend is ready.
@@ -33,6 +26,9 @@ class DummyStudentAuthRepository {
 
   final Duration latency;
   final Map<String, StudentAccount> _accounts;
+  StudentAccount? _currentAccount;
+
+  StudentAccount? get currentAccount => _currentAccount;
 
   Future<StudentAccount?> login({
     required String nim,
@@ -40,13 +36,42 @@ class DummyStudentAuthRepository {
   }) async {
     await Future<void>.delayed(latency);
     final account = _accounts[nim];
-    if (account == null || account.password != password) return null;
+    if (account == null || account.password != password) {
+      _currentAccount = null;
+      return null;
+    }
+    _currentAccount = account;
     return account;
+  }
+
+  void logout() {
+    _currentAccount = null;
   }
 
   Future<bool> isNimRegistered(String nim) async {
     await Future<void>.delayed(latency);
     return _accounts.containsKey(nim);
+  }
+
+  Future<bool> changePassword({
+    required String nim,
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    await Future<void>.delayed(latency);
+    final account = _accounts[nim];
+    if (account == null || account.password != currentPassword) return false;
+
+    final updatedAccount = StudentAccount(
+      nim: account.nim,
+      fullName: account.fullName,
+      className: account.className,
+      password: newPassword,
+      facePhotoPaths: account.facePhotoPaths,
+    );
+    _accounts[nim] = updatedAccount;
+    if (_currentAccount?.nim == nim) _currentAccount = updatedAccount;
+    return true;
   }
 
   Future<StudentAccount> register(
@@ -67,28 +92,6 @@ class DummyStudentAuthRepository {
     );
     _accounts[account.nim] = account;
     return account;
-  }
-
-  Future<StudentAccount> changePassword({
-    required String nim,
-    required String currentPassword,
-    required String newPassword,
-  }) async {
-    await Future<void>.delayed(latency);
-    final account = _accounts[nim];
-    if (account == null || account.password != currentPassword) {
-      throw const WrongPasswordException();
-    }
-
-    final updated = StudentAccount(
-      nim: account.nim,
-      fullName: account.fullName,
-      className: account.className,
-      password: newPassword,
-      facePhotoPaths: account.facePhotoPaths,
-    );
-    _accounts[nim] = updated;
-    return updated;
   }
 }
 

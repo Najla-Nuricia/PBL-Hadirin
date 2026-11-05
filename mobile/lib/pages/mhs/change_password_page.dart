@@ -1,35 +1,37 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/mhs/dummy_student_auth_repository.dart';
-import '../../data/mhs/student_profile_preview.dart';
-import '../../routing/student_route_paths.dart';
-
-const _minimumPasswordLength = 8;
 
 class ChangePasswordPage extends StatefulWidget {
-  const ChangePasswordPage({super.key, this.nim});
+  const ChangePasswordPage({required this.nim, this.repository, super.key});
 
-  /// Akun yang kata sandinya diubah. Default ke akun mahasiswa yang sedang login.
-  final String? nim;
+  final String nim;
+  final DummyStudentAuthRepository? repository;
 
   @override
   State<ChangePasswordPage> createState() => _ChangePasswordPageState();
 }
 
 class _ChangePasswordPageState extends State<ChangePasswordPage> {
+  static const _minimumPasswordLength = 8;
+
   final _formKey = GlobalKey<FormState>();
-  final _currentController = TextEditingController();
-  final _newController = TextEditingController();
+  final _currentPasswordController = TextEditingController();
+  final _newPasswordController = TextEditingController();
   final _confirmationController = TextEditingController();
+  bool _isNewPasswordVisible = false;
+  bool _isConfirmationVisible = false;
+  bool _isCurrentPasswordVisible = false;
   bool _isSubmitting = false;
 
-  String get _nim => widget.nim ?? studentProfilePreview.studentId;
+  DummyStudentAuthRepository get _repository =>
+      widget.repository ?? studentAuthRepository;
 
   @override
   void dispose() {
-    _currentController.dispose();
-    _newController.dispose();
+    _currentPasswordController.dispose();
+    _newPasswordController.dispose();
     _confirmationController.dispose();
     super.dispose();
   }
@@ -39,51 +41,51 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
     FocusScope.of(context).unfocus();
     setState(() => _isSubmitting = true);
-    try {
-      await studentAuthRepository.changePassword(
-        nim: _nim,
-        currentPassword: _currentController.text,
-        newPassword: _newController.text,
-      );
-      if (!mounted) return;
-      setState(() => _isSubmitting = false);
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(content: Text('Kata sandi berhasil diperbarui.')),
-        );
-      context.go(StudentRoutePaths.beranda);
-    } on WrongPasswordException {
-      if (!mounted) return;
-      setState(() => _isSubmitting = false);
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(content: Text('Kata sandi saat ini salah.')),
-        );
+    final changed = await _repository.changePassword(
+      nim: widget.nim,
+      currentPassword: _currentPasswordController.text,
+      newPassword: _newPasswordController.text,
+    );
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
+
+    final message = changed
+        ? 'Kata sandi berhasil diubah.'
+        : 'Kata sandi saat ini salah.';
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+
+    if (changed) {
+      _currentPasswordController.clear();
+      _newPasswordController.clear();
+      _confirmationController.clear();
+      _formKey.currentState!.reset();
     }
   }
 
-  String? _validateCurrent(String? value) {
+  String? _validateCurrentPassword(String? value) {
     if ((value ?? '').isEmpty) return 'Kata sandi saat ini wajib diisi.';
     return null;
   }
 
-  String? _validateNew(String? value) {
+  String? _validateNewPassword(String? value) {
     final password = value ?? '';
     if (password.isEmpty) return 'Kata sandi baru wajib diisi.';
     if (password.length < _minimumPasswordLength) {
       return 'Kata sandi minimal $_minimumPasswordLength karakter.';
     }
-    if (password == _currentController.text) {
+    if (password == _currentPasswordController.text) {
       return 'Kata sandi baru harus berbeda.';
     }
     return null;
   }
 
   String? _validateConfirmation(String? value) {
-    if ((value ?? '').isEmpty) return 'Konfirmasi kata sandi wajib diisi.';
-    if (value != _newController.text) {
+    if ((value ?? '').isEmpty) {
+      return 'Konfirmasi kata sandi wajib diisi.';
+    }
+    if (value != _newPasswordController.text) {
       return 'Konfirmasi kata sandi tidak sama.';
     }
     return null;
@@ -100,75 +102,89 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
           children: [
             _buildHeader(context, colorScheme),
             Expanded(
-              child: SingleChildScrollView(
+              child: Padding(
                 padding: const EdgeInsets.fromLTRB(18, 20, 18, 48),
                 child: Form(
                   key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _buildPasswordField(
-                        colorScheme: colorScheme,
-                        label: 'Kata Sandi Saat Ini',
-                        hint: 'Masukkan kata sandi saat ini',
-                        controller: _currentController,
-                        validator: _validateCurrent,
-                      ),
-                      const SizedBox(height: 12),
-                      _buildPasswordField(
-                        colorScheme: colorScheme,
-                        label: 'Kata Sandi Baru',
-                        hint: 'Masukkan kata sandi',
-                        controller: _newController,
-                        validator: _validateNew,
-                      ),
-                      const SizedBox(height: 12),
-                      _buildPasswordField(
-                        colorScheme: colorScheme,
-                        label: 'Konfirmasi Kata Sandi Baru',
-                        hint: 'Masukkan ulang kata sandi',
-                        controller: _confirmationController,
-                        textInputAction: TextInputAction.done,
-                        onSubmitted: (_) => _submit(),
-                        validator: _validateConfirmation,
-                      ),
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 42,
-                        child: FilledButton(
-                          onPressed: _isSubmitting ? null : _submit,
-                          style: FilledButton.styleFrom(
-                            backgroundColor: colorScheme.primary,
-                            foregroundColor: colorScheme.onPrimary,
-                            disabledBackgroundColor: colorScheme.primary
-                                .withValues(alpha: 0.4),
-                            disabledForegroundColor: colorScheme.onPrimary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
+                  child: AutofillGroup(
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          _buildPasswordField(
+                            key: const ValueKey('current-password-field'),
+                            colorScheme: colorScheme,
+                            label: 'Kata Sandi Saat Ini',
+                            hint: 'Masukkan kata sandi saat ini',
+                            controller: _currentPasswordController,
+                            isVisible: _isCurrentPasswordVisible,
+                            enabled: !_isSubmitting,
+                            validator: _validateCurrentPassword,
+                            onVisibilityChanged: (value) {
+                              setState(() => _isCurrentPasswordVisible = value);
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          _buildPasswordField(
+                            key: const ValueKey('new-password-field'),
+                            colorScheme: colorScheme,
+                            label: 'Kata Sandi Baru',
+                            hint: 'Masukkan kata sandi baru',
+                            controller: _newPasswordController,
+                            isVisible: _isNewPasswordVisible,
+                            enabled: !_isSubmitting,
+                            validator: _validateNewPassword,
+                            onVisibilityChanged: (value) {
+                              setState(() => _isNewPasswordVisible = value);
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                          _buildPasswordField(
+                            key: const ValueKey('confirm-password-field'),
+                            colorScheme: colorScheme,
+                            label: 'Konfirmasi Kata Sandi Baru',
+                            hint: 'Masukkan ulang kata sandi baru',
+                            controller: _confirmationController,
+                            isVisible: _isConfirmationVisible,
+                            enabled: !_isSubmitting,
+                            validator: _validateConfirmation,
+                            onVisibilityChanged: (value) {
+                              setState(() => _isConfirmationVisible = value);
+                            },
+                          ),
+                          const SizedBox(height: 32),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 42,
+                            child: FilledButton(
+                              onPressed: _isSubmitting ? null : _submit,
+                              style: FilledButton.styleFrom(
+                                backgroundColor: colorScheme.primary,
+                                foregroundColor: colorScheme.onPrimary,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                              ),
+                              child: _isSubmitting
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Text(
+                                      'Simpan',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
                             ),
                           ),
-                          child: _isSubmitting
-                              ? SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      colorScheme.onPrimary,
-                                    ),
-                                  ),
-                                )
-                              : const Text(
-                                  'Simpan',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                        ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -187,7 +203,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
         child: Row(
           children: [
             IconButton(
-              onPressed: () => context.go(StudentRoutePaths.beranda),
+              onPressed: () => context.go('/mhs/beranda'),
               icon: const Icon(Icons.chevron_left),
               color: colorScheme.onSurfaceVariant,
               tooltip: 'Kembali',
@@ -208,113 +224,73 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 }
 
 Widget _buildPasswordField({
+  required Key key,
   required ColorScheme colorScheme,
   required String label,
   required String hint,
   required TextEditingController controller,
-  required FormFieldValidator<String> validator,
-  TextInputAction textInputAction = TextInputAction.next,
-  ValueChanged<String>? onSubmitted,
+  required bool isVisible,
+  required bool enabled,
+  required String? Function(String?) validator,
+  required ValueChanged<bool> onVisibilityChanged,
 }) {
-  return _StudentPasswordField(
-    colorScheme: colorScheme,
-    label: label,
-    hint: hint,
-    controller: controller,
-    validator: validator,
-    textInputAction: textInputAction,
-    onSubmitted: onSubmitted,
+  return Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        label,
+        style: TextStyle(
+          color: colorScheme.onSurface,
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      const SizedBox(height: 7),
+      TextFormField(
+        key: key,
+        controller: controller,
+        enabled: enabled,
+        obscureText: !isVisible,
+        style: TextStyle(color: colorScheme.onSurface, fontSize: 11),
+        validator: validator,
+        autovalidateMode: AutovalidateMode.onUserInteraction,
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: TextStyle(
+            color: colorScheme.onSurfaceVariant,
+            fontSize: 14,
+          ),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+          suffixIconConstraints: const BoxConstraints(
+            minWidth: 38,
+            minHeight: 38,
+          ),
+          suffixIcon: IconButton(
+            onPressed: enabled ? () => onVisibilityChanged(!isVisible) : null,
+            padding: EdgeInsets.zero,
+            icon: Icon(
+              isVisible ? Icons.visibility_outlined : Icons.visibility_off,
+              size: 15,
+              color: colorScheme.onSurfaceVariant,
+            ),
+            tooltip: isVisible
+                ? 'Sembunyikan kata sandi'
+                : 'Tampilkan kata sandi',
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(color: colorScheme.outline),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(color: colorScheme.outline),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(color: colorScheme.primary),
+          ),
+        ),
+      ),
+    ],
   );
-}
-
-class _StudentPasswordField extends StatefulWidget {
-  const _StudentPasswordField({
-    required this.colorScheme,
-    required this.label,
-    required this.hint,
-    required this.controller,
-    required this.validator,
-    required this.textInputAction,
-    this.onSubmitted,
-  });
-
-  final ColorScheme colorScheme;
-  final String label;
-  final String hint;
-  final TextEditingController controller;
-  final FormFieldValidator<String> validator;
-  final TextInputAction textInputAction;
-  final ValueChanged<String>? onSubmitted;
-
-  @override
-  State<_StudentPasswordField> createState() => _StudentPasswordFieldState();
-}
-
-class _StudentPasswordFieldState extends State<_StudentPasswordField> {
-  bool _isVisible = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final border = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: BorderSide(color: widget.colorScheme.outline),
-    );
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          widget.label,
-          style: TextStyle(
-            color: widget.colorScheme.onSurface,
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        const SizedBox(height: 7),
-        TextFormField(
-          controller: widget.controller,
-          obscureText: !_isVisible,
-          textInputAction: widget.textInputAction,
-          onFieldSubmitted: widget.onSubmitted,
-          validator: widget.validator,
-          style: TextStyle(color: widget.colorScheme.onSurface, fontSize: 12),
-          decoration: InputDecoration(
-            isDense: true,
-            hintText: widget.hint,
-            hintStyle: TextStyle(
-              color: widget.colorScheme.onSurfaceVariant,
-              fontSize: 12,
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 11,
-            ),
-            errorStyle: const TextStyle(fontSize: 11),
-            suffixIconConstraints: const BoxConstraints(
-              minWidth: 38,
-              minHeight: 38,
-            ),
-            suffixIcon: IconButton(
-              onPressed: () => setState(() => _isVisible = !_isVisible),
-              padding: EdgeInsets.zero,
-              icon: Icon(
-                _isVisible ? Icons.visibility_outlined : Icons.visibility_off,
-                size: 15,
-                color: widget.colorScheme.onSurfaceVariant,
-              ),
-              tooltip: _isVisible
-                  ? 'Sembunyikan kata sandi'
-                  : 'Tampilkan kata sandi',
-            ),
-            border: border,
-            enabledBorder: border,
-            focusedBorder: border.copyWith(
-              borderSide: BorderSide(color: widget.colorScheme.primary),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
 }
