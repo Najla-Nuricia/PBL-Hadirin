@@ -6,12 +6,24 @@
     "test": "mocha \"../test/appium/**/*.test.js\" --timeout 120000",
     "test:admin": "APP_ROLE=admin mocha \"../test/appium/admin/**/*.test.js\" --timeout 120000",
     "test:dosen": "APP_ROLE=lecturer mocha \"../test/appium/dosen/**/*.test.js\" --timeout 120000",
-    "test:mhs": "APP_ROLE=student mocha \"../test/appium/mhs/**/*.test.js\" --timeout 120000"
+    "test:mhs": "APP_ROLE=student wdio run ./wdio.mhs.conf.ts",
+    "test:mhs:types": "tsc --noEmit -p ./tsconfig.e2e.json"
   },
   "devDependencies": {
-    "appium": "^2.19.0",
+    "@wdio/appium-service": "^9.32.0",
+    "@wdio/cli": "^9.32.0",
+    "@wdio/globals": "^9.32.0",
+    "@wdio/local-runner": "^9.32.0",
+    "@wdio/mocha-framework": "^9.32.0",
+    "@wdio/spec-reporter": "^9.32.0",
+    "appium": "^3.8.0",
     "appium-flutter-driver": "^2.2.0",
+    "appium-uiautomator2-driver": "^8.7.0",
+    "dotenv": "^18.0.9",
+    "expect-webdriverio": "^7.0.1",
     "mocha": "^11.7.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^7.0.2",
     "webdriverio": "^9.20.0"
   }
 }

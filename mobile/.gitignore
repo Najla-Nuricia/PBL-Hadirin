@@ -49,3 +49,5 @@ app.*.map.json
 
 # Appium/Node related
 /appium/node_modules/
+/test/appium/node_modules/
+/test/appium/node_modules

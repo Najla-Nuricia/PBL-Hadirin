@@ -6,9 +6,10 @@ Appium tests are kept separate from Flutter functional tests:
 test/
 ├── functional/          # Flutter unit, widget, and repository tests
 └── appium/
-    ├── admin/            # Test case untuk role admin
-    ├── dosen/            # Test case untuk role dosen
-    └── mhs/              # Test case untuk role mahasiswa
+    ├── admin/             # Smoke test role admin
+    ├── dosen/             # Smoke test role dosen
+    ├── mhs/               # Smoke test role mahasiswa
+    └── mahasiswa/         # Seluruh TC Mahasiswa dari repo PBL-Hadirin-QA
 ```
 
 ## Prerequisites
@@ -26,15 +27,17 @@ npx appium driver install uiautomator2
 npx appium driver install --source=npm appium-flutter-driver
 ```
 
-Build the APK for the role under test. `APP_ROLE` is read by `lib/main.dart`:
+Run the app directly on the connected Android device. This is the recommended
+way to run the TC because Flutter installs and starts the current source:
 
 ```bash
 cd ..
-flutter build apk --debug --dart-define=APP_ROLE=student
+flutter run -d <device-id> --dart-define=APP_ROLE=student
 ```
 
 Supported values are `student`, `lecturer`, and any other value for the admin
-router. Use the matching npm script for the APK that was built:
+router. Keep `flutter run` active in one terminal, then run the test suite in
+another terminal:
 
 Start Appium in one terminal:
 
@@ -43,12 +46,23 @@ cd appium
 npm run appium
 ```
 
-Then run the tests from another terminal:
+Then run the seluruh TC Mahasiswa from another terminal:
 
 ```bash
 cd appium
+npm run test:mhs:types
 npm run test:mhs
 ```
 
-Use `APP_PATH` when the APK is stored elsewhere, and `DEVICE_NAME` when the
-connected device is not named `Android Emulator`.
+Set `ANDROID_DEVICE_NAME` and `ANDROID_PLATFORM_VERSION` when they are not
+detected automatically:
+
+```bash
+ANDROID_DEVICE_NAME=<device-id> ANDROID_PLATFORM_VERSION=14 npm run test:mhs
+```
+
+`FLUTTER_APP_PATH` is optional and is only needed when Appium should install an
+APK directly instead of attaching to the app installed by `flutter run`.
+
+The test cases are grouped under `test/appium/mahasiswa/TS*`, following the
+scenario and TC folders from `PBL-Hadirin-QA`.
