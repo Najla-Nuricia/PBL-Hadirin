@@ -54,6 +54,21 @@ npm run test:mhs:types
 npm run test:mhs
 ```
 
+To run one scenario folder, such as `TS01_Registrasi_Akun`:
+
+```bash
+cd appium
+npx wdio run ./wdio.mhs.conf.ts --spec ../test/appium/mahasiswa/TS01_Registrasi_Akun/**/*.ts
+```
+
+To run one specific test case:
+
+```bash
+cd appium
+npx wdio run ./wdio.mhs.conf.ts \
+  --spec ../test/appium/mahasiswa/TS01_Registrasi_Akun/TC01_Registrasi_Akun_Valid.ts
+```
+
 Set `ANDROID_DEVICE_NAME` and `ANDROID_PLATFORM_VERSION` when they are not
 detected automatically:
 
