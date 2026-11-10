@@ -1,4 +1,4 @@
-import { browser, $ } from '@wdio/globals';
+import { browser, driver, $ } from '@wdio/globals';
 import { LOCATORS } from './selectors';
 
 /**
@@ -24,6 +24,57 @@ export async function openStudentLogin(): Promise<void> {
   await $(LOCATORS.onboarding.mahasiswa).waitForDisplayed();
   await $(LOCATORS.onboarding.mahasiswa).click();
   await waitForLoginScreen();
+}
+
+export async function openStudentRegistration(): Promise<void> {
+  await openStudentLogin();
+  await $('~Daftar').click();
+  await $(LOCATORS.mahasiswa.register.title).waitForDisplayed();
+}
+
+const FOCUSED_EDIT =
+  'android=new UiSelector().className("android.widget.EditText").focused(true)';
+
+export async function fillField(
+  selector: string,
+  value: string,
+): Promise<void> {
+  if (await driver.isKeyboardShown()) {
+    await driver.hideKeyboard();
+    await browser.pause(800);
+  }
+
+  try {
+    const field = await $(selector);
+    await field.waitForDisplayed({ timeout: 10000 });
+    await field.click();
+    await browser.pause(800);
+  } catch (error) {
+    if (!selector.includes('instance(4)')) throw error;
+
+    const passwordField = await $(
+      selector.replace('instance(4)', 'instance(3)'),
+    );
+    await passwordField.waitForDisplayed({ timeout: 10000 });
+    await passwordField.click();
+    await driver.pressKeyCode(61);
+    await browser.pause(500);
+  }
+
+  const focusedField = await $(FOCUSED_EDIT);
+  await focusedField.waitForExist({ timeout: 5000 });
+  await focusedField.setValue(value);
+}
+
+export async function tapSubmitRegistrasi(): Promise<void> {
+  if (await driver.isKeyboardShown().catch(() => false)) {
+    await driver.pressKeyCode(4); // Back, cuma nutup keyboard
+    await browser.pause(800);
+  }
+
+  const submitButton = await $(LOCATORS.mahasiswa.register.submitButton);
+  await submitButton.waitForDisplayed({ timeout: 10000 });
+  await submitButton.click();
 }
 
 export async function adminLogin(username: string, password: string): Promise<void> {

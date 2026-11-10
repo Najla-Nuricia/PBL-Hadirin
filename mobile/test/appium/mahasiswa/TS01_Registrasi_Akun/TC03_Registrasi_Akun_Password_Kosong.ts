@@ -15,6 +15,8 @@
  */
 
 import { browser, expect, $ } from '@wdio/globals';
+import { openStudentRegistration } from '../../src/support/actions';
+import { LOCATORS } from '../../src/support/selectors';
 
 describe('TC-MHS-003 - Registrasi mahasiswa dengan password kosong', () => {
   before(async () => {
@@ -29,26 +31,19 @@ describe('TC-MHS-003 - Registrasi mahasiswa dengan password kosong', () => {
     //
     // Expected Result: Sistem menampilkan validasi password wajib diisi
 
-    await browser.pause(2000);
+    await openStudentRegistration();
 
-    const bukaRegistrasiButton = await $(
-      '~Daftar'
-    );
-    await bukaRegistrasiButton.click();
-    await browser.pause(2000);
-
-    const passwordField = await $(
-      'android=new UiSelector().className("android.widget.EditText").instance(3)'
-    );
+    await $(LOCATORS.mahasiswa.register.fullNameField).setValue('Najla Nuricia');
+    await $(LOCATORS.mahasiswa.register.nimField).setValue('244107020091');
+    await $(LOCATORS.mahasiswa.register.classField).setValue('3F-TI');
+    const passwordField = await $(LOCATORS.mahasiswa.register.passwordField);
     await passwordField.setValue('');
 
-    const submitButton = await $(
-      '~Lanjut ke Scan Wajah →'
-    );
+    const submitButton = await $(LOCATORS.mahasiswa.register.submitButton);
     await submitButton.click();
     await browser.pause(3000);
 
     // Assertion: validasi password wajib diisi ditampilkan.
-    await expect($('~Password wajib diisi.')).toBeDisplayed();
+    await expect($('~Kata sandi wajib diisi.')).toBeDisplayed();
   });
 });

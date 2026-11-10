@@ -15,6 +15,8 @@
  */
 
 import { browser, expect, $ } from '@wdio/globals';
+import { openStudentRegistration } from '../../src/support/actions';
+import { LOCATORS } from '../../src/support/selectors';
 
 describe('TC-MHS-002 - Registrasi mahasiswa dengan NIM kosong', () => {
   before(async () => {
@@ -29,22 +31,16 @@ describe('TC-MHS-002 - Registrasi mahasiswa dengan NIM kosong', () => {
     //
     // Expected Result: Sistem menampilkan validasi NIM wajib diisi
 
-    await browser.pause(2000);
+    await openStudentRegistration();
 
-    const bukaRegistrasiButton = await $(
-      '~Daftar'
-    );
-    await bukaRegistrasiButton.click();
-    await browser.pause(2000);
-
-    const nimField = await $(
-      'android=new UiSelector().className("android.widget.EditText").instance(1)'
-    );
+    await $(LOCATORS.mahasiswa.register.fullNameField).setValue('Najla Nuricia');
+    const nimField = await $(LOCATORS.mahasiswa.register.nimField);
     await nimField.setValue('');
+    await $(LOCATORS.mahasiswa.register.classField).setValue('3F-TI');
+    await $(LOCATORS.mahasiswa.register.passwordField).setValue('najla1234');
+    await $(LOCATORS.mahasiswa.register.confirmPasswordField).setValue('najla1234');
 
-    const submitButton = await $(
-      '~Lanjut ke Scan Wajah →'
-    );
+    const submitButton = await $(LOCATORS.mahasiswa.register.submitButton);
     await submitButton.click();
     await browser.pause(3000);
 

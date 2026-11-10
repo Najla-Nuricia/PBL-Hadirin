@@ -16,6 +16,8 @@
 
 import { browser, expect, $ } from '@wdio/globals';
 import { HADIRIN_DEMO_ACCOUNTS } from '../../src/support/env';
+import { openStudentRegistration } from '../../src/support/actions';
+import { LOCATORS } from '../../src/support/selectors';
 
 describe('TC-MHS-004 - Registrasi mahasiswa dengan NIM sudah terdaftar', () => {
   before(async () => {
@@ -30,27 +32,20 @@ describe('TC-MHS-004 - Registrasi mahasiswa dengan NIM sudah terdaftar', () => {
     //
     // Expected Result: Sistem menolak registrasi dan menampilkan pesan
 
-    await browser.pause(2000);
+    await openStudentRegistration();
 
-    const bukaRegistrasiButton = await $(
-      '~Daftar'
-    );
-    await bukaRegistrasiButton.click();
-    await browser.pause(2000);
-
-    const nimField = await $(
-      'android=new UiSelector().className("android.widget.EditText").instance(1)'
-    );
+    await $(LOCATORS.mahasiswa.register.fullNameField).setValue('Mahasiswa Duplikat');
+    const nimField = await $(LOCATORS.mahasiswa.register.nimField);
     await nimField.setValue(HADIRIN_DEMO_ACCOUNTS.mahasiswa.nim);
+    await $(LOCATORS.mahasiswa.register.classField).setValue('3F-TI');
+    await $(LOCATORS.mahasiswa.register.passwordField).setValue('najla1234');
+    await $(LOCATORS.mahasiswa.register.confirmPasswordField).setValue('najla1234');
 
-    const submitButton = await $(
-      '~Lanjut ke Scan Wajah →'
-    );
+    const submitButton = await $(LOCATORS.mahasiswa.register.submitButton);
     await submitButton.click();
     await browser.pause(3000);
 
     // Assertion: registrasi ditolak dan pesan NIM sudah terdaftar ditampilkan.
-    // ~NIM sudah terdaftar. Silakan login. belum tersedia.
-    await expect($('~NIM sudah terdaftar. Silakan login.')).toBeDisplayed();
+    await expect($(LOCATORS.mahasiswa.register.duplicateNimSnackbar)).toBeDisplayed();
   });
 });
