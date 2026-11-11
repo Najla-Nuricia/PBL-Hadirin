@@ -49,10 +49,13 @@ describe('TC-MHS-012 - Update informasi akun mahasiswa', () => {
       'android=new UiSelector().className("android.widget.EditText").instance(3)',
     );
 
+    await nameField.click();
     await nameField.clearValue();
     await nameField.setValue('Najla Nuricia');
+    await phoneField.click();
     await phoneField.clearValue();
     await phoneField.setValue('08570000000');
+    await emailField.click();
     await emailField.clearValue();
     await emailField.setValue('najla@email.com');
 
