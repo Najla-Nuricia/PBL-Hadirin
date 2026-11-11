@@ -16,7 +16,11 @@
 
 import { browser, expect, $ } from '@wdio/globals';
 import { HADIRIN_DEMO_ACCOUNTS } from '../../src/support/env';
-import { openStudentRegistration } from '../../src/support/actions';
+import {
+  fillField,
+  openStudentRegistration,
+  tapSubmitRegistrasi,
+} from '../../src/support/actions';
 import { LOCATORS } from '../../src/support/selectors';
 
 describe('TC-MHS-004 - Registrasi mahasiswa dengan NIM sudah terdaftar', () => {
@@ -34,18 +38,28 @@ describe('TC-MHS-004 - Registrasi mahasiswa dengan NIM sudah terdaftar', () => {
 
     await openStudentRegistration();
 
-    await $(LOCATORS.mahasiswa.register.fullNameField).setValue('Mahasiswa Duplikat');
-    const nimField = await $(LOCATORS.mahasiswa.register.nimField);
-    await nimField.setValue(HADIRIN_DEMO_ACCOUNTS.mahasiswa.nim);
-    await $(LOCATORS.mahasiswa.register.classField).setValue('3F-TI');
-    await $(LOCATORS.mahasiswa.register.passwordField).setValue('najla1234');
-    await $(LOCATORS.mahasiswa.register.confirmPasswordField).setValue('najla1234');
+    await fillField(
+      LOCATORS.mahasiswa.register.fullNameField,
+      'Mahasiswa Duplikat',
+    );
+    await fillField(
+      LOCATORS.mahasiswa.register.nimField,
+      HADIRIN_DEMO_ACCOUNTS.mahasiswa.nim,
+    );
+    await fillField(LOCATORS.mahasiswa.register.classField, '3F-TI');
+    await fillField(LOCATORS.mahasiswa.register.passwordField, 'najla1234');
+    await fillField(
+      LOCATORS.mahasiswa.register.confirmPasswordField,
+      'najla1234',
+    );
 
-    const submitButton = await $(LOCATORS.mahasiswa.register.submitButton);
-    await submitButton.click();
-    await browser.pause(3000);
+    await tapSubmitRegistrasi();
 
-    // Assertion: registrasi ditolak dan pesan NIM sudah terdaftar ditampilkan.
-    await expect($(LOCATORS.mahasiswa.register.duplicateNimSnackbar)).toBeDisplayed();
+    const snackbar = $(LOCATORS.mahasiswa.register.duplicateNimSnackbar);
+    await snackbar.waitForDisplayed({
+      timeout: 10000,
+      timeoutMsg: 'Snackbar NIM sudah terdaftar tidak muncul',
+    });
+    await expect(snackbar).toBeDisplayed();
   });
 });

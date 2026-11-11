@@ -15,7 +15,11 @@
  */
 
 import { browser, expect, $ } from '@wdio/globals';
-import { openStudentRegistration } from '../../src/support/actions';
+import {
+  fillField,
+  openStudentRegistration,
+  tapSubmitRegistrasi,
+} from '../../src/support/actions';
 import { LOCATORS } from '../../src/support/selectors';
 
 describe('TC-MHS-002 - Registrasi mahasiswa dengan NIM kosong', () => {
@@ -33,15 +37,19 @@ describe('TC-MHS-002 - Registrasi mahasiswa dengan NIM kosong', () => {
 
     await openStudentRegistration();
 
-    await $(LOCATORS.mahasiswa.register.fullNameField).setValue('Najla Nuricia');
-    const nimField = await $(LOCATORS.mahasiswa.register.nimField);
-    await nimField.setValue('');
-    await $(LOCATORS.mahasiswa.register.classField).setValue('3F-TI');
-    await $(LOCATORS.mahasiswa.register.passwordField).setValue('najla1234');
-    await $(LOCATORS.mahasiswa.register.confirmPasswordField).setValue('najla1234');
+    await fillField(
+      LOCATORS.mahasiswa.register.fullNameField,
+      'Najla Nuricia',
+    );
+    await fillField(LOCATORS.mahasiswa.register.nimField, '');
+    await fillField(LOCATORS.mahasiswa.register.classField, '3F-TI');
+    await fillField(LOCATORS.mahasiswa.register.passwordField, 'najla1234');
+    await fillField(
+      LOCATORS.mahasiswa.register.confirmPasswordField,
+      'najla1234',
+    );
 
-    const submitButton = await $(LOCATORS.mahasiswa.register.submitButton);
-    await submitButton.click();
+    await tapSubmitRegistrasi();
     await browser.pause(3000);
 
     // Assertion: validasi NIM wajib diisi ditampilkan.

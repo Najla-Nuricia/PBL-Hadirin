@@ -15,7 +15,11 @@
  */
 
 import { browser, expect, $ } from '@wdio/globals';
-import { openStudentRegistration } from '../../src/support/actions';
+import {
+  fillField,
+  openStudentRegistration,
+  tapSubmitRegistrasi,
+} from '../../src/support/actions';
 import { LOCATORS } from '../../src/support/selectors';
 
 describe('TC-MHS-003 - Registrasi mahasiswa dengan password kosong', () => {
@@ -33,14 +37,19 @@ describe('TC-MHS-003 - Registrasi mahasiswa dengan password kosong', () => {
 
     await openStudentRegistration();
 
-    await $(LOCATORS.mahasiswa.register.fullNameField).setValue('Najla Nuricia');
-    await $(LOCATORS.mahasiswa.register.nimField).setValue('244107020091');
-    await $(LOCATORS.mahasiswa.register.classField).setValue('3F-TI');
-    const passwordField = await $(LOCATORS.mahasiswa.register.passwordField);
-    await passwordField.setValue('');
+    await fillField(
+      LOCATORS.mahasiswa.register.fullNameField,
+      'Najla Nuricia',
+    );
+    await fillField(LOCATORS.mahasiswa.register.nimField, '244107020091');
+    await fillField(LOCATORS.mahasiswa.register.classField, '3F-TI');
+    await fillField(LOCATORS.mahasiswa.register.passwordField, '');
+    await fillField(
+      LOCATORS.mahasiswa.register.confirmPasswordField,
+      'najla1234',
+    );
 
-    const submitButton = await $(LOCATORS.mahasiswa.register.submitButton);
-    await submitButton.click();
+    await tapSubmitRegistrasi();
     await browser.pause(3000);
 
     // Assertion: validasi password wajib diisi ditampilkan.

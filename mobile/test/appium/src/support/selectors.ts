@@ -49,8 +49,7 @@ export const LOCATORS = {
         'android=new UiSelector().className("android.widget.EditText").instance(4)',
       submitButton: '~Lanjut ke Scan Wajah →',
       successSnackbar: '~Registrasi berhasil. Silakan login dengan NIM kamu.',
-      duplicateNimSnackbar:
-        'android=new UiSelector().textContains("sudah terdaftar. Silakan login.")',
+      duplicateNimSnackbar: '//*[contains(@content-desc,"NIM sudah terdaftar")]',
     },
   },
   dosen: {
