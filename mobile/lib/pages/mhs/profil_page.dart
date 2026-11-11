@@ -49,6 +49,9 @@ class _ProfilPageState extends State<ProfilPage> {
       _email = updatedProfile.email;
       _phoneNumber = updatedProfile.phoneNumber;
     });
+    studentAuthRepository.updateProfile(
+      fullName: updatedProfile.fullName,
+    );
     _showMessage('Profil berhasil diperbarui.');
   }
 
