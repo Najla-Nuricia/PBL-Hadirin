@@ -23,6 +23,7 @@ class _SuratPageState extends State<SuratPage> {
   ];
 
   int _selectedType = 0;
+  String _selectedAbsenceType = 'izin';
   String? _fileName;
   String? _selectedCourse;
   DateTime? _selectedDate;
@@ -44,11 +45,14 @@ class _SuratPageState extends State<SuratPage> {
     }
     setState(() => _isSubmitting = true);
     try {
-      final jenis = _selectedType == 0 ? 'izin' : 'sakit';
-      final tanggal = (_selectedDate ?? DateTime.now()).toIso8601String().split('T').first;
+      final jenis = _selectedType == 0 ? _selectedAbsenceType : 'sakit';
+      final tanggal = (_selectedDate ?? DateTime.now())
+          .toIso8601String()
+          .split('T')
+          .first;
       final alasan = _notesController.text.trim().isNotEmpty
           ? _notesController.text.trim()
-          : 'Pengajuan surat ${_selectedType == 0 ? "izin" : "sakit"}';
+          : 'Pengajuan surat $jenis';
 
       await studentDataService.submitPengajuan(
         jenis: jenis,
@@ -70,9 +74,8 @@ class _SuratPageState extends State<SuratPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal mengirim surat: $e')),
-        );
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Gagal mengirim surat: $e')));
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
@@ -196,6 +199,51 @@ class _SuratPageState extends State<SuratPage> {
     );
   }
 
+  Widget _buildAbsenceTypeSelector(ColorScheme colorScheme) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.start,
+      children: [
+        _buildAbsenceRadio('sakit', 'Sakit', colorScheme),
+        const SizedBox(width: 20),
+        _buildAbsenceRadio('izin', 'Izin', colorScheme),
+      ],
+    );
+  }
+
+  Widget _buildAbsenceRadio(
+    String value,
+    String label,
+    ColorScheme colorScheme,
+  ) {
+    return Semantics(
+      label: label,
+      selected: _selectedAbsenceType == value,
+      child: InkWell(
+        onTap: () => setState(() => _selectedAbsenceType = value),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Radio<String>(
+              value: value,
+              groupValue: _selectedAbsenceType,
+              onChanged: (selected) {
+                if (selected != null) {
+                  setState(() => _selectedAbsenceType = selected);
+                }
+              },
+              activeColor: colorScheme.primary,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            Text(
+              label,
+              style: TextStyle(color: colorScheme.onSurface, fontSize: 12),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildFormCard(ColorScheme colorScheme) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -208,6 +256,10 @@ class _SuratPageState extends State<SuratPage> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _buildFilePicker(colorScheme),
+          if (_selectedType == 0) ...[
+            const SizedBox(height: 8),
+            _buildAbsenceTypeSelector(colorScheme),
+          ],
           const SizedBox(height: 14),
           _buildFieldLabel('Mata Kuliah', colorScheme),
           const SizedBox(height: 6),
@@ -240,11 +292,17 @@ class _SuratPageState extends State<SuratPage> {
                   ? const SizedBox(
                       width: 18,
                       height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
                   : const Text(
                       'Kirim Surat',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
             ),
           ),
