@@ -16,6 +16,12 @@
 
 import { browser, expect, $ } from '@wdio/globals';
 import { HADIRIN_DEMO_ACCOUNTS } from '../../src/support/env';
+import {
+  fillField,
+  openStudentRegistration,
+  tapSubmitRegistrasi,
+} from '../../src/support/actions';
+import { LOCATORS } from '../../src/support/selectors';
 
 describe('TC-MHS-004 - Registrasi mahasiswa dengan NIM sudah terdaftar', () => {
   before(async () => {
@@ -30,27 +36,30 @@ describe('TC-MHS-004 - Registrasi mahasiswa dengan NIM sudah terdaftar', () => {
     //
     // Expected Result: Sistem menolak registrasi dan menampilkan pesan
 
-    await browser.pause(2000);
+    await openStudentRegistration();
 
-    const bukaRegistrasiButton = await $(
-      '~Daftar'
+    await fillField(
+      LOCATORS.mahasiswa.register.fullNameField,
+      'Mahasiswa Duplikat',
     );
-    await bukaRegistrasiButton.click();
-    await browser.pause(2000);
-
-    const nimField = await $(
-      'android=new UiSelector().className("android.widget.EditText").instance(1)'
+    await fillField(
+      LOCATORS.mahasiswa.register.nimField,
+      HADIRIN_DEMO_ACCOUNTS.mahasiswa.nim,
     );
-    await nimField.setValue(HADIRIN_DEMO_ACCOUNTS.mahasiswa.nim);
-
-    const submitButton = await $(
-      '~Lanjut ke Scan Wajah →'
+    await fillField(LOCATORS.mahasiswa.register.classField, '3F-TI');
+    await fillField(LOCATORS.mahasiswa.register.passwordField, 'najla1234');
+    await fillField(
+      LOCATORS.mahasiswa.register.confirmPasswordField,
+      'najla1234',
     );
-    await submitButton.click();
-    await browser.pause(3000);
 
-    // Assertion: registrasi ditolak dan pesan NIM sudah terdaftar ditampilkan.
-    // ~NIM sudah terdaftar. Silakan login. belum tersedia.
-    await expect($('~NIM sudah terdaftar. Silakan login.')).toBeDisplayed();
+    await tapSubmitRegistrasi();
+
+    const snackbar = $(LOCATORS.mahasiswa.register.duplicateNimSnackbar);
+    await snackbar.waitForDisplayed({
+      timeout: 10000,
+      timeoutMsg: 'Snackbar NIM sudah terdaftar tidak muncul',
+    });
+    await expect(snackbar).toBeDisplayed();
   });
 });

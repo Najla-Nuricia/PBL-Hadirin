@@ -13,14 +13,21 @@
  * Expected Result: Alarm / pengingat muncul
  */
 
-import { browser, expect, $ } from '@wdio/globals';
+import { expect, $ } from '@wdio/globals';
 import { mahasiswaLogin } from '../../src/support/actions';
 import { HADIRIN_DEMO_ACCOUNTS } from '../../src/support/env';
+import {
+  advanceToReminderWindow,
+  FakeClock,
+} from '../../src/support/clock';
 
 describe('TC-MHS-014 - Alarm 30 menit sebelum kelas', () => {
   before(async () => {
     // Pre-condition: jadwal kelas tersedia.
-    await mahasiswaLogin( HADIRIN_DEMO_ACCOUNTS.mahasiswa.nim, HADIRIN_DEMO_ACCOUNTS.mahasiswa.password, );
+    await mahasiswaLogin(
+      HADIRIN_DEMO_ACCOUNTS.mahasiswa.nim,
+      HADIRIN_DEMO_ACCOUNTS.mahasiswa.password,
+    );
   });
 
   it('should show reminder before class starts', async () => {
@@ -29,11 +36,15 @@ describe('TC-MHS-014 - Alarm 30 menit sebelum kelas', () => {
     //
     // Expected Result: Alarm / pengingat muncul
 
-    await browser.pause(5000);
-
-    const notifikasi = await $(
-      '~Pengingat kelas'
+    const classStart = new Date();
+    classStart.setMinutes(classStart.getMinutes() + 31);
+    const clock = new FakeClock(
+      new Date(classStart.getTime() - 31 * 60 * 1000),
     );
+    advanceToReminderWindow(clock, classStart);
+
+    const notifikasi = await $('~Pengingat kelas');
+    await notifikasi.waitForDisplayed({ timeout: 10000 });
     await expect(notifikasi).toBeDisplayed();
   });
 });

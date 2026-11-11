@@ -36,6 +36,8 @@ describe('TC-MHS-011 - Melihat informasi akun mahasiswa', () => {
     await goToStudentTab('Profil');
 
     // Assertion: halaman informasi akun tampil.
-    await expect($('android=new UiSelector().text("Informasi Akun")')).toBeDisplayed();
+    await expect(
+      $('android=new UiSelector().description("Informasi Akun")'),
+    ).toBeDisplayed();
   });
 });

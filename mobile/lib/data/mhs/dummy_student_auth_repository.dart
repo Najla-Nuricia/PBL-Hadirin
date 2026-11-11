@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../api_config.dart';
@@ -14,7 +15,7 @@ class NimAlreadyRegisteredException implements Exception {
 }
 
 /// Stand-in & Real HTTP repository for student auth.
-class DummyStudentAuthRepository {
+class DummyStudentAuthRepository extends ChangeNotifier {
   DummyStudentAuthRepository({
     Iterable<StudentAccount> seedAccounts = const [demoAccount],
     this.latency = const Duration(milliseconds: 600),
@@ -90,6 +91,26 @@ class DummyStudentAuthRepository {
 
   void logout() {
     _currentAccount = null;
+    notifyListeners();
+  }
+
+  void updateProfile({
+    required String fullName,
+  }) {
+    final account = _currentAccount;
+    if (account == null) return;
+
+    final updatedAccount = StudentAccount(
+      nim: account.nim,
+      fullName: fullName,
+      className: account.className,
+      password: account.password,
+      facePhotoPaths: account.facePhotoPaths,
+      token: account.token,
+    );
+    _accounts[account.nim] = updatedAccount;
+    _currentAccount = updatedAccount;
+    notifyListeners();
   }
 
   Future<bool> isNimRegistered(String nim) async {

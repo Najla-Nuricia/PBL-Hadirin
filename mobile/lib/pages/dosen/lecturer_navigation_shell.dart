@@ -4,13 +4,18 @@ import 'package:go_router/go_router.dart';
 import '../../theme/style/navbar_style.dart';
 
 const _lecturerNavbarItems = [
-  (icon: Icons.home_outlined, selectedIcon: Icons.home, label: 'Beranda'),
   (
     icon: Icons.fact_check_outlined,
     selectedIcon: Icons.fact_check,
     label: 'Kehadiran',
+    branchIndex: 1,
   ),
-  (icon: Icons.person_outline, selectedIcon: Icons.person, label: 'Profil'),
+  (
+    icon: Icons.person_outline,
+    selectedIcon: Icons.person,
+    label: 'Profil',
+    branchIndex: 2,
+  ),
 ];
 
 class LecturerNavigationShell extends StatelessWidget {
@@ -35,8 +40,10 @@ class LecturerNavigationShell extends StatelessWidget {
               currentIndex: navigationShell.currentIndex,
               onTap: (index) {
                 navigationShell.goBranch(
-                  index,
-                  initialLocation: index == navigationShell.currentIndex,
+                  _lecturerNavbarItems[index].branchIndex,
+                  initialLocation:
+                      _lecturerNavbarItems[index].branchIndex ==
+                      navigationShell.currentIndex,
                 );
               },
             )
@@ -83,7 +90,8 @@ class _LecturerBottomNavigationBar extends StatelessWidget {
                     icon: _lecturerNavbarItems[index].icon,
                     selectedIcon: _lecturerNavbarItems[index].selectedIcon,
                     label: _lecturerNavbarItems[index].label,
-                    selected: currentIndex == index,
+                    selected:
+                        currentIndex == _lecturerNavbarItems[index].branchIndex,
                     onTap: () => onTap(index),
                   ),
                 ),

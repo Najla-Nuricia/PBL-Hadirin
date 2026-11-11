@@ -33,16 +33,21 @@ describe('TC-MHS-013 - Ubah kata sandi setelah login', () => {
       'android=new UiSelector().className("android.widget.EditText").instance(2)',
     );
 
+    await currentPasswordField.click();
     await currentPasswordField.setValue(
       HADIRIN_DEMO_ACCOUNTS.mahasiswa.password,
     );
+    await newPasswordField.click();
     await newPasswordField.setValue('mahasiswa456');
+    await confirmationField.click();
     await confirmationField.setValue('mahasiswa456');
     await $('~Simpan').click();
 
-    await expect(
-      $('android=new UiSelector().text("Kata sandi berhasil diubah.")'),
-    ).toBeDisplayed();
-    await browser.pause(1000);
+    const snackbar = $('//*[contains(@content-desc,"Kata sandi berhasil diubah")]');
+    await snackbar.waitForDisplayed({
+      timeout: 15000,
+      timeoutMsg: 'Snackbar kata sandi berhasil diubah tidak muncul',
+    });
+    await expect(snackbar).toBeDisplayed();
   });
 });

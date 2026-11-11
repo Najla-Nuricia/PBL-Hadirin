@@ -49,7 +49,18 @@ class _BerandaPageState extends State<BerandaPage> {
   @override
   void initState() {
     super.initState();
+    studentAuthRepository.addListener(_handleAccountChanged);
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    studentAuthRepository.removeListener(_handleAccountChanged);
+    super.dispose();
+  }
+
+  void _handleAccountChanged() {
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadData() async {

@@ -17,17 +17,20 @@
  */
 
 import { browser, expect, $ } from '@wdio/globals';
+import {fillField, openStudentRegistration,tapSubmitRegistrasi} from '../../src/support/actions';
+import { LOCATORS } from '../../src/support/selectors';
+
 
 describe('TC-MHS-001 - Registrasi mahasiswa dengan data valid', () => {
   before(async () => {
-    // Pre-condition: aplikasi terpasang dan halaman registrasi terbuka.
+    // Pre-condition: aplikasi terpasang.
     await browser.pause(2000);
   });
 
   it('should register mahasiswa with valid data', async () => {
     // Langkah Pengujian:
     // 1. Buka registrasi
-    // 2. Isi nama, NIM, kelas
+    // 2. Isi nama, NIM, kelas, kata sandi, dan konfirmasi kata sandi
     // 3. Submit
     //
     // Data Uji:
@@ -35,37 +38,38 @@ describe('TC-MHS-001 - Registrasi mahasiswa dengan data valid', () => {
     // - NIM: 244107020091
     // - Kelas: 3F-TI
 
-    await browser.pause(2000);
+    await openStudentRegistration();
 
-    const bukaRegistrasiButton = await $(
-      '~Daftar'
+    await fillField(
+      LOCATORS.mahasiswa.register.fullNameField,
+      'Najla Nuricia',
     );
-    await bukaRegistrasiButton.click();
-    await browser.pause(2000);
+    await fillField(
+      LOCATORS.mahasiswa.register.nimField,
+      '244107020091',
+    );
+    await fillField(
+      LOCATORS.mahasiswa.register.classField,
+      '3F-TI',
+    );
+    await fillField(
+      LOCATORS.mahasiswa.register.passwordField,
+      'najla1234',
+    );
+    await fillField(
+      LOCATORS.mahasiswa.register.confirmPasswordField,
+      'najla1234',
+    );
 
-    const namaLengkapField = await $(
-      'android=new UiSelector().className("android.widget.EditText").instance(0)'
-    );
-    await namaLengkapField.setValue('Najla Nuricia');
-
-    const nimField = await $(
-      'android=new UiSelector().className("android.widget.EditText").instance(1)'
-    );
-    await nimField.setValue('244107020091');
-
-    const kelasField = await $(
-      'android=new UiSelector().className("android.widget.EditText").instance(2)'
-    );
-    await kelasField.setValue('3F-TI');
-
-    const submitButton = await $(
-      '~Lanjut ke Scan Wajah →'
-    );
-    await submitButton.click();
+    await tapSubmitRegistrasi();
     await browser.pause(3000);
 
-    // Assertion: akun berhasil dibuat.
-    // ~Registrasi berhasil. Silakan login dengan NIM kamu. belum tersedia.
-    await expect($('~Registrasi berhasil. Silakan login dengan NIM kamu.')).toBeDisplayed();
+    // Akun dibuat setelah lima sampel wajah selesai; tahap ini memastikan
+    // data registrasi valid dan berhasil diteruskan ke scan wajah.
+    const scanWajah = await $(
+    'android=new UiSelector().descriptionMatches("(?i).*scan wajah.*")',
+    );
+    await scanWajah.waitForDisplayed({ timeout: 15000 });
+    await expect(scanWajah).toBeDisplayed();
   });
 });

@@ -36,15 +36,20 @@ export const LOCATORS = {
       forgotPassword: 'Forgot password?',
     },
     register: {
-      title: 'Registrasi Mahasiswa',
-      fullNameField: 'android=new UiSelector().className("android.widget.EditText").instance(0)',
-      nimField: 'android=new UiSelector().className("android.widget.EditText").instance(1)',
-      classField: 'android=new UiSelector().className("android.widget.EditText").instance(2)',
-      passwordField: 'android=new UiSelector().className("android.widget.EditText").instance(3)',
-      confirmPasswordField: 'android=new UiSelector().className("android.widget.EditText").instance(4)',
+      title: '~Registrasi Mahasiswa',
+      fullNameField:
+        'android=new UiSelector().className("android.widget.EditText").instance(0)',
+      nimField:
+        'android=new UiSelector().className("android.widget.EditText").instance(1)',
+      classField:
+        'android=new UiSelector().className("android.widget.EditText").instance(2)',
+      passwordField:
+        'android=new UiSelector().className("android.widget.EditText").instance(3)',
+      confirmPasswordField:
+        'android=new UiSelector().className("android.widget.EditText").instance(4)',
       submitButton: '~Lanjut ke Scan Wajah →',
-      successSnackbar: 'Registrasi berhasil. Silakan login dengan NIM kamu.',
-      duplicateNimSnackbar: 'NIM sudah terdaftar. Silakan login.',
+      successSnackbar: '~Registrasi berhasil. Silakan login dengan NIM kamu.',
+      duplicateNimSnackbar: '//*[contains(@content-desc,"NIM sudah terdaftar")]',
     },
   },
   dosen: {
