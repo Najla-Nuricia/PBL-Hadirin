@@ -46,3 +46,8 @@ app.*.map.json
 
 # Widget Preview related
 .widget_preview/
+
+# Appium/Node related
+/appium/node_modules/
+/test/appium/node_modules/
+/test/appium/node_modules
