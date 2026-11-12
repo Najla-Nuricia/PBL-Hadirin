@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../data/mhs/dummy_student_auth_repository.dart';
 import '../../data/mhs/student_attendance.dart';
+import '../../data/mhs/student_data_service.dart';
 
 class RiwayatPage extends StatefulWidget {
   const RiwayatPage({super.key});
@@ -10,13 +12,57 @@ class RiwayatPage extends StatefulWidget {
 }
 
 class _RiwayatPageState extends State<RiwayatPage> {
-  String _selectedSemester = 'Genap 2023/2024';
+  String _selectedSemester = 'Ganjil 2026/2027';
   AttendanceStatus? _selectedStatus;
+  List<StudentAttendanceRecord> _records = const [];
+  StudentAttendanceSummary _summary = const StudentAttendanceSummary(
+    hadir: 0,
+    izin: 0,
+    sakit: 0,
+    alfa: 0,
+  );
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    if (!studentAuthRepository.hasRemoteSession) {
+      setState(() {
+        _records = dummyAttendanceRecords;
+        _summary = dummyAttendanceSummary;
+      });
+      return;
+    }
+
+    setState(() => _isLoading = true);
+    try {
+      final results = await Future.wait([
+        studentDataService.loadAttendanceSummary(),
+        studentDataService.loadAttendanceHistory(),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _summary = results[0] as StudentAttendanceSummary;
+        _records = results[1] as List<StudentAttendanceRecord>;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text('$error')));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final records = dummyAttendanceRecords
+    final records = _records
         .where(
           (record) =>
               _selectedStatus == null || record.status == _selectedStatus,
@@ -31,58 +77,72 @@ class _RiwayatPageState extends State<RiwayatPage> {
           children: [
             _buildAppBar(colorScheme),
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _buildFilter(
-                      label: 'Semester',
-                      value: _selectedSemester,
-                      items: const ['Genap 2023/2024', 'Ganjil 2023/2024'],
-                      onChanged: (value) {
-                        if (value != null) {
-                          setState(() => _selectedSemester = value);
-                        }
-                      },
-                    ),
-                    const SizedBox(height: 10),
-                    _buildFilter(
-                      label: 'Status',
-                      value: _selectedStatus == null
-                          ? 'Semua Status'
-                          : _statusLabel(_selectedStatus!),
-                      items: const [
-                        'Semua Status',
-                        'Hadir',
-                        'Izin',
-                        'Sakit',
-                        'Alfa',
-                      ],
-                      onChanged: (value) => setState(
-                        () => _selectedStatus = value == 'Semua Status'
-                            ? null
-                            : _statusFromLabel(value!),
+              child: RefreshIndicator(
+                onRefresh: _loadData,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      _buildFilter(
+                        label: 'Semester',
+                        value: _selectedSemester,
+                        items: const [
+                          'Ganjil 2026/2027',
+                          'Genap 2025/2026',
+                        ],
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() => _selectedSemester = value);
+                          }
+                        },
                       ),
-                    ),
-                    const SizedBox(height: 12),
-                    _buildCounters(colorScheme),
-                    const SizedBox(height: 12),
-                    if (records.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 32),
-                        child: Text(
-                          'Belum ada riwayat untuk status ini.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: colorScheme.onSurfaceVariant),
+                      const SizedBox(height: 10),
+                      _buildFilter(
+                        label: 'Status',
+                        value: _selectedStatus == null
+                            ? 'Semua Status'
+                            : _statusLabel(_selectedStatus!),
+                        items: const [
+                          'Semua Status',
+                          'Hadir',
+                          'Izin',
+                          'Sakit',
+                          'Alfa',
+                        ],
+                        onChanged: (value) => setState(
+                          () => _selectedStatus = value == 'Semua Status'
+                              ? null
+                              : _statusFromLabel(value!),
                         ),
-                      )
-                    else
-                      ...records.map((record) => Padding(
+                      ),
+                      const SizedBox(height: 12),
+                      _buildCounters(colorScheme),
+                      const SizedBox(height: 12),
+                      if (_isLoading)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 32),
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      else if (records.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 32),
+                          child: Text(
+                            'Belum ada riwayat untuk status ini.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: colorScheme.onSurfaceVariant),
+                          ),
+                        )
+                      else
+                        ...records.map(
+                          (record) => Padding(
                             padding: const EdgeInsets.only(bottom: 8),
                             child: _AttendanceTile(record: record),
-                          )),
-                  ],
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -94,14 +154,24 @@ class _RiwayatPageState extends State<RiwayatPage> {
 
   Widget _buildAppBar(ColorScheme colorScheme) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      child: Text(
-        'Riwayat Absensi',
-        style: TextStyle(
-          color: colorScheme.onSurface,
-          fontSize: 20,
-          fontWeight: FontWeight.w800,
-        ),
+      padding: const EdgeInsets.fromLTRB(16, 12, 8, 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            'Riwayat Absensi',
+            style: TextStyle(
+              color: colorScheme.onSurface,
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          IconButton(
+            onPressed: _isLoading ? null : _loadData,
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Muat ulang',
+          ),
+        ],
       ),
     );
   }
@@ -153,13 +223,29 @@ class _RiwayatPageState extends State<RiwayatPage> {
   Widget _buildCounters(ColorScheme colorScheme) {
     return Row(
       children: [
-        _Counter(label: 'Hadir', value: 12, color: colorScheme.secondary),
+        _Counter(
+          label: 'Hadir',
+          value: _summary.hadir,
+          color: colorScheme.secondary,
+        ),
         const SizedBox(width: 8),
-        _Counter(label: 'Izin', value: 2, color: colorScheme.primary),
+        _Counter(
+          label: 'Izin',
+          value: _summary.izin,
+          color: colorScheme.primary,
+        ),
         const SizedBox(width: 8),
-        _Counter(label: 'Sakit', value: 1, color: colorScheme.tertiary),
+        _Counter(
+          label: 'Sakit',
+          value: _summary.sakit,
+          color: colorScheme.tertiary,
+        ),
         const SizedBox(width: 8),
-        _Counter(label: 'Alfa', value: 1, color: colorScheme.error),
+        _Counter(
+          label: 'Alfa',
+          value: _summary.alfa,
+          color: colorScheme.error,
+        ),
       ],
     );
   }
@@ -187,9 +273,14 @@ class _Counter extends StatelessWidget {
         ),
         child: Column(
           children: [
-            Text('$value',
-                style: TextStyle(
-                    color: color, fontSize: 16, fontWeight: FontWeight.w800)),
+            Text(
+              '$value',
+              style: TextStyle(
+                color: color,
+                fontSize: 16,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
             Text(label, style: TextStyle(color: color, fontSize: 9)),
           ],
         ),
@@ -226,7 +317,10 @@ class _AttendanceTile extends StatelessWidget {
             child: Text(
               record.date,
               style: TextStyle(
-                  color: color, fontSize: 12, fontWeight: FontWeight.w800),
+                color: color,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
           const SizedBox(width: 10),
@@ -234,13 +328,21 @@ class _AttendanceTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(record.courseName,
-                    style: const TextStyle(
-                        fontSize: 11, fontWeight: FontWeight.w700)),
+                Text(
+                  record.courseName,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
                 const SizedBox(height: 2),
-                Text(record.time,
-                    style: TextStyle(
-                        color: colorScheme.onSurfaceVariant, fontSize: 9)),
+                Text(
+                  record.time,
+                  style: TextStyle(
+                    color: colorScheme.onSurfaceVariant,
+                    fontSize: 9,
+                  ),
+                ),
               ],
             ),
           ),
@@ -253,7 +355,10 @@ class _AttendanceTile extends StatelessWidget {
             child: Text(
               _statusLabel(record.status),
               style: TextStyle(
-                  color: color, fontSize: 9, fontWeight: FontWeight.w700),
+                color: color,
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ],

@@ -15,7 +15,7 @@ void main() {
     expect(account?.nim, '2341720001');
     expect(account?.fullName, 'Mahasiswa Demo');
     expect(account?.token, isNotNull);
-    expect(account?.token?.startsWith('jwt_'), isTrue);
+    expect(account?.token?.split('.').length, 3);
 
     // Login with wrong credentials
     final failedAccount = await repo.login(

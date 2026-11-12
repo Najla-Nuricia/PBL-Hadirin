@@ -1,6 +1,8 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -52,8 +54,10 @@ class _StudentFaceScanPageState extends State<StudentFaceScanPage>
   bool _isCapturing = false;
   bool _isSubmitting = false;
   final List<XFile> _capturedPhotos = [];
+  final List<Uint8List> _capturedBytes = [];
+  final List<String> _capturedNames = [];
 
-  bool get _isScanComplete => _capturedPhotos.length >= _faceDirections.length;
+  bool get _isScanComplete => _capturedBytes.length >= _faceDirections.length;
 
   bool get _canCapture =>
       _cameraStatus == _CameraStatus.ready &&
@@ -156,21 +160,62 @@ class _StudentFaceScanPageState extends State<StudentFaceScanPage>
 
     setState(() => _isCapturing = true);
     XFile? photo;
+    Uint8List? bytes;
     try {
       photo = await controller.takePicture();
-    } on CameraException catch (error) {
-      debugPrint('Taking face photo failed: ${error.code}');
+      bytes = await photo.readAsBytes();
+    } catch (error) {
+      debugPrint('Taking face photo failed: $error');
     }
     if (!mounted) return;
 
     setState(() {
       _isCapturing = false;
-      if (photo != null) _capturedPhotos.add(photo);
+      if (photo != null && bytes != null && bytes.isNotEmpty) {
+        _capturedPhotos.add(photo);
+        _capturedBytes.add(bytes);
+        _capturedNames.add(photo.name);
+      }
     });
 
-    if (photo == null) {
+    if (photo == null || bytes == null || bytes.isEmpty) {
       _showMessage('Gagal mengambil foto. Coba lagi.');
     } else if (_isScanComplete) {
+      await _completeRegistration();
+    }
+  }
+
+  Future<void> _pickPhotosFromFiles() async {
+    if (_isCapturing || _isSubmitting) return;
+    final remaining = _faceDirections.length - _capturedBytes.length;
+    if (remaining <= 0) return;
+
+    final result = await FilePicker.pickFiles(
+      type: FileType.image,
+    );
+    if (!mounted || result.isEmpty) return;
+
+    final addedBytes = <Uint8List>[];
+    final addedNames = <String>[];
+    for (final file in result.take(remaining)) {
+      final bytes = await file.readAsBytes();
+      if (bytes.isNotEmpty) {
+        addedBytes.add(bytes);
+        addedNames.add(file.name);
+      }
+    }
+    if (!mounted) return;
+    if (addedBytes.isEmpty) {
+      _showMessage('File foto tidak dapat dibaca.');
+      return;
+    }
+
+    setState(() {
+      _capturedBytes.addAll(addedBytes);
+      _capturedNames.addAll(addedNames);
+    });
+
+    if (_isScanComplete) {
       await _completeRegistration();
     }
   }
@@ -179,25 +224,59 @@ class _StudentFaceScanPageState extends State<StudentFaceScanPage>
     setState(() => _isSubmitting = true);
     final messenger = ScaffoldMessenger.of(context);
 
-    var message = 'Registrasi berhasil. Silakan login dengan NIM kamu.';
     try {
       await studentAuthRepository.register(
         widget.draft,
-        facePhotoPaths: [for (final photo in _capturedPhotos) photo.path],
+        facePhotoPaths: _capturedPhotos.isNotEmpty
+            ? [for (final photo in _capturedPhotos) photo.path]
+            : List<String>.unmodifiable(_capturedNames),
+        facePhotoBytes: _capturedBytes.isNotEmpty
+            ? List<Uint8List>.unmodifiable(_capturedBytes)
+            : null,
       );
+      if (!mounted) return;
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Registrasi berhasil. Silakan login dengan NIM kamu.'),
+          ),
+        );
+      context.go(StudentRoutePaths.login);
     } on NimAlreadyRegisteredException {
-      message = 'NIM ${widget.draft.nim} sudah terdaftar. Silakan login.';
+      if (!mounted) return;
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              'NIM ${widget.draft.nim} sudah terdaftar. Silakan login.',
+            ),
+          ),
+        );
+      context.go(StudentRoutePaths.login);
+    } on RemoteApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isSubmitting = false;
+        _capturedPhotos.clear();
+        _capturedBytes.clear();
+        _capturedNames.clear();
+      });
+      _showMessage(error.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      _showMessage('Registrasi gagal. Periksa koneksi server dan coba lagi.');
     }
-    if (!mounted) return;
-
-    messenger
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
-    context.go(StudentRoutePaths.login);
   }
 
   void _restartScan() {
-    setState(_capturedPhotos.clear);
+    setState(() {
+      _capturedPhotos.clear();
+      _capturedBytes.clear();
+      _capturedNames.clear();
+    });
   }
 
   void _goBack() {
@@ -218,7 +297,7 @@ class _StudentFaceScanPageState extends State<StudentFaceScanPage>
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final capturedCount = _capturedPhotos.length;
+    final capturedCount = _capturedBytes.length;
     final totalDirections = _faceDirections.length;
     final currentDirection = _isScanComplete
         ? 'Scan wajah selesai'
@@ -250,6 +329,9 @@ class _StudentFaceScanPageState extends State<StudentFaceScanPage>
                       status: _cameraStatus,
                       controller: _controller,
                       onRetry: _initializeCamera,
+                      onPickFiles: _cameraStatus != _CameraStatus.initializing
+                          ? _pickPhotosFromFiles
+                          : null,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -287,6 +369,11 @@ class _StudentFaceScanPageState extends State<StudentFaceScanPage>
                   ),
                   if (capturedCount > 0 && !_isSubmitting) ...[
                     const SizedBox(height: 8),
+                    if (!_isScanComplete)
+                      OutlinedButton(
+                        onPressed: _isCapturing ? null : _completeRegistration,
+                        child: Text('Kirim $capturedCount Foto & Daftar'),
+                      ),
                     TextButton(
                       onPressed: _isCapturing ? null : _restartScan,
                       child: const Text('Ulangi Scan'),
@@ -307,11 +394,13 @@ class _CameraFrame extends StatelessWidget {
     required this.status,
     required this.controller,
     required this.onRetry,
+    this.onPickFiles,
   });
 
   final _CameraStatus status;
   final CameraController? controller;
   final VoidCallback onRetry;
+  final VoidCallback? onPickFiles;
 
   @override
   Widget build(BuildContext context) {
@@ -420,6 +509,11 @@ class _CameraFrame extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           TextButton(onPressed: onRetry, child: const Text('Coba Lagi')),
+          if (onPickFiles != null)
+            TextButton(
+              onPressed: onPickFiles,
+              child: const Text('Pilih Foto Wajah'),
+            ),
         ],
       ),
     );

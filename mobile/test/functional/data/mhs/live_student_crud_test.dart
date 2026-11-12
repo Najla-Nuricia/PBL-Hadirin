@@ -34,71 +34,82 @@ void main() {
       expect(summary.alfa, isNonNegative);
     });
 
-    test('loadClassReminder returns upcoming reminder', () async {
+    test('loadClassReminder returns upcoming reminder when available', () async {
       final reminder = await studentDataService.loadClassReminder();
-      expect(reminder.courseName.isNotEmpty, isTrue);
-      expect(reminder.time.isNotEmpty, isTrue);
+      if (reminder != null) {
+        expect(reminder.courseName.isNotEmpty, isTrue);
+        expect(reminder.time.isNotEmpty, isTrue);
+      }
     });
   });
 
   group('3. CRUD Operations', () {
     test('CRUD Data Mahasiswa (Create, Read, Update, Delete)', () async {
       const testNim = '2341999999';
+      await studentDataService.deleteMahasiswa(testNim);
 
-      // CREATE
-      final created = await studentDataService.createMahasiswa(
-        nim: testNim,
-        namaLengkap: 'Mahasiswa Baru QA',
-        email: 'qa@student.polinema.ac.id',
-        noHp: '081299998888',
-        kelas: 'TI-3A',
-        prodi: 'D4-TI',
-      );
-      expect(created, isTrue);
+      try {
+        // CREATE
+        final created = await studentDataService.createMahasiswa(
+          nim: testNim,
+          namaLengkap: 'Mahasiswa Baru QA',
+          email: 'qa@student.polinema.ac.id',
+          noHp: '081299998888',
+          kelas: 'TI-3A',
+          prodi: 'D4-TI',
+        );
+        expect(created, isTrue);
 
-      // READ
-      final list = await studentDataService.listMahasiswa(search: 'Mahasiswa Baru QA');
-      expect(list.any((m) => m['nim'] == testNim), isTrue);
+        // READ
+        final list =
+            await studentDataService.listMahasiswa(search: 'Mahasiswa Baru QA');
+        expect(list.any((m) => m['nim'] == testNim), isTrue);
 
-      // UPDATE
-      final updated = await studentDataService.updateMahasiswa(
-        testNim,
-        namaLengkap: 'Mahasiswa QA Updated',
-        noHp: '081200000000',
-      );
-      expect(updated, isTrue);
-
-      // DELETE
-      final deleted = await studentDataService.deleteMahasiswa(testNim);
-      expect(deleted, isTrue);
+        // UPDATE
+        final updated = await studentDataService.updateMahasiswa(
+          testNim,
+          namaLengkap: 'Mahasiswa QA Updated',
+          noHp: '081200000000',
+        );
+        expect(updated, isTrue);
+      } finally {
+        // DELETE
+        final deleted = await studentDataService.deleteMahasiswa(testNim);
+        expect(deleted, isTrue);
+      }
     });
 
     test('CRUD Pengajuan Surat Ketidakhadiran (Create, Read, Update, Delete)', () async {
-      // CREATE
-      final res = await studentDataService.submitPengajuan(
-        jenis: 'izin',
-        alasan: 'Lomba Robotika Nasional',
-        matakuliah: 'Pemrograman Web',
-        tanggal: '2026-11-20',
-        dokumenPath: 'robotika.pdf',
-      );
-      expect(res['data'], isNotNull);
-      final pengajuanId = res['data']['id'] as String;
+      String? pengajuanId;
+      try {
+        // CREATE
+        final res = await studentDataService.submitPengajuan(
+          jenis: 'izin',
+          alasan: 'Lomba Robotika Nasional',
+          matakuliah: 'Pemrograman Web',
+          tanggal: '2026-11-20',
+          dokumenPath: 'robotika.pdf',
+        );
+        expect(res['data'], isNotNull);
+        pengajuanId = res['data']['id'] as String;
 
-      // READ
-      final list = await studentDataService.loadPengajuanList();
-      expect(list.any((p) => p['id'] == pengajuanId), isTrue);
+        // READ
+        final list = await studentDataService.loadPengajuanList();
+        expect(list.any((p) => p['id'] == pengajuanId), isTrue);
 
-      // UPDATE
-      final updated = await studentDataService.updatePengajuan(
-        pengajuanId: pengajuanId,
-        alasan: 'Lomba Robotika Nasional (Final)',
-      );
-      expect(updated, isTrue);
-
-      // DELETE
-      final deleted = await studentDataService.deletePengajuan(pengajuanId);
-      expect(deleted, isTrue);
+        // UPDATE
+        final updated = await studentDataService.updatePengajuan(
+          pengajuanId: pengajuanId,
+          alasan: 'Lomba Robotika Nasional (Final)',
+        );
+        expect(updated, isTrue);
+      } finally {
+        // DELETE
+        if (pengajuanId != null) {
+          final deleted = await studentDataService.deletePengajuan(pengajuanId);
+          expect(deleted, isTrue);
+        }
+      }
     });
   });
 }

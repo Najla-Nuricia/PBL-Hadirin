@@ -17,11 +17,9 @@ class BerandaPage extends StatefulWidget {
 }
 
 class _BerandaPageState extends State<BerandaPage> {
-  // Hari yang dipilih di jadwal (default hari ini, disesuaikan dgn demo = Rabu=3)
-  int _selectedDay = 3;
+  int _selectedDay = DateTime.now().weekday;
 
-  // Alarm toggle per schedule index
-  final Map<int, bool> _alarmToggles = {0: true};
+  final Map<int, bool> _alarmToggles = {};
 
   bool _showReminder = true;
 
@@ -30,21 +28,33 @@ class _BerandaPageState extends State<BerandaPage> {
       DummyStudentAuthRepository.demoAccount;
 
   String get _displayName {
+    if (_profile != null && _profile!.fullName.isNotEmpty) {
+      return _profile!.fullName;
+    }
     final current = studentAuthRepository.currentAccount;
     if (current != null) return current.fullName;
-    return _profile?.fullName ?? _account.fullName;
+    return _account.fullName;
   }
 
   String get _displaySubtitle {
-    final current = studentAuthRepository.currentAccount;
-    if (current != null) return '${current.nim} · ${current.className}';
-    return '${_profile?.studentId ?? _account.nim} · ${_account.className}';
+    final nim = (_profile?.studentId.isNotEmpty == true)
+        ? _profile!.studentId
+        : (studentAuthRepository.currentAccount?.nim ?? _account.nim);
+    final cls = (_profile?.className.isNotEmpty == true)
+        ? _profile!.className
+        : (studentAuthRepository.currentAccount?.className ?? _account.className);
+    return cls.isNotEmpty ? '$nim · $cls' : nim;
   }
 
   StudentProfile? _profile;
-  StudentAttendanceSummary _summary = dummyAttendanceSummary;
-  List<StudentSchedule> _schedules = dummySchedules;
-  ClassReminder _reminder = dummyClassReminder;
+  StudentAttendanceSummary _summary = const StudentAttendanceSummary(
+    hadir: 0,
+    izin: 0,
+    sakit: 0,
+    alfa: 0,
+  );
+  List<StudentSchedule> _schedules = const [];
+  ClassReminder? _reminder;
 
   @override
   void initState() {
@@ -60,23 +70,49 @@ class _BerandaPageState extends State<BerandaPage> {
   }
 
   void _handleAccountChanged() {
-    if (mounted) setState(() {});
+    final current = studentAuthRepository.currentAccount;
+    if (!mounted) return;
+    setState(() {
+      if (_profile != null && current != null && current.nim == _profile!.studentId) {
+        _profile = StudentProfile(
+          fullName: current.fullName,
+          studentId: _profile!.studentId,
+          email: _profile!.email,
+          phoneNumber: _profile!.phoneNumber,
+          role: _profile!.role,
+          className: _profile!.className,
+        );
+      }
+    });
   }
 
   Future<void> _loadData() async {
+    if (!studentAuthRepository.hasRemoteSession) {
+      setState(() {
+        _summary = dummyAttendanceSummary;
+        _schedules = dummySchedules;
+        _reminder = dummyClassReminder;
+      });
+      return;
+    }
     try {
-      final p = await studentDataService.loadProfile();
-      final sum = await studentDataService.loadAttendanceSummary();
-      final sched = await studentDataService.loadSchedules();
-      final rem = await studentDataService.loadClassReminder();
-      if (mounted) {
-        setState(() {
-          _profile = p;
-          _summary = sum;
-          _schedules = sched;
-          _reminder = rem;
-        });
-      }
+      final results = await Future.wait([
+        studentDataService.loadProfile(),
+        studentDataService.loadAttendanceSummary(),
+        studentDataService.loadSchedules(),
+        studentDataService.loadClassReminder(),
+      ]);
+      if (!mounted) return;
+      final loadedSchedules = results[2] as List<StudentSchedule>;
+      setState(() {
+        _profile = results[0] as StudentProfile;
+        _summary = results[1] as StudentAttendanceSummary;
+        _schedules = loadedSchedules;
+        _reminder = results[3] as ClassReminder?;
+        for (var i = 0; i < loadedSchedules.length; i++) {
+          _alarmToggles.putIfAbsent(i, () => loadedSchedules[i].hasAlarm);
+        }
+      });
     } catch (_) {}
   }
 
@@ -91,17 +127,21 @@ class _BerandaPageState extends State<BerandaPage> {
           children: [
             _buildHeader(colorScheme),
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (_showReminder)
-                      _ReminderBanner(
-                        reminder: _reminder,
-                        onDismiss: () => setState(() => _showReminder = false),
-                      ),
-                    const SizedBox(height: 12),
+              child: RefreshIndicator(
+                onRefresh: _loadData,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (_showReminder && _reminder != null)
+                        _ReminderBanner(
+                          reminder: _reminder!,
+                          onDismiss: () => setState(() => _showReminder = false),
+                        ),
+                      if (_showReminder && _reminder != null)
+                        const SizedBox(height: 12),
                     _QuickActions(
                       onAbsensiTap: () => context.go(StudentRoutePaths.absensi),
                       onSuratTap: () => context.go(StudentRoutePaths.surat),
@@ -112,16 +152,17 @@ class _BerandaPageState extends State<BerandaPage> {
                       onViewAll: () => context.go(StudentRoutePaths.riwayat),
                     ),
                     const SizedBox(height: 16),
-                    _ScheduleSection(
-                      selectedDay: _selectedDay,
-                      schedules: _schedules,
-                      onDaySelected: (day) =>
-                          setState(() => _selectedDay = day),
-                      alarmToggles: _alarmToggles,
-                      onAlarmToggle: (index, val) =>
-                          setState(() => _alarmToggles[index] = val),
-                    ),
-                  ],
+                      _ScheduleSection(
+                        selectedDay: _selectedDay,
+                        schedules: _schedules,
+                        onDaySelected: (day) =>
+                            setState(() => _selectedDay = day),
+                        alarmToggles: _alarmToggles,
+                        onAlarmToggle: (index, val) =>
+                            setState(() => _alarmToggles[index] = val),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -504,12 +545,17 @@ class _ScheduleSection extends StatelessWidget {
   final List<StudentSchedule>? schedules;
 
   static const _dayLabels = ['SEN', 'SEL', 'RAB', 'KAM', 'JUM', 'SAB', 'MIN'];
-  // hari ini tanggal 14 (Rabu), demo start dari 12 (Senin)
-  static const _dayDates = [12, 13, 14, 15, 16, 17, 18];
+
+  List<int> _currentWeekDayNumbers() {
+    final now = DateTime.now();
+    final monday = now.subtract(Duration(days: now.weekday - DateTime.monday));
+    return List.generate(7, (i) => monday.add(Duration(days: i)).day);
+  }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final dayDates = _currentWeekDayNumbers();
     final sourceSchedules = schedules ?? dummySchedules;
     final filteredSchedules = sourceSchedules
         .where((s) => s.dayOfWeek == selectedDay)
@@ -567,7 +613,7 @@ class _ScheduleSection extends StatelessWidget {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '${_dayDates[i]}',
+                              '${dayDates[i]}',
                               style: TextStyle(
                                 color: selectedDay == (i + 1)
                                     ? colorScheme.onPrimary

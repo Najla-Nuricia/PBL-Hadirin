@@ -1,9 +1,11 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../data/mhs/dummy_student_auth_repository.dart';
 import '../../data/mhs/student_data_service.dart';
 
 class SuratPage extends StatefulWidget {
@@ -14,21 +16,52 @@ class SuratPage extends StatefulWidget {
 }
 
 class _SuratPageState extends State<SuratPage> {
-  static const _courses = [
-    'Pemrograman Web',
-    'Basis Data',
+  static const _fallbackCourses = [
+    'Pemrograman Web Lanjut',
+    'Basis Data Lanjut',
     'Interaksi Manusia Komputer',
     'Kecerdasan Buatan',
     'Jaringan Komputer',
   ];
+  static const int _maxFileBytes = 5 * 1024 * 1024;
 
+  List<String> _courses = List<String>.from(_fallbackCourses);
   int _selectedType = 0;
   String _selectedAbsenceType = 'izin';
   String? _fileName;
+  Uint8List? _fileBytes;
   String? _selectedCourse;
   DateTime? _selectedDate;
   bool _isSubmitting = false;
   final _notesController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCourseOptions();
+  }
+
+  Future<void> _loadCourseOptions() async {
+    if (!studentAuthRepository.hasRemoteSession) return;
+    try {
+      final schedules = await studentDataService.loadSchedules();
+      final names = schedules
+          .map((item) => item.courseName.trim())
+          .where((name) => name.isNotEmpty)
+          .toSet()
+          .toList()
+        ..sort();
+      if (!mounted || names.isEmpty) return;
+      setState(() {
+        _courses = names;
+        if (_selectedCourse != null && !_courses.contains(_selectedCourse)) {
+          _selectedCourse = null;
+        }
+      });
+    } catch (_) {
+      // Fallback course list remains available if schedules fail to load.
+    }
+  }
 
   @override
   void dispose() {
@@ -45,11 +78,9 @@ class _SuratPageState extends State<SuratPage> {
     }
     setState(() => _isSubmitting = true);
     try {
-      final jenis = _selectedType == 0 ? _selectedAbsenceType : 'sakit';
-      final tanggal = (_selectedDate ?? DateTime.now())
-          .toIso8601String()
-          .split('T')
-          .first;
+      final jenis = _selectedType == 0 ? _selectedAbsenceType : 'kompensasi';
+      final tanggal =
+          (_selectedDate ?? DateTime.now()).toIso8601String().split('T').first;
       final alasan = _notesController.text.trim().isNotEmpty
           ? _notesController.text.trim()
           : 'Pengajuan surat $jenis';
@@ -60,6 +91,8 @@ class _SuratPageState extends State<SuratPage> {
         matakuliah: _selectedCourse!,
         tanggal: tanggal,
         dokumenPath: _fileName ?? '',
+        fileBytes: _fileBytes,
+        fileName: _fileName,
       );
 
       if (mounted) {
@@ -68,14 +101,18 @@ class _SuratPageState extends State<SuratPage> {
         );
         setState(() {
           _fileName = null;
+          _fileBytes = null;
           _selectedCourse = null;
+          _selectedDate = null;
           _notesController.clear();
         });
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Gagal mengirim surat: $e')));
+        final msg = e.toString().replaceFirst('Exception: ', '');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Gagal mengirim surat: $msg')),
+        );
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
@@ -83,12 +120,36 @@ class _SuratPageState extends State<SuratPage> {
   }
 
   Future<void> _pickFile() async {
-    final result = await FilePicker.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf'],
-    );
-    if (!mounted || result.isEmpty) return;
-    setState(() => _fileName = result.single.name);
+    try {
+      final picked = await FilePicker.pickFile(
+        type: FileType.custom,
+        allowedExtensions: ['jpg', 'jpeg', 'png', 'pdf'],
+      );
+      if (picked == null) return;
+      final bytes = await picked.readAsBytes();
+      if (!mounted) return;
+      if (bytes.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('File kosong atau gagal dibaca.')),
+        );
+        return;
+      }
+      if (bytes.length > _maxFileBytes) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Ukuran file maksimal 5 MB.')),
+        );
+        return;
+      }
+      setState(() {
+        _fileName = picked.name;
+        _fileBytes = bytes;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal memilih file: $e')),
+      );
+    }
   }
 
   Future<void> _pickDate() async {
@@ -200,13 +261,21 @@ class _SuratPageState extends State<SuratPage> {
   }
 
   Widget _buildAbsenceTypeSelector(ColorScheme colorScheme) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.start,
-      children: [
-        _buildAbsenceRadio('sakit', 'Sakit', colorScheme),
-        const SizedBox(width: 20),
-        _buildAbsenceRadio('izin', 'Izin', colorScheme),
-      ],
+    return RadioGroup<String>(
+      groupValue: _selectedAbsenceType,
+      onChanged: (selected) {
+        if (selected != null) {
+          setState(() => _selectedAbsenceType = selected);
+        }
+      },
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.start,
+        children: [
+          _buildAbsenceRadio('sakit', 'Sakit', colorScheme),
+          const SizedBox(width: 20),
+          _buildAbsenceRadio('izin', 'Izin', colorScheme),
+        ],
+      ),
     );
   }
 
@@ -225,12 +294,6 @@ class _SuratPageState extends State<SuratPage> {
           children: [
             Radio<String>(
               value: value,
-              groupValue: _selectedAbsenceType,
-              onChanged: (selected) {
-                if (selected != null) {
-                  setState(() => _selectedAbsenceType = selected);
-                }
-              },
               activeColor: colorScheme.primary,
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),
@@ -292,17 +355,11 @@ class _SuratPageState extends State<SuratPage> {
                   ? const SizedBox(
                       width: 18,
                       height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                     )
                   : const Text(
                       'Kirim Surat',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                     ),
             ),
           ),
@@ -395,8 +452,11 @@ class _SuratPageState extends State<SuratPage> {
   }
 
   Widget _buildCourseDropdown(ColorScheme colorScheme) {
+    final safeValue =
+        _courses.contains(_selectedCourse) ? _selectedCourse : null;
     return DropdownButtonFormField<String>(
-      initialValue: _selectedCourse,
+      key: ValueKey(safeValue),
+      initialValue: safeValue,
       isExpanded: true,
       hint: const Text('Pilih mata kuliah...'),
       icon: const Icon(Icons.keyboard_arrow_down),
@@ -410,19 +470,36 @@ class _SuratPageState extends State<SuratPage> {
   }
 
   Widget _buildDateField(ColorScheme colorScheme) {
-    final dateText = _selectedDate == null
-        ? ''
-        : '${_selectedDate!.day.toString().padLeft(2, '0')}/'
-              '${_selectedDate!.month.toString().padLeft(2, '0')}/'
-              '${_selectedDate!.year}';
+    final effectiveDate = _selectedDate ?? DateTime.now();
+    final formatted = '${effectiveDate.day.toString().padLeft(2, '0')}/'
+        '${effectiveDate.month.toString().padLeft(2, '0')}/'
+        '${effectiveDate.year}';
+    final displayText =
+        _selectedDate == null ? '$formatted (Hari ini)' : formatted;
     return InkWell(
       onTap: _pickDate,
       borderRadius: BorderRadius.circular(10),
       child: InputDecorator(
         decoration: _fieldDecoration(colorScheme),
-        child: Text(
-          dateText,
-          style: TextStyle(color: colorScheme.onSurface, fontSize: 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                displayText,
+                style: TextStyle(
+                  color: _selectedDate == null
+                      ? colorScheme.onSurfaceVariant
+                      : colorScheme.onSurface,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+            Icon(
+              Icons.calendar_today_outlined,
+              size: 16,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ],
         ),
       ),
     );
