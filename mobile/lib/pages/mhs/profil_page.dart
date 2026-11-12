@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../data/mhs/dummy_student_auth_repository.dart';
 import '../../data/mhs/student_account.dart';
+import '../../data/mhs/student_data_service.dart';
 import '../../routing/student_route_paths.dart';
 
 class ProfilPage extends StatefulWidget {
@@ -26,9 +27,39 @@ class _ProfilPageState extends State<ProfilPage> {
   @override
   void initState() {
     super.initState();
+    _syncFromWidgetAccount();
+    _loadLiveProfile();
+  }
+
+  @override
+  void didUpdateWidget(covariant ProfilPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.account.nim != widget.account.nim) {
+      _syncFromWidgetAccount();
+      _loadLiveProfile();
+    }
+  }
+
+  void _syncFromWidgetAccount() {
     _fullName = widget.account.fullName;
     _nim = widget.account.nim;
+    _email = '';
     _phoneNumber = 'Belum diisi';
+  }
+
+  Future<void> _loadLiveProfile() async {
+    if (!studentAuthRepository.hasRemoteSession) return;
+    try {
+      final profile = await studentDataService.loadProfile();
+      if (!mounted) return;
+      setState(() {
+        _fullName = profile.fullName.isNotEmpty ? profile.fullName : _fullName;
+        _nim = profile.studentId.isNotEmpty ? profile.studentId : _nim;
+        _email = profile.email;
+        _phoneNumber =
+            profile.phoneNumber.trim().isEmpty ? 'Belum diisi' : profile.phoneNumber;
+      });
+    } catch (_) {}
   }
 
   Future<void> _editProfile() async {
@@ -38,10 +69,36 @@ class _ProfilPageState extends State<ProfilPage> {
         fullName: _fullName,
         nim: _nim,
         email: _email,
-        phoneNumber: _phoneNumber,
+        phoneNumber: _phoneNumber == 'Belum diisi' ? '' : _phoneNumber,
       ),
     );
     if (!mounted || updatedProfile == null) return;
+
+    if (studentAuthRepository.hasRemoteSession) {
+      try {
+        final saved = await studentDataService.updateMyProfile(
+          fullName: updatedProfile.fullName,
+          email: updatedProfile.email,
+          phoneNumber: updatedProfile.phoneNumber,
+        );
+        if (!mounted) return;
+        setState(() {
+          _fullName = saved.fullName;
+          _email = saved.email;
+          _phoneNumber = saved.phoneNumber.trim().isEmpty
+              ? 'Belum diisi'
+              : saved.phoneNumber;
+        });
+        studentAuthRepository.updateProfile(
+          fullName: saved.fullName,
+        );
+        _showMessage('Profil berhasil diperbarui.');
+      } catch (error) {
+        if (!mounted) return;
+        _showMessage('$error');
+      }
+      return;
+    }
 
     setState(() {
       _fullName = updatedProfile.fullName;
@@ -49,6 +106,9 @@ class _ProfilPageState extends State<ProfilPage> {
       _email = updatedProfile.email;
       _phoneNumber = updatedProfile.phoneNumber;
     });
+    studentAuthRepository.updateProfile(
+      fullName: updatedProfile.fullName,
+    );
     _showMessage('Profil berhasil diperbarui.');
   }
 

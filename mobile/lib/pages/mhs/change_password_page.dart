@@ -41,17 +41,26 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
     FocusScope.of(context).unfocus();
     setState(() => _isSubmitting = true);
-    final changed = await _repository.changePassword(
-      nim: widget.nim,
-      currentPassword: _currentPasswordController.text,
-      newPassword: _newPasswordController.text,
-    );
+    bool changed = false;
+    String? errorMessage;
+    try {
+      changed = await _repository.changePassword(
+        nim: widget.nim,
+        currentPassword: _currentPasswordController.text,
+        newPassword: _newPasswordController.text,
+      );
+    } on RemoteApiException catch (e) {
+      errorMessage = e.message;
+    } catch (_) {
+      errorMessage = 'Gagal menghubungi server untuk mengubah kata sandi.';
+    }
     if (!mounted) return;
     setState(() => _isSubmitting = false);
 
-    final message = changed
-        ? 'Kata sandi berhasil diubah.'
-        : 'Kata sandi saat ini salah.';
+    final message = errorMessage ??
+        (changed
+            ? 'Kata sandi berhasil diubah.'
+            : 'Kata sandi saat ini salah.');
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
