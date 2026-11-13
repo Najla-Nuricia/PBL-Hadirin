@@ -175,6 +175,114 @@ export async function goToLecturerTab(label: string): Promise<void> {
   await browser.pause(1000);
 }
 
+const HARI_ID = [
+  'Senin',
+  'Selasa',
+  'Rabu',
+  'Kamis',
+  'Jumat',
+  'Sabtu',
+  'Minggu',
+] as const;
+
+const BULAN_ID = [
+  'Januari',
+  'Februari',
+  'Maret',
+  'April',
+  'Mei',
+  'Juni',
+  'Juli',
+  'Agustus',
+  'September',
+  'Oktober',
+  'November',
+  'Desember',
+] as const;
+
+/** Samakan dengan formatDateId() pada lib/models/dosen/date_id.dart. */
+export function formatTanggalId(date: Date): string {
+  const hari = HARI_ID[(date.getDay() + 6) % 7];
+  return `${hari}, ${date.getDate()} ${BULAN_ID[date.getMonth()]} ${date.getFullYear()}`;
+}
+
+/** Buka dashboard kehadiran dosen (Cek Daftar Presensi). */
+export async function openLecturerAttendance(): Promise<void> {
+  await goToLecturerTab('Kehadiran');
+  await $(LOCATORS.dosen.attendance.title).waitForDisplayed();
+}
+
+/**
+ * Pilih tanggal lewat dialog DatePicker lalu tekan OK.
+ * Hari selalu berada di bulan berjalan (initialDate = hari ini).
+ */
+export async function pickPresensiDate(day: number): Promise<Date> {
+  const okButton = await $(LOCATORS.dosen.attendance.datePickerOk);
+  const dateBox = await $(LOCATORS.dosen.attendance.dateBox);
+  await dateBox.waitForDisplayed();
+  await dateBox.click();
+
+  // Fallback: tap area kotak tanggal tepat di bawah label "Tanggal".
+  if (!(await okButton.isDisplayed().catch(() => false))) {
+    const label = await $('~Tanggal');
+    const { x, y } = await label.getLocation();
+    const { width } = await label.getSize();
+    await browser.execute('mobile: clickGesture', {
+      x: Math.round(x + width / 2),
+      y: Math.round(y + 40),
+    });
+  }
+
+  await okButton.waitForDisplayed();
+  const dayCell = await $(LOCATORS.dosen.attendance.datePickerDay(day));
+  await dayCell.waitForDisplayed();
+  await dayCell.click();
+  await okButton.click();
+
+  await $(LOCATORS.dosen.attendance.title).waitForDisplayed();
+  const today = new Date();
+  return new Date(today.getFullYear(), today.getMonth(), day);
+}
+
+/** Pilih nilai dropdown Kelas / Mata Kuliah pada Cek Daftar Presensi. */
+export async function selectPresensiValue(
+  currentValue: string,
+  nextValue: string,
+): Promise<void> {
+  const dropdown = await $(
+    LOCATORS.dosen.attendance.selectedOption(currentValue),
+  );
+  await dropdown.waitForDisplayed();
+  await dropdown.click();
+
+  const option = await $(LOCATORS.dosen.attendance.option(nextValue));
+  await option.waitForDisplayed({ timeout: 10000 });
+  await option.click();
+  await browser.pause(800);
+}
+
+/** Tekan "Tampilkan Data" lalu tunggu halaman Daftar Kehadiran terbuka. */
+export async function showLecturerAttendance(): Promise<void> {
+  await $(LOCATORS.dosen.attendance.showDataButton).click();
+  await $(LOCATORS.dosen.attendance.listTitle).waitForDisplayed({
+    timeout: 10000,
+  });
+}
+
+/**
+ * Semantics tile mahasiswa pada halaman Daftar Kehadiran, mis.
+ * "Adi Saputra, NIM 2211001, status Hadir, jam 07:58. Ketuk untuk melihat detail."
+ */
+export function lecturerStudentTile(
+  name: string,
+  checkInTime?: string,
+): string {
+  const timeFilter = checkInTime
+    ? ` and contains(@content-desc,"jam ${checkInTime}")`
+    : '';
+  return `//*[contains(@content-desc,"${name}")${timeFilter}]`;
+}
+
 export async function tapSubmitLecturerRegistration(): Promise<void> {
   if (await driver.isKeyboardShown().catch(() => false)) {
     await driver.pressKeyCode(4);

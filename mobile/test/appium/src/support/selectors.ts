@@ -76,6 +76,30 @@ export const LOCATORS = {
       submitButton: '~Daftar',
       successSnackbar: '~Registrasi dosen berhasil. Silakan login.',
     },
+    attendance: {
+      title: '~Cek Daftar Presensi',
+      // Kotak tanggal berisi teks "Kamis, 13 November 2026"; instance(0)
+      // adalah kotak tanggal, instance berikutnya adalah baris ringkasan.
+      dateBox:
+        'android=new UiSelector().descriptionMatches("(Senin|Selasa|Rabu|Kamis|Jumat|Sabtu|Minggu), .*").instance(0)',
+      datePickerOk: '~OK',
+      // Sel tanggal pada dialog DatePicker, mis. "15, May 15, 2024".
+      datePickerDay: (day: number) =>
+        `//*[starts-with(@content-desc,"${day}, ")]`,
+      // DropdownButton (Kelas / Mata Kuliah): nilai terpilih lalu item menu.
+      selectedOption: (value: string) =>
+        `android=new UiSelector().description("${value}").instance(0)`,
+      option: (value: string) => `//*[@content-desc="${value}"]`,
+      showDataButton: '~Tampilkan Data',
+      listTitle: '~Daftar Kehadiran',
+      summary: '//*[contains(@content-desc,"Total Mahasiswa")]',
+      statusChip: {
+        hadir: '~Hadir',
+        izin: '~Izin',
+        sakit: '~Sakit',
+        alfa: '~Alfa',
+      },
+    },
     navigation: {
       profileTab: '~Profil',
     },

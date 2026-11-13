@@ -54,8 +54,8 @@ npm run test:mhs:types
 npm run test:mhs
 ```
 
-For the lecturer scenarios (TS01, TS03, TS04 upload foto, TS17, and TS18),
-start the app with `--dart-define=APP_ROLE=lecturer` and run:
+For the lecturer scenarios (TS01, TS03, TS04 upload foto, TS05 kehadiran,
+TS17, and TS18), start the app with `--dart-define=APP_ROLE=lecturer` and run:
 
 ```bash
 cd appium
