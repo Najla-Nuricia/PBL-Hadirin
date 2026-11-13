@@ -175,37 +175,6 @@ export async function goToLecturerTab(label: string): Promise<void> {
   await browser.pause(1000);
 }
 
-const HARI_ID = [
-  'Senin',
-  'Selasa',
-  'Rabu',
-  'Kamis',
-  'Jumat',
-  'Sabtu',
-  'Minggu',
-] as const;
-
-const BULAN_ID = [
-  'Januari',
-  'Februari',
-  'Maret',
-  'April',
-  'Mei',
-  'Juni',
-  'Juli',
-  'Agustus',
-  'September',
-  'Oktober',
-  'November',
-  'Desember',
-] as const;
-
-/** Samakan dengan formatDateId() pada lib/models/dosen/date_id.dart. */
-export function formatTanggalId(date: Date): string {
-  const hari = HARI_ID[(date.getDay() + 6) % 7];
-  return `${hari}, ${date.getDate()} ${BULAN_ID[date.getMonth()]} ${date.getFullYear()}`;
-}
-
 /** Buka dashboard kehadiran dosen (Cek Daftar Presensi). */
 export async function openLecturerAttendance(): Promise<void> {
   await goToLecturerTab('Kehadiran');
@@ -213,10 +182,21 @@ export async function openLecturerAttendance(): Promise<void> {
 }
 
 /**
+ * Selector tanggal pada halaman Cek Daftar Presensi.
+ *
+ * Hanya memakai tanggal (hari) ke-`day`, bukan bulan/tahun, karena DatePicker
+ * memakai tanggal device (emulator) sedangkan runner memakai tanggal host.
+ * Contoh teks di app: "Minggu, 15 November 2026".
+ */
+export function presensiDateSelector(day: number): string {
+  return `//*[contains(@content-desc,", ${day} ")]`;
+}
+
+/**
  * Pilih tanggal lewat dialog DatePicker lalu tekan OK.
  * Hari selalu berada di bulan berjalan (initialDate = hari ini).
  */
-export async function pickPresensiDate(day: number): Promise<Date> {
+export async function pickPresensiDate(day: number): Promise<void> {
   const okButton = await $(LOCATORS.dosen.attendance.datePickerOk);
   const dateBox = await $(LOCATORS.dosen.attendance.dateBox);
   await dateBox.waitForDisplayed();
@@ -234,14 +214,51 @@ export async function pickPresensiDate(day: number): Promise<Date> {
   }
 
   await okButton.waitForDisplayed();
-  const dayCell = await $(LOCATORS.dosen.attendance.datePickerDay(day));
-  await dayCell.waitForDisplayed();
-  await dayCell.click();
-  await okButton.click();
+  await browser.pause(800); // tunggu animasi dialog DatePicker selesai
 
+  // Sel tanggal bisa diekspos sebagai content-desc (semantics Flutter) atau
+  // sebagai text biasa, tergantung versi driver. Coba keduanya.
+  const dayCellSelectors = [
+    `//*[starts-with(@content-desc,"${day}, ") and @clickable="true"]`,
+    LOCATORS.dosen.attendance.datePickerDay(day),
+    `//*[@text="${day}"]`,
+    `android=new UiSelector().text("${day}")`,
+  ];
+
+  let dayCell = null;
+  for (const selector of dayCellSelectors) {
+    const candidate = await $(selector);
+    const visible = await candidate
+      .waitForDisplayed({ timeout: 2000 })
+      .then(() => true)
+      .catch(() => false);
+    if (visible) {
+      dayCell = candidate;
+      break;
+    }
+  }
+  if (!dayCell) {
+    throw new Error(`Sel tanggal ${day} tidak ditemukan pada DatePicker.`);
+  }
+
+  // Tap lewat koordinat sel; element.click() pada node semantics Flutter
+  // kadang tidak memilih tanggal di DatePicker.
+  const { x, y } = await dayCell.getLocation();
+  const { width, height } = await dayCell.getSize();
+  if (width > 0 && height > 0) {
+    await browser.execute('mobile: clickGesture', {
+      x: Math.round(x + width / 2),
+      y: Math.round(y + height / 2),
+    });
+  } else {
+    await dayCell.click();
+  }
+  await browser.pause(800); // tunggu tanggal terpilih (setState)
+
+  // Setelah memilih tanggal, baru konfirmasi dengan tombol OK.
+  // Query ulang karena node semantics dialog bisa berubah setelah setState.
+  await $(LOCATORS.dosen.attendance.datePickerOk).click();
   await $(LOCATORS.dosen.attendance.title).waitForDisplayed();
-  const today = new Date();
-  return new Date(today.getFullYear(), today.getMonth(), day);
 }
 
 /** Pilih nilai dropdown Kelas / Mata Kuliah pada Cek Daftar Presensi. */

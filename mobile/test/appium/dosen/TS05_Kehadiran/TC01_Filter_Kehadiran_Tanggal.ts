@@ -22,9 +22,9 @@
 import { expect, $ } from '@wdio/globals';
 import {
   dosenLogin,
-  formatTanggalId,
   openLecturerAttendance,
   pickPresensiDate,
+  presensiDateSelector,
   showLecturerAttendance,
 } from '../../src/support/actions';
 import { HADIRIN_DEMO_ACCOUNTS } from '../../src/support/env';
@@ -43,15 +43,12 @@ describe('TC-DOSEN-040 - Filter kehadiran berdasarkan tanggal', () => {
     // Langkah Pengujian:
     // 1. Pilih tanggal
     await openLecturerAttendance();
-
-    const selectedDate = await pickPresensiDate(15);
+    await pickPresensiDate(15);
 
     // Assertion: tanggal pilihan tampil di kotak tanggal dan ringkasan.
-    await expect(
-      $(
-        `android=new UiSelector().description("${formatTanggalId(selectedDate)}")`,
-      ),
-    ).toBeDisplayed();
+    // Cek hari (15) saja, bukan bulan/tahun, agar tidak bergantung tanggal
+    // device emulator.
+    await expect($(presensiDateSelector(15))).toBeDisplayed();
 
     // 2. Lihat data
     await showLecturerAttendance();
