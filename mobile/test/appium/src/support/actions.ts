@@ -115,6 +115,20 @@ export async function goToStudentTab(label: string): Promise<void> {
   await browser.pause(1000);
 }
 
+export async function tapProfileChangePassword(selector: string): Promise<void> {
+  const action = await $(selector);
+  if (await action.isDisplayed().catch(() => false)) {
+    await action.click();
+    return;
+  }
+
+  const { width, height } = await browser.getWindowSize();
+  await browser.execute('mobile: clickGesture', {
+    x: Math.round(width * 0.5),
+    y: Math.round(height * 0.67),
+  });
+}
+
 export async function dosenLogin(email: string, password: string): Promise<void> {
   await openLecturerLogin();
   const emailField = await $(LOCATORS.dosen.login.emailField);
