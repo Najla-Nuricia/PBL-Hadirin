@@ -9,6 +9,7 @@ export const LOCATORS = {
   onboarding: {
     next: '~Next',
     mahasiswa: '~Mahasiswa',
+    dosen: '~Dosen',
     admin: '~Login Sebagai Sekretaris Jurusan',
   },
   admin: {
@@ -61,7 +62,62 @@ export const LOCATORS = {
       errorSnackbar: '~Email atau password salah.',
     },
     register: {
-      title: 'Registrasi Dosen',
+      title: '~Registrasi Dosen',
+      fullNameField:
+        'android=new UiSelector().className("android.widget.EditText").instance(0)',
+      staffIdField:
+        'android=new UiSelector().className("android.widget.EditText").instance(1)',
+      emailField:
+        'android=new UiSelector().className("android.widget.EditText").instance(2)',
+      passwordField:
+        'android=new UiSelector().className("android.widget.EditText").instance(3)',
+      confirmPasswordField:
+        'android=new UiSelector().className("android.widget.EditText").instance(4)',
+      submitButton: '~Daftar',
+      successSnackbar: '~Registrasi dosen berhasil. Silakan login.',
+    },
+    attendance: {
+      title: '~Cek Daftar Presensi',
+      // Kotak tanggal berisi teks "Kamis, 13 November 2026"; instance(0)
+      // adalah kotak tanggal, instance berikutnya adalah baris ringkasan.
+      dateBox:
+        'android=new UiSelector().descriptionMatches("(Senin|Selasa|Rabu|Kamis|Jumat|Sabtu|Minggu), .*").instance(0)',
+      datePickerOk: '~OK',
+      // Sel tanggal pada dialog DatePicker, mis. "15, May 15, 2024".
+      datePickerDay: (day: number) =>
+        `//*[starts-with(@content-desc,"${day}, ")]`,
+      // DropdownButton (Kelas / Mata Kuliah): nilai terpilih lalu item menu.
+      selectedOption: (value: string) =>
+        `android=new UiSelector().description("${value}").instance(0)`,
+      option: (value: string) => `//*[@content-desc="${value}"]`,
+      showDataButton: '~Tampilkan Data',
+      listTitle: '~Daftar Kehadiran',
+      summary: '//*[contains(@content-desc,"Total Mahasiswa")]',
+      statusChip: {
+        hadir: '~Hadir',
+        izin: '~Izin',
+        sakit: '~Sakit',
+        alfa: '~Alfa',
+      },
+    },
+    navigation: {
+      profileTab: '~Profil',
+    },
+    profile: {
+      uploadPhoto: '~Ubah foto profil',
+      changePhoto: '//*[contains(@text,"Ubah Foto Profil")]',
+      changePassword: '//*[contains(@text,"Ubah Kata Sandi")]',
+      logout: '//*[contains(@text,"Keluar")]',
+    },
+    changePassword: {
+      currentPasswordField:
+        'android=new UiSelector().className("android.widget.EditText").instance(0)',
+      newPasswordField:
+        'android=new UiSelector().className("android.widget.EditText").instance(1)',
+      confirmationField:
+        'android=new UiSelector().className("android.widget.EditText").instance(2)',
+      submitButton: '~Simpan',
+      successSnackbar: '//*[contains(@content-desc,"Kata sandi berhasil diperbarui")]',
     },
   },
 } as const;

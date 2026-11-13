@@ -7,7 +7,9 @@
     "test:admin": "APP_ROLE=admin mocha \"../test/appium/admin/**/*.test.js\" --timeout 120000",
     "test:dosen": "APP_ROLE=lecturer mocha \"../test/appium/dosen/**/*.test.js\" --timeout 120000",
     "test:mhs": "APP_ROLE=student wdio run ./wdio.mhs.conf.ts",
-    "test:mhs:types": "tsc --noEmit -p ./tsconfig.e2e.json"
+    "test:mhs:types": "tsc --noEmit -p ./tsconfig.e2e.json",
+    "test:dosen:e2e": "APP_ROLE=lecturer wdio run ./wdio.dosen.conf.ts",
+    "test:dosen:types": "tsc --noEmit -p ./tsconfig.e2e.json"
   },
   "devDependencies": {
     "@wdio/appium-service": "^9.32.0",
