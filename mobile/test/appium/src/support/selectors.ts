@@ -9,6 +9,7 @@ export const LOCATORS = {
   onboarding: {
     next: '~Next',
     mahasiswa: '~Mahasiswa',
+    dosen: '~Dosen',
     admin: '~Login Sebagai Sekretaris Jurusan',
   },
   admin: {
@@ -61,7 +62,38 @@ export const LOCATORS = {
       errorSnackbar: '~Email atau password salah.',
     },
     register: {
-      title: 'Registrasi Dosen',
+      title: '~Registrasi Dosen',
+      fullNameField:
+        'android=new UiSelector().className("android.widget.EditText").instance(0)',
+      staffIdField:
+        'android=new UiSelector().className("android.widget.EditText").instance(1)',
+      emailField:
+        'android=new UiSelector().className("android.widget.EditText").instance(2)',
+      passwordField:
+        'android=new UiSelector().className("android.widget.EditText").instance(3)',
+      confirmPasswordField:
+        'android=new UiSelector().className("android.widget.EditText").instance(4)',
+      submitButton: '~Daftar',
+      successSnackbar: '~Registrasi dosen berhasil. Silakan login.',
+    },
+    navigation: {
+      profileTab: '~Profil',
+    },
+    profile: {
+      uploadPhoto: '~Ubah foto profil',
+      changePhoto: '//*[contains(@text,"Ubah Foto Profil")]',
+      changePassword: '//*[contains(@text,"Ubah Kata Sandi")]',
+      logout: '//*[contains(@text,"Keluar")]',
+    },
+    changePassword: {
+      currentPasswordField:
+        'android=new UiSelector().className("android.widget.EditText").instance(0)',
+      newPasswordField:
+        'android=new UiSelector().className("android.widget.EditText").instance(1)',
+      confirmationField:
+        'android=new UiSelector().className("android.widget.EditText").instance(2)',
+      submitButton: '~Simpan',
+      successSnackbar: '//*[contains(@content-desc,"Kata sandi berhasil diperbarui")]',
     },
   },
 } as const;

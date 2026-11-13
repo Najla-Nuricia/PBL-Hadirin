@@ -54,6 +54,15 @@ npm run test:mhs:types
 npm run test:mhs
 ```
 
+For the lecturer scenarios (TS01, TS03, TS04 upload foto, TS17, and TS18),
+start the app with `--dart-define=APP_ROLE=lecturer` and run:
+
+```bash
+cd appium
+npm run test:dosen:types
+npm run test:dosen:e2e
+```
+
 To run one scenario folder, such as `TS01_Registrasi_Akun`:
 
 ```bash

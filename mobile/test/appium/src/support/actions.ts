@@ -116,15 +116,60 @@ export async function goToStudentTab(label: string): Promise<void> {
 }
 
 export async function dosenLogin(email: string, password: string): Promise<void> {
-  // Pre-condition: halaman login dosen ("Login Dosen") terbuka.
+  await openLecturerLogin();
   const emailField = await $(LOCATORS.dosen.login.emailField);
   const passwordField = await $(LOCATORS.dosen.login.passwordField);
   const submitButton = await $(LOCATORS.dosen.login.submitButton);
 
+  await emailField.click();
+  await emailField.clearValue();
   await emailField.setValue(email);
+  await passwordField.click();
+  await passwordField.clearValue();
   await passwordField.setValue(password);
   await submitButton.click();
-  await browser.pause(3000);
+  await browser.pause(2500);
+}
+
+export async function openLecturerLogin(): Promise<void> {
+  const loginTitle = await $(LOCATORS.dosen.login.title);
+  if (await loginTitle.isDisplayed().catch(() => false)) return;
+
+  const next = await $(LOCATORS.onboarding.next);
+  if (await next.isDisplayed().catch(() => false)) {
+    await next.click();
+  }
+
+  await $(LOCATORS.onboarding.dosen).waitForDisplayed();
+  await $(LOCATORS.onboarding.dosen).click();
+  await loginTitle.waitForDisplayed();
+}
+
+export async function openLecturerRegistration(): Promise<void> {
+  await openLecturerLogin();
+  await $('~Daftar').click();
+  await $(LOCATORS.dosen.register.title).waitForDisplayed();
+}
+
+export async function goToLecturerTab(label: string): Promise<void> {
+  const accessibilityTab = await $(`~${label}`);
+  const tab = (await accessibilityTab.isDisplayed().catch(() => false))
+    ? accessibilityTab
+    : await $(`android=new UiSelector().text("${label}")`);
+  await tab.waitForDisplayed();
+  await tab.click();
+  await browser.pause(1000);
+}
+
+export async function tapSubmitLecturerRegistration(): Promise<void> {
+  if (await driver.isKeyboardShown().catch(() => false)) {
+    await driver.pressKeyCode(4);
+    await browser.pause(800);
+  }
+
+  const submitButton = await $(LOCATORS.dosen.register.submitButton);
+  await submitButton.waitForDisplayed({ timeout: 10000 });
+  await submitButton.click();
 }
 
 export async function logoutCurrentUser(): Promise<void> {

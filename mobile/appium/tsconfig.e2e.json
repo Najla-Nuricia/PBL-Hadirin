@@ -27,6 +27,8 @@
     "include": [
         "../test/appium/src/**/*.ts",
         "../test/appium/mahasiswa/**/*.ts",
-        "./wdio.mhs.conf.ts"
+        "../test/appium/dosen/**/*.ts",
+        "./wdio.mhs.conf.ts",
+        "./wdio.dosen.conf.ts"
     ]
 }
