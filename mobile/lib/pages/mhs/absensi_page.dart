@@ -341,14 +341,10 @@ class _AbsensiPageState extends State<AbsensiPage>
       return;
     }
     final qrToken = _qrTokenController.text.trim();
-    if ((_selectedSessionId == null || _selectedSessionId!.isEmpty) &&
-        qrToken.isEmpty) {
-      setState(
-        () => _errorMessage =
-            'Pilih sesi presensi aktif atau isi token QR terlebih dahulu.',
-      );
-      return;
-    }
+    final effectiveSessionId = _selectedSessionId ??
+        (_activeSessions.isNotEmpty
+            ? _activeSessions.first['sesi_presensi_id'] as String?
+            : null);
 
     setState(() => _errorMessage = null);
     _setSubmitting(true);
@@ -356,7 +352,7 @@ class _AbsensiPageState extends State<AbsensiPage>
       final res = await studentDataService.submitFaceAttendance(
         imageBytes: _probeImageBytes!,
         filename: _probeImageName ?? 'probe.jpg',
-        sesiPresensiId: _selectedSessionId,
+        sesiPresensiId: effectiveSessionId,
         qrToken: qrToken.isNotEmpty ? qrToken : null,
         latitude: _defaultLatitude,
         longitude: _defaultLongitude,

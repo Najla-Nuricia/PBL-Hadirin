@@ -32,6 +32,20 @@ class StudentDataService {
 
   bool get _hasRemoteSession => studentAuthRepository.hasRemoteSession;
 
+  /// Pastikan sesi remote aktif, jika belum coba login dengan akun saat ini / demo
+  Future<void> _ensureSession() async {
+    if (!_hasRemoteSession) {
+      final acc = studentAuthRepository.currentAccount ??
+          DummyStudentAuthRepository.demoAccount;
+      try {
+        await studentAuthRepository.login(
+          nim: acc.nim,
+          password: acc.password.isNotEmpty ? acc.password : 'mahasiswa123',
+        );
+      } catch (_) {}
+    }
+  }
+
   String _extractError(http.Response res, String fallback) {
     try {
       final decoded = jsonDecode(res.body);
@@ -45,6 +59,7 @@ class StudentDataService {
   // ── Profil Mahasiswa ────────────────────────────────────────────────────
 
   Future<StudentProfile> loadProfile() async {
+    await _ensureSession();
     if (_hasRemoteSession) {
       final uri = Uri.parse('${ApiConfig.baseUrl}/mahasiswa/me');
       final res = await _client.get(uri, headers: _headers).timeout(_timeout);
@@ -141,6 +156,7 @@ class StudentDataService {
   // ── Jadwal & Pengingat ──────────────────────────────────────────────────
 
   Future<List<StudentSchedule>> loadSchedules({int? dayOfWeek}) async {
+    await _ensureSession();
     if (_hasRemoteSession) {
       final query = dayOfWeek != null ? '?day_of_week=$dayOfWeek' : '';
       final uri = Uri.parse('${ApiConfig.baseUrl}/mahasiswa/jadwal$query');
@@ -183,6 +199,7 @@ class StudentDataService {
   }
 
   Future<StudentAttendanceSummary> loadAttendanceSummary() async {
+    await _ensureSession();
     if (_hasRemoteSession) {
       final uri = Uri.parse('${ApiConfig.baseUrl}/mahasiswa/presensi/summary');
       final res = await _client.get(uri, headers: _headers).timeout(_timeout);
@@ -203,6 +220,7 @@ class StudentDataService {
   Future<List<StudentAttendanceRecord>> loadAttendanceHistory({
     String? status,
   }) async {
+    await _ensureSession();
     if (_hasRemoteSession) {
       final query = (status != null && status.isNotEmpty) ? '?status=$status' : '';
       final uri =
@@ -241,6 +259,7 @@ class StudentDataService {
       };
 
   Future<ClassReminder?> loadClassReminder() async {
+    await _ensureSession();
     if (_hasRemoteSession) {
       final uri = Uri.parse('${ApiConfig.baseUrl}/mahasiswa/pengingat');
       final res = await _client.get(uri, headers: _headers).timeout(_timeout);
@@ -269,6 +288,7 @@ class StudentDataService {
   // ── Presensi (QR / Face / Sesi Aktif) ───────────────────────────────────
 
   Future<List<Map<String, dynamic>>> loadActiveSessions() async {
+    await _ensureSession();
     if (!_hasRemoteSession) return const [];
     final uri = Uri.parse('${ApiConfig.baseUrl}/attendance/sesi-aktif');
     final res = await _client.get(uri, headers: _headers).timeout(_timeout);
@@ -281,6 +301,7 @@ class StudentDataService {
   }
 
   Future<Map<String, dynamic>> getFaceStatus() async {
+    await _ensureSession();
     if (!_hasRemoteSession) {
       return {'is_registered': false, 'active_samples': 0, 'threshold': 0.5};
     }
@@ -329,6 +350,7 @@ class StudentDataService {
     double? latitude,
     double? longitude,
   }) async {
+    await _ensureSession();
     if (!_hasRemoteSession && studentAuthRepository.useRemoteApi) {
       throw Exception(
         'Sesi login server belum aktif. Pastikan backend aktif di ${ApiConfig.baseUrl} lalu masuk ulang.',
@@ -474,6 +496,33 @@ class StudentDataService {
     } catch (_) {
       return false;
     }
+  }
+
+  // ── Daftar Kelas ─────────────────────────────────────────────────────────
+
+  /// Ambil daftar kelas dari database (endpoint publik, tidak perlu login).
+  Future<List<Map<String, dynamic>>> loadKelasList() async {
+    try {
+      final uri = Uri.parse('${ApiConfig.baseUrl}/kelas');
+      final res = await _client.get(uri).timeout(_timeout);
+      if (res.statusCode == 200) {
+        final decoded = jsonDecode(res.body) as Map<String, dynamic>;
+        final list = decoded['data'] as List<dynamic>? ?? const [];
+        return list.cast<Map<String, dynamic>>();
+      }
+    } catch (_) {}
+    // Fallback: list kelas statis jika backend tidak terjangkau
+    return const [
+      {'id': '22222222-0000-0000-0000-000000000001', 'nama': 'TI-1A'},
+      {'id': '22222222-0000-0000-0000-000000000002', 'nama': 'TI-1B'},
+      {'id': '22222222-0000-0000-0000-000000000003', 'nama': 'TI-2A'},
+      {'id': '22222222-0000-0000-0000-000000000004', 'nama': 'TI-2B'},
+      {'id': '22222222-0000-0000-0000-000000000005', 'nama': 'TI-3A'},
+      {'id': '22222222-0000-0000-0000-000000000006', 'nama': 'TI-3B'},
+      {'id': '22222222-0000-0000-0000-000000000007', 'nama': 'TI-4A'},
+      {'id': '22222222-0000-0000-0000-000000000008', 'nama': 'PPLS-1A'},
+      {'id': '22222222-0000-0000-0000-000000000009', 'nama': 'PPLS-2A'},
+    ];
   }
 
   // ── CRUD Data Mahasiswa ─────────────────────────────────────────────────
