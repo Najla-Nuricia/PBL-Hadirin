@@ -55,6 +55,8 @@ class _BerandaPageState extends State<BerandaPage> {
   );
   List<StudentSchedule> _schedules = const [];
   ClassReminder? _reminder;
+  bool _isLoading = false;
+  String? _loadError;
 
   @override
   void initState() {
@@ -87,14 +89,10 @@ class _BerandaPageState extends State<BerandaPage> {
   }
 
   Future<void> _loadData() async {
-    if (!studentAuthRepository.hasRemoteSession) {
-      setState(() {
-        _summary = dummyAttendanceSummary;
-        _schedules = dummySchedules;
-        _reminder = dummyClassReminder;
-      });
-      return;
-    }
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
     try {
       final results = await Future.wait([
         studentDataService.loadProfile(),
@@ -109,11 +107,19 @@ class _BerandaPageState extends State<BerandaPage> {
         _summary = results[1] as StudentAttendanceSummary;
         _schedules = loadedSchedules;
         _reminder = results[3] as ClassReminder?;
+        _isLoading = false;
+        _loadError = null;
         for (var i = 0; i < loadedSchedules.length; i++) {
           _alarmToggles.putIfAbsent(i, () => loadedSchedules[i].hasAlarm);
         }
       });
-    } catch (_) {}
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _loadError = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
   }
 
   @override
@@ -135,6 +141,40 @@ class _BerandaPageState extends State<BerandaPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      if (_isLoading)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 32),
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      else if (_loadError != null)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          child: Card(
+                            color: Theme.of(context).colorScheme.errorContainer,
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                children: [
+                                  Icon(Icons.warning_amber_rounded,
+                                      color: Theme.of(context).colorScheme.onErrorContainer),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Gagal memuat data: $_loadError',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                        color: Theme.of(context).colorScheme.onErrorContainer),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  TextButton(
+                                    onPressed: _loadData,
+                                    child: const Text('Coba Lagi'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        )
+                      else ...[ 
                       if (_showReminder && _reminder != null)
                         _ReminderBanner(
                           reminder: _reminder!,
@@ -161,6 +201,7 @@ class _BerandaPageState extends State<BerandaPage> {
                         onAlarmToggle: (index, val) =>
                             setState(() => _alarmToggles[index] = val),
                       ),
+                    ], // end else
                     ],
                   ),
                 ),

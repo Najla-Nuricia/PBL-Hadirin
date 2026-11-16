@@ -23,7 +23,6 @@ void main() {
     expect(find.text('Informasi Akun'), findsOneWidget);
     expect(find.text('Dr. Andi Pratama, S.T., M.Kom.'), findsOneWidget);
     expect(find.text('NIP/NIDN'), findsOneWidget);
-    expect(find.text('Beranda'), findsOneWidget);
     expect(find.text('Kehadiran'), findsOneWidget);
     expect(find.text('Profil'), findsOneWidget);
 

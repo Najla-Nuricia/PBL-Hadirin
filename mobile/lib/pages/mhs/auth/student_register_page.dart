@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../data/mhs/dummy_student_auth_repository.dart';
 import '../../../data/mhs/student_account.dart';
+import '../../../data/mhs/student_data_service.dart';
 import '../../../routing/student_route_paths.dart';
 import '../../../theme/style/auth_style.dart';
 import 'widgets/auth_buttons.dart';
@@ -25,16 +26,51 @@ class _StudentRegisterPageState extends State<StudentRegisterPage> {
   final _formKey = GlobalKey<FormState>();
   final _fullNameController = TextEditingController();
   final _nimController = TextEditingController();
-  final _classNameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _passwordConfirmationController = TextEditingController();
+
+  static const _defaultKelasList = [
+    {'id': '22222222-0000-0000-0000-000000000001', 'nama': 'TI-1A'},
+    {'id': '22222222-0000-0000-0000-000000000002', 'nama': 'TI-1B'},
+    {'id': '22222222-0000-0000-0000-000000000003', 'nama': 'TI-2A'},
+    {'id': '22222222-0000-0000-0000-000000000004', 'nama': 'TI-2B'},
+    {'id': '22222222-0000-0000-0000-000000000005', 'nama': 'TI-3A'},
+    {'id': '22222222-0000-0000-0000-000000000006', 'nama': 'TI-3B'},
+    {'id': '22222222-0000-0000-0000-000000000007', 'nama': 'TI-4A'},
+    {'id': '22222222-0000-0000-0000-000000000008', 'nama': 'PPLS-1A'},
+    {'id': '22222222-0000-0000-0000-000000000009', 'nama': 'PPLS-2A'},
+  ];
+
   bool _isSubmitting = false;
+  bool _isLoadingKelas = false;
+
+  List<Map<String, dynamic>> _kelasList = _defaultKelasList;
+  String? _selectedKelas; // nama kelas yang dipilih
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchKelas();
+  }
+
+  Future<void> _fetchKelas() async {
+    try {
+      final list = await studentDataService.loadKelasList();
+      if (mounted) {
+        setState(() {
+          _kelasList = list;
+          _isLoadingKelas = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingKelas = false);
+    }
+  }
 
   @override
   void dispose() {
     _fullNameController.dispose();
     _nimController.dispose();
-    _classNameController.dispose();
     _passwordController.dispose();
     _passwordConfirmationController.dispose();
     super.dispose();
@@ -55,7 +91,7 @@ class _StudentRegisterPageState extends State<StudentRegisterPage> {
     final draft = StudentRegistrationDraft(
       fullName: _fullNameController.text.trim(),
       nim: _nimController.text.trim(),
-      className: _classNameController.text.trim().toUpperCase(),
+      className: (_selectedKelas ?? '').toUpperCase(),
       password: _passwordController.text,
     );
 
@@ -101,6 +137,8 @@ class _StudentRegisterPageState extends State<StudentRegisterPage> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return AuthScaffold(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -150,14 +188,64 @@ class _StudentRegisterPageState extends State<StudentRegisterPage> {
                         validator: (value) => _validateRequired(value, 'NIM'),
                       ),
                       const SizedBox(height: 16),
-                      AuthTextField(
-                        label: 'Kelas',
-                        hintText: 'Contoh: 3F-TI',
-                        controller: _classNameController,
-                        enabled: !_isSubmitting,
-                        textCapitalization: TextCapitalization.characters,
-                        validator: (value) => _validateRequired(value, 'Kelas'),
+                      // ── Kelas Select Box ────────────────────────────────
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Kelas',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              color: colorScheme.onSurface,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          DropdownButtonFormField<String>(
+                            initialValue: _selectedKelas,
+                            decoration: InputDecoration(
+                              hintText: _isLoadingKelas
+                                  ? 'Memuat daftar kelas...'
+                                  : 'Pilih kelas kamu',
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 14,
+                              ),
+                              suffixIcon: _isLoadingKelas
+                                  ? const Padding(
+                                      padding: EdgeInsets.all(12),
+                                      child: SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                            strokeWidth: 2),
+                                      ),
+                                    )
+                                  : null,
+                            ),
+                            isExpanded: true,
+                            items: _kelasList.map((k) {
+                              final nama = k['nama'] as String;
+                              return DropdownMenuItem<String>(
+                                value: nama,
+                                child: Text(nama),
+                              );
+                            }).toList(),
+                            onChanged: _isSubmitting || _isLoadingKelas
+                                ? null
+                                : (value) =>
+                                    setState(() => _selectedKelas = value),
+                            validator: (value) =>
+                                (value == null || value.trim().isEmpty)
+                                    ? 'Kelas wajib dipilih.'
+                                    : null,
+                          ),
+                        ],
                       ),
+                      // ───────────────────────────────────────────────────
                       const SizedBox(height: 16),
                       AuthTextField(
                         label: 'Kata Sandi',

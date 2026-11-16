@@ -109,7 +109,10 @@ void main() {
 
     await tester.enterText(field('Nama Lengkap'), 'Joni Mahasiswa');
     await tester.enterText(field('NIM'), '2341720050');
-    await tester.enterText(field('Kelas'), '3f-ti');
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('TI-3A').last);
+    await tester.pumpAndSettle();
     await tester.enterText(field('Kata Sandi'), 'rahasia123');
     await tester.enterText(field('Konfirmasi Kata Sandi'), 'beda12345');
     await tester.ensureVisible(find.text('Lanjut ke Scan Wajah →'));
@@ -171,7 +174,10 @@ void main() {
       field('NIM'),
       DummyStudentAuthRepository.demoAccount.nim,
     );
-    await tester.enterText(field('Kelas'), '3F-TI');
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('TI-3A').last);
+    await tester.pumpAndSettle();
     await tester.enterText(field('Kata Sandi'), 'rahasia123');
     await tester.enterText(field('Konfirmasi Kata Sandi'), 'rahasia123');
     await tester.ensureVisible(find.text('Lanjut ke Scan Wajah →'));
