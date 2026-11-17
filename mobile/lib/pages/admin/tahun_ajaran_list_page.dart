@@ -52,11 +52,50 @@ class _TahunAjaranListPageState extends State<TahunAjaranListPage> {
 
   Future<void> _openTambah() async {
     final added = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => const TambahTahunAjaranPage(),
-      ),
+      MaterialPageRoute(builder: (_) => const TambahTahunAjaranPage()),
     );
     if (added == true) _refresh();
+  }
+
+  Future<void> _openEdit(TahunAjaran item) async {
+    final updated = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => TambahTahunAjaranPage(initialItem: item),
+      ),
+    );
+    if (updated == true) _refresh();
+  }
+
+  Future<void> _delete(TahunAjaran item) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        final colorScheme = Theme.of(context).colorScheme;
+        return AlertDialog(
+          title: const Text('Hapus tahun ajaran?'),
+          content: Text(
+            'Data ${item.tahun} akan dihapus dan tidak dapat dikembalikan.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Batal'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: colorScheme.error,
+                foregroundColor: colorScheme.onError,
+              ),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Hapus'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !mounted) return;
+    tahunAjaranRepository.delete(item.id);
+    _refresh();
   }
 
   @override
@@ -80,11 +119,11 @@ class _TahunAjaranListPageState extends State<TahunAjaranListPage> {
                       itemCount: _displayed.length,
                       separatorBuilder: (_, i) => const SizedBox(height: 8),
                       itemBuilder: (context, index) {
+                        final item = _displayed[index];
                         return _TahunAjaranCard(
-                          item: _displayed[index],
-                          onTap: () {
-                            // TODO: buka halaman detail / edit
-                          },
+                          item: item,
+                          onEdit: () => _openEdit(item),
+                          onDelete: () => _delete(item),
                         );
                       },
                     ),
@@ -159,8 +198,11 @@ class _TahunAjaranListPageState extends State<TahunAjaranListPage> {
           ),
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
-                  icon: Icon(Icons.close,
-                      color: colorScheme.onSurfaceVariant, size: 18),
+                  icon: Icon(
+                    Icons.close,
+                    color: colorScheme.onSurfaceVariant,
+                    size: 18,
+                  ),
                   onPressed: () {
                     _searchController.clear();
                   },
@@ -192,15 +234,15 @@ class _TahunAjaranListPageState extends State<TahunAjaranListPage> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.calendar_today_outlined,
-              size: 48, color: colorScheme.onSurfaceVariant),
+          Icon(
+            Icons.calendar_today_outlined,
+            size: 48,
+            color: colorScheme.onSurfaceVariant,
+          ),
           const SizedBox(height: 12),
           Text(
             'Tidak ada tahun ajaran ditemukan.',
-            style: TextStyle(
-              color: colorScheme.onSurfaceVariant,
-              fontSize: 14,
-            ),
+            style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
           ),
         ],
       ),
@@ -212,10 +254,15 @@ class _TahunAjaranListPageState extends State<TahunAjaranListPage> {
 // Card item tahun ajaran
 // ─────────────────────────────────────────────────────────
 class _TahunAjaranCard extends StatelessWidget {
-  const _TahunAjaranCard({required this.item, required this.onTap});
+  const _TahunAjaranCard({
+    required this.item,
+    required this.onEdit,
+    required this.onDelete,
+  });
 
   final TahunAjaran item;
-  final VoidCallback onTap;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -225,71 +272,81 @@ class _TahunAjaranCard extends StatelessWidget {
     return Material(
       color: colorScheme.surface,
       borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: colorScheme.outlineVariant),
-          ),
-          child: Row(
-            children: [
-              // Ikon kalender
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  Icons.calendar_month_outlined,
-                  color: colorScheme.primary,
-                  size: 20,
-                ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: colorScheme.outlineVariant),
+        ),
+        child: Row(
+          children: [
+            // Ikon kalender
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(10),
               ),
-              const SizedBox(width: 12),
-              // Info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
+              child: Icon(
+                Icons.calendar_month_outlined,
+                color: colorScheme.primary,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
                           item.tahun,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: colorScheme.onSurface,
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        if (isAktif) ...[
-                          const SizedBox(width: 8),
-                          _AktifBadge(colorScheme: colorScheme),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      item.semesterLabel,
-                      style: TextStyle(
-                        color: colorScheme.onSurfaceVariant,
-                        fontSize: 12,
                       ),
+                      if (isAktif) ...[
+                        const SizedBox(width: 8),
+                        _AktifBadge(colorScheme: colorScheme),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    item.semesterLabel,
+                    style: TextStyle(
+                      color: colorScheme.onSurfaceVariant,
+                      fontSize: 12,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              Icon(
-                Icons.chevron_right,
-                color: colorScheme.onSurfaceVariant,
-                size: 20,
-              ),
-            ],
-          ),
+            ),
+            IconButton(
+              onPressed: onEdit,
+              tooltip: 'Edit tahun ajaran',
+              constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+              padding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
+              icon: Icon(Icons.edit_outlined, color: colorScheme.primary),
+            ),
+            IconButton(
+              onPressed: onDelete,
+              tooltip: 'Hapus tahun ajaran',
+              constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+              padding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
+              icon: Icon(Icons.delete_outline, color: colorScheme.error),
+            ),
+          ],
         ),
       ),
     );

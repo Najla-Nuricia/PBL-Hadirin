@@ -5,7 +5,9 @@ import '../../data/admin/tahun_ajaran.dart';
 import '../../routing/admin_route_paths.dart';
 
 class TambahTahunAjaranPage extends StatefulWidget {
-  const TambahTahunAjaranPage({super.key});
+  const TambahTahunAjaranPage({this.initialItem, super.key});
+
+  final TahunAjaran? initialItem;
 
   @override
   State<TambahTahunAjaranPage> createState() => _TambahTahunAjaranPageState();
@@ -21,6 +23,20 @@ class _TambahTahunAjaranPageState extends State<TambahTahunAjaranPage> {
   DateTime? _tanggalMulai;
   DateTime? _tanggalSelesai;
   bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final item = widget.initialItem;
+    if (item != null) {
+      _tahunController.text = item.tahun;
+      _status = item.status;
+      _semesterGanjil = item.semesterGanjil;
+      _semesterGenap = item.semesterGenap;
+      _tanggalMulai = item.tanggalMulai;
+      _tanggalSelesai = item.tanggalSelesai;
+    }
+  }
 
   @override
   void dispose() {
@@ -42,9 +58,8 @@ class _TambahTahunAjaranPageState extends State<TambahTahunAjaranPage> {
       lastDate: DateTime(2035),
       helpText: isStart ? 'Pilih tanggal mulai' : 'Pilih tanggal selesai',
       builder: (context, child) => Theme(
-        data: Theme.of(context).copyWith(
-          colorScheme: Theme.of(context).colorScheme,
-        ),
+        data: Theme.of(context)
+            .copyWith(colorScheme: Theme.of(context).colorScheme),
         child: child!,
       ),
     );
@@ -53,8 +68,7 @@ class _TambahTahunAjaranPageState extends State<TambahTahunAjaranPage> {
       if (isStart) {
         _tanggalMulai = picked;
         // Reset end date if it's before start
-        if (_tanggalSelesai != null &&
-            _tanggalSelesai!.isBefore(picked)) {
+        if (_tanggalSelesai != null && _tanggalSelesai!.isBefore(picked)) {
           _tanggalSelesai = null;
         }
       } else {
@@ -83,6 +97,13 @@ class _TambahTahunAjaranPageState extends State<TambahTahunAjaranPage> {
       _showError('Tanggal selesai harus setelah tanggal mulai.');
       return;
     }
+    if (tahunAjaranRepository.exists(
+      _tahunController.text,
+      excludingId: widget.initialItem?.id,
+    )) {
+      _showError('Tahun ajaran tersebut sudah terdaftar.');
+      return;
+    }
 
     setState(() => _isSubmitting = true);
 
@@ -90,8 +111,8 @@ class _TambahTahunAjaranPageState extends State<TambahTahunAjaranPage> {
     await Future<void>.delayed(const Duration(milliseconds: 600));
     if (!mounted) return;
 
-    final newItem = TahunAjaran(
-      id: tahunAjaranRepository.generateId(),
+    final item = TahunAjaran(
+      id: widget.initialItem?.id ?? tahunAjaranRepository.generateId(),
       tahun: _tahunController.text.trim(),
       status: _status,
       semesterGanjil: _semesterGanjil,
@@ -100,7 +121,11 @@ class _TambahTahunAjaranPageState extends State<TambahTahunAjaranPage> {
       tanggalSelesai: _tanggalSelesai,
     );
 
-    tahunAjaranRepository.add(newItem);
+    if (widget.initialItem == null) {
+      tahunAjaranRepository.add(item);
+    } else {
+      tahunAjaranRepository.update(item);
+    }
     setState(() => _isSubmitting = false);
 
     if (!mounted) return;
@@ -146,7 +171,9 @@ class _TambahTahunAjaranPageState extends State<TambahTahunAjaranPage> {
           tooltip: 'Kembali',
         ),
         title: Text(
-          'Tambah Tahun Ajaran',
+          widget.initialItem == null
+              ? 'Tambah Tahun Ajaran'
+              : 'Edit Tahun Ajaran',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
@@ -170,185 +197,180 @@ class _TambahTahunAjaranPageState extends State<TambahTahunAjaranPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                      // ── Section 01 ──────────────────────────
-                      _SectionHeader(
-                        number: '01',
-                        title: 'Informasi periode',
-                        subtitle: 'Masukkan identitas dan semester yang tersedia.',
-                        colorScheme: colorScheme,
-                      ),
-                      const SizedBox(height: 20),
-                      _FieldLabel(
-                        label: 'Tahun ajaran',
-                        required: true,
-                        colorScheme: colorScheme,
-                      ),
-                      const SizedBox(height: 6),
-                      TextFormField(
-                        controller: _tahunController,
-                        decoration: _fieldDecoration(
-                          colorScheme,
-                          hintText: '2026/2027',
-                          helperText: 'Contoh: 2026/2027',
-                        ),
-                        style: TextStyle(
-                          color: colorScheme.onSurface,
-                          fontSize: 14,
-                        ),
-                        validator: (v) {
-                          final val = (v ?? '').trim();
-                          if (val.isEmpty) return 'Tahun ajaran wajib diisi.';
-                          final pattern = RegExp(r'^\d{4}/\d{4}$');
-                          if (!pattern.hasMatch(val)) {
-                            return 'Format: YYYY/YYYY, contoh 2026/2027';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      _FieldLabel(
-                        label: 'Status',
-                        required: true,
-                        colorScheme: colorScheme,
-                      ),
-                      const SizedBox(height: 6),
-                      _StatusDropdown(
-                        value: _status,
-                        colorScheme: colorScheme,
-                        onChanged: (v) => setState(() => _status = v!),
-                      ),
-                      const SizedBox(height: 16),
-                      _FieldLabel(
-                        label: 'Semester',
-                        required: true,
-                        colorScheme: colorScheme,
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _SemesterToggleCard(
-                              label: defaultSemesterInfo.namaGanjil,
-                              period: defaultSemesterInfo.periodGanjil,
-                              selected: _semesterGanjil,
-                              colorScheme: colorScheme,
-                              onTap: () => setState(
-                                  () => _semesterGanjil = !_semesterGanjil),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: _SemesterToggleCard(
-                              label: defaultSemesterInfo.namaGenap,
-                              period: defaultSemesterInfo.periodGenap,
-                              selected: _semesterGenap,
-                              colorScheme: colorScheme,
-                              onTap: () => setState(
-                                  () => _semesterGenap = !_semesterGenap),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 28),
-
-                      // ── Section 02 ──────────────────────────
-                      _SectionHeader(
-                        number: '02',
-                        title: 'Rentang tanggal',
-                        subtitle:
-                            'Tentukan waktu mulai dan berakhirnya periode.',
-                        colorScheme: colorScheme,
-                      ),
-                      const SizedBox(height: 20),
-                      _FieldLabel(
-                        label: 'Tanggal mulai',
-                        required: true,
-                        colorScheme: colorScheme,
-                      ),
-                      const SizedBox(height: 6),
-                      _DatePickerField(
-                        date: _tanggalMulai,
-                        colorScheme: colorScheme,
-                        onTap: () => _pickDate(isStart: true),
-                      ),
-                      const SizedBox(height: 16),
-                      _FieldLabel(
-                        label: 'Tanggal selesai',
-                        required: true,
-                        colorScheme: colorScheme,
-                      ),
-                      const SizedBox(height: 6),
-                      _DatePickerField(
-                        date: _tanggalSelesai,
-                        colorScheme: colorScheme,
-                        onTap: () => _pickDate(isStart: false),
-                        firstSelectableDate: _tanggalMulai,
-                      ),
-                      const SizedBox(height: 32),
-
-                      // ── Buttons ─────────────────────────────
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: _isSubmitting ? null : _back,
-                              style: OutlinedButton.styleFrom(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 14),
-                                side: BorderSide(
-                                    color: colorScheme.outlineVariant),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                foregroundColor: colorScheme.onSurface,
-                              ),
-                              child: const Text(
-                                'Batal',
-                                style: TextStyle(fontWeight: FontWeight.w600),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            flex: 2,
-                            child: FilledButton(
-                              onPressed: _isSubmitting ? null : _submit,
-                              style: FilledButton.styleFrom(
-                                backgroundColor: colorScheme.primary,
-                                disabledBackgroundColor:
-                                    colorScheme.primary.withValues(alpha: 0.38),
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 14),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: _isSubmitting
-                                  ? SizedBox(
-                                      width: 18,
-                                      height: 18,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: colorScheme.onPrimary,
-                                      ),
-                                    )
-                                  : const Text(
-                                      'Simpan tahun ajaran',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.w600,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+                // ── Section 01 ──────────────────────────
+                _SectionHeader(
+                  number: '01',
+                  title: 'Informasi periode',
+                  subtitle: 'Masukkan identitas dan semester yang tersedia.',
+                  colorScheme: colorScheme,
                 ),
-              ),
+                const SizedBox(height: 20),
+                _FieldLabel(
+                  label: 'Tahun ajaran',
+                  required: true,
+                  colorScheme: colorScheme,
+                ),
+                const SizedBox(height: 6),
+                TextFormField(
+                  controller: _tahunController,
+                  decoration: _fieldDecoration(
+                    colorScheme,
+                    hintText: '2026/2027',
+                    helperText: 'Contoh: 2026/2027',
+                  ),
+                  style: TextStyle(color: colorScheme.onSurface, fontSize: 14),
+                  validator: (v) {
+                    final val = (v ?? '').trim();
+                    if (val.isEmpty) return 'Tahun ajaran wajib diisi.';
+                    final pattern = RegExp(r'^\d{4}/\d{4}$');
+                    if (!pattern.hasMatch(val)) {
+                      return 'Format: YYYY/YYYY, contoh 2026/2027';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                _FieldLabel(
+                  label: 'Status',
+                  required: true,
+                  colorScheme: colorScheme,
+                ),
+                const SizedBox(height: 6),
+                _StatusDropdown(
+                  value: _status,
+                  colorScheme: colorScheme,
+                  onChanged: (v) => setState(() => _status = v!),
+                ),
+                const SizedBox(height: 16),
+                _FieldLabel(
+                  label: 'Semester',
+                  required: true,
+                  colorScheme: colorScheme,
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _SemesterToggleCard(
+                        label: defaultSemesterInfo.namaGanjil,
+                        period: defaultSemesterInfo.periodGanjil,
+                        selected: _semesterGanjil,
+                        colorScheme: colorScheme,
+                        onTap: () =>
+                            setState(() => _semesterGanjil = !_semesterGanjil),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _SemesterToggleCard(
+                        label: defaultSemesterInfo.namaGenap,
+                        period: defaultSemesterInfo.periodGenap,
+                        selected: _semesterGenap,
+                        colorScheme: colorScheme,
+                        onTap: () =>
+                            setState(() => _semesterGenap = !_semesterGenap),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 28),
+
+                // ── Section 02 ──────────────────────────
+                _SectionHeader(
+                  number: '02',
+                  title: 'Rentang tanggal',
+                  subtitle: 'Tentukan waktu mulai dan berakhirnya periode.',
+                  colorScheme: colorScheme,
+                ),
+                const SizedBox(height: 20),
+                _FieldLabel(
+                  label: 'Tanggal mulai',
+                  required: true,
+                  colorScheme: colorScheme,
+                ),
+                const SizedBox(height: 6),
+                _DatePickerField(
+                  date: _tanggalMulai,
+                  colorScheme: colorScheme,
+                  onTap: () => _pickDate(isStart: true),
+                ),
+                const SizedBox(height: 16),
+                _FieldLabel(
+                  label: 'Tanggal selesai',
+                  required: true,
+                  colorScheme: colorScheme,
+                ),
+                const SizedBox(height: 6),
+                _DatePickerField(
+                  date: _tanggalSelesai,
+                  colorScheme: colorScheme,
+                  onTap: () => _pickDate(isStart: false),
+                  firstSelectableDate: _tanggalMulai,
+                ),
+                const SizedBox(height: 32),
+
+                // ── Buttons ─────────────────────────────
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _isSubmitting ? null : _back,
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          side: BorderSide(color: colorScheme.outlineVariant),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          foregroundColor: colorScheme.onSurface,
+                        ),
+                        child: const Text(
+                          'Batal',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: FilledButton(
+                        onPressed: _isSubmitting ? null : _submit,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: colorScheme.primary,
+                          disabledBackgroundColor: colorScheme.primary
+                              .withValues(alpha: 0.38),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: _isSubmitting
+                            ? SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: colorScheme.onPrimary,
+                                ),
+                              )
+                                  : Text(
+                                      widget.initialItem == null
+                                          ? 'Simpan tahun ajaran'
+                                          : 'Simpan perubahan',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 14,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          );
+          ),
+        ),
+      ),
+    );
   }
 
   InputDecoration _fieldDecoration(
@@ -358,13 +380,10 @@ class _TambahTahunAjaranPageState extends State<TambahTahunAjaranPage> {
   }) {
     return InputDecoration(
       hintText: hintText,
-      hintStyle:
-          TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13),
+      hintStyle: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13),
       helperText: helperText,
-      helperStyle:
-          TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11),
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+      helperStyle: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),
         borderSide: BorderSide(color: colorScheme.outlineVariant),
@@ -528,9 +547,15 @@ class _StatusDropdown extends StatelessWidget {
           )
           .toList(),
       onChanged: onChanged,
-      icon: Icon(Icons.keyboard_arrow_down, color: colorScheme.onSurfaceVariant),
+      icon: Icon(
+        Icons.keyboard_arrow_down,
+        color: colorScheme.onSurfaceVariant,
+      ),
       decoration: InputDecoration(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 13,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: BorderSide(color: colorScheme.outlineVariant),
@@ -621,7 +646,9 @@ class _SemesterToggleCard extends StatelessWidget {
                     period,
                     style: TextStyle(
                       color: selected
-                          ? colorScheme.onPrimaryContainer.withValues(alpha: 0.7)
+                          ? colorScheme.onPrimaryContainer.withValues(
+                              alpha: 0.7,
+                            )
                           : colorScheme.onSurfaceVariant,
                       fontSize: 11,
                     ),
@@ -671,8 +698,10 @@ class _DatePickerField extends StatelessWidget {
             size: 18,
             color: colorScheme.onSurfaceVariant,
           ),
-          contentPadding:
-              const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 13,
+          ),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
             borderSide: BorderSide(color: colorScheme.outlineVariant),

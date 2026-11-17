@@ -4,6 +4,15 @@ import 'tahun_ajaran.dart';
 
 enum SemesterPeriode { ganjil, genap }
 
+enum MataKuliahStatus { aktif, nonAktif }
+
+extension MataKuliahStatusLabel on MataKuliahStatus {
+  String get label => switch (this) {
+    MataKuliahStatus.aktif => 'Aktif',
+    MataKuliahStatus.nonAktif => 'Non-Aktif',
+  };
+}
+
 extension SemesterPeriodeLabel on SemesterPeriode {
   String get label => switch (this) {
     SemesterPeriode.ganjil => defaultSemesterInfo.namaGanjil,
@@ -30,19 +39,44 @@ class MataKuliah {
     required this.nama,
     required this.semester,
     required this.sks,
+    this.id = '',
+    this.programStudiKode = 'D4-TI',
+    this.status = MataKuliahStatus.aktif,
   });
 
+  final String id;
   final String kode;
   final String nama;
 
   /// Semester kurikulum (1–8); ganjil/genap dan tingkat diturunkan dari sini.
   final int semester;
   final int sks;
+  final String programStudiKode;
+  final MataKuliahStatus status;
 
   SemesterPeriode get periode =>
       semester.isOdd ? SemesterPeriode.ganjil : SemesterPeriode.genap;
 
   int get tingkat => (semester + 1) ~/ 2;
+
+  MataKuliah copyWith({
+    String? kode,
+    String? nama,
+    int? semester,
+    int? sks,
+    String? programStudiKode,
+    MataKuliahStatus? status,
+  }) {
+    return MataKuliah(
+      id: id,
+      kode: kode ?? this.kode,
+      nama: nama ?? this.nama,
+      semester: semester ?? this.semester,
+      sks: sks ?? this.sks,
+      programStudiKode: programStudiKode ?? this.programStudiKode,
+      status: status ?? this.status,
+    );
+  }
 }
 
 class Dosen {
