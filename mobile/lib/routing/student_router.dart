@@ -6,6 +6,7 @@ import '../pages/admin/admin_navigation_shell.dart';
 import '../pages/admin/auth/admin_login_page.dart';
 import '../pages/admin/data_academic_page.dart';
 import '../pages/admin/jadwal_list_page.dart';
+import '../pages/admin/mata_kuliah_list_page.dart';
 import '../pages/admin/tahun_ajaran_list_page.dart';
 import '../pages/admin/tambah_jadwal_page.dart';
 import '../pages/admin/tambah_kelas_page.dart';
@@ -143,6 +144,10 @@ GoRouter createStudentRouter({bool showOnboarding = false}) => GoRouter(
     GoRoute(
       path: AdminRoutePaths.tambahRuangan,
       builder: (context, state) => const TambahRuanganPage(),
+    ),
+    GoRoute(
+      path: AdminRoutePaths.mataKuliah,
+      builder: (context, state) => const MataKuliahListPage(),
     ),
     GoRoute(
       path: AdminRoutePaths.tambahMataKuliah,
