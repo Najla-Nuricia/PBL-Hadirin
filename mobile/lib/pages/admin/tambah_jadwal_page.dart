@@ -5,6 +5,7 @@ import '../../data/admin/dosen.dart';
 import '../../data/admin/jadwal.dart';
 import '../../data/admin/kelas.dart';
 import '../../data/admin/ruangan.dart';
+import '../../data/admin/mata_kuliah.dart';
 import '../../data/admin/tahun_ajaran.dart';
 import '../../routing/admin_route_paths.dart';
 import 'widgets/jadwal_form_widgets.dart';
@@ -301,7 +302,7 @@ class _TambahJadwalPageState extends State<TambahJadwalPage> {
         const JadwalFieldLabel(label: 'Mata Kuliah', required: true),
         JadwalSearchPickerField<MataKuliah>(
           value: _mataKuliah,
-          options: JadwalMasterData.mataKuliah,
+          options: mataKuliahRepository.getActive(),
           itemLabel: (item) => item.nama,
           itemSubtitle: (item) =>
               '${item.kode} · Semester ${item.semester} · ${item.sks} SKS',

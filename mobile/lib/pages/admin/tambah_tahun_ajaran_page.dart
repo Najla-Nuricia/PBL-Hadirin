@@ -5,7 +5,9 @@ import '../../data/admin/tahun_ajaran.dart';
 import '../../routing/admin_route_paths.dart';
 
 class TambahTahunAjaranPage extends StatefulWidget {
-  const TambahTahunAjaranPage({super.key});
+  const TambahTahunAjaranPage({this.initialItem, super.key});
+
+  final TahunAjaran? initialItem;
 
   @override
   State<TambahTahunAjaranPage> createState() => _TambahTahunAjaranPageState();
@@ -21,6 +23,20 @@ class _TambahTahunAjaranPageState extends State<TambahTahunAjaranPage> {
   DateTime? _tanggalMulai;
   DateTime? _tanggalSelesai;
   bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final item = widget.initialItem;
+    if (item != null) {
+      _tahunController.text = item.tahun;
+      _status = item.status;
+      _semesterGanjil = item.semesterGanjil;
+      _semesterGenap = item.semesterGenap;
+      _tanggalMulai = item.tanggalMulai;
+      _tanggalSelesai = item.tanggalSelesai;
+    }
+  }
 
   @override
   void dispose() {
@@ -81,6 +97,13 @@ class _TambahTahunAjaranPageState extends State<TambahTahunAjaranPage> {
       _showError('Tanggal selesai harus setelah tanggal mulai.');
       return;
     }
+    if (tahunAjaranRepository.exists(
+      _tahunController.text,
+      excludingId: widget.initialItem?.id,
+    )) {
+      _showError('Tahun ajaran tersebut sudah terdaftar.');
+      return;
+    }
 
     setState(() => _isSubmitting = true);
 
@@ -88,8 +111,8 @@ class _TambahTahunAjaranPageState extends State<TambahTahunAjaranPage> {
     await Future<void>.delayed(const Duration(milliseconds: 600));
     if (!mounted) return;
 
-    final newItem = TahunAjaran(
-      id: tahunAjaranRepository.generateId(),
+    final item = TahunAjaran(
+      id: widget.initialItem?.id ?? tahunAjaranRepository.generateId(),
       tahun: _tahunController.text.trim(),
       status: _status,
       semesterGanjil: _semesterGanjil,
@@ -98,7 +121,11 @@ class _TambahTahunAjaranPageState extends State<TambahTahunAjaranPage> {
       tanggalSelesai: _tanggalSelesai,
     );
 
-    tahunAjaranRepository.add(newItem);
+    if (widget.initialItem == null) {
+      tahunAjaranRepository.add(item);
+    } else {
+      tahunAjaranRepository.update(item);
+    }
     setState(() => _isSubmitting = false);
 
     if (!mounted) return;
@@ -144,7 +171,9 @@ class _TambahTahunAjaranPageState extends State<TambahTahunAjaranPage> {
           tooltip: 'Kembali',
         ),
         title: Text(
-          'Tambah Tahun Ajaran',
+          widget.initialItem == null
+              ? 'Tambah Tahun Ajaran'
+              : 'Edit Tahun Ajaran',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
@@ -325,6 +354,10 @@ class _TambahTahunAjaranPageState extends State<TambahTahunAjaranPage> {
                               )
                             : const Text(
                                 'Simpan tahun ajaran',
+                                  : Text(
+                                      widget.initialItem == null
+                                          ? 'Simpan tahun ajaran'
+                                          : 'Simpan perubahan',
                                 style: TextStyle(
                                   fontWeight: FontWeight.w600,
                                   fontSize: 14,

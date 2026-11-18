@@ -1,20 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../data/admin/jadwal.dart';
+import '../../data/admin/mata_kuliah.dart';
 import '../../routing/admin_route_paths.dart';
 import 'widgets/labeled_fields.dart';
 
-const _programStudi = [
-  'D4 Teknik Informatika',
-  'D4 Sistem Informasi Bisnis',
-  'D2 Pengembangan Perangkat Lunak Situs',
-];
-const _statusOptions = ['Aktif', 'Non-Aktif'];
+const _programStudi = {
+  'D4-TI': 'D4 Teknik Informatika',
+  'D4-SIB': 'D4 Sistem Informasi Bisnis',
+  'D2-PPLS': 'D2 Pengembangan Perangkat Lunak Situs',
+};
 const _sksOptions = ['1', '2', '3', '4'];
 const _semesterOptions = ['1', '2', '3', '4', '5', '6', '7', '8'];
 
 class TambahMataKuliahPage extends StatefulWidget {
-  const TambahMataKuliahPage({super.key});
+  const TambahMataKuliahPage({this.initialItem, super.key});
+
+  final MataKuliah? initialItem;
 
   @override
   State<TambahMataKuliahPage> createState() => _TambahMataKuliahPageState();
@@ -24,10 +27,27 @@ class _TambahMataKuliahPageState extends State<TambahMataKuliahPage> {
   final _formKey = GlobalKey<FormState>();
   final _kodeController = TextEditingController();
   final _namaController = TextEditingController();
+
   String _sks = '3';
-  String _prodi = _programStudi.first;
+  String _prodi = _programStudi.keys.first;
   String _semester = '3';
-  String _status = _statusOptions.first;
+  MataKuliahStatus _status = MataKuliahStatus.aktif;
+
+  @override
+  void initState() {
+    super.initState();
+    final item = widget.initialItem;
+    if (item != null) {
+      _kodeController.text = item.kode;
+      _namaController.text = item.nama;
+      _sks = item.sks.toString();
+      _prodi = _programStudi.containsKey(item.programStudiKode)
+          ? item.programStudiKode
+          : _programStudi.keys.first;
+      _semester = item.semester.toString();
+      _status = item.status;
+    }
+  }
 
   @override
   void dispose() {
@@ -36,26 +56,53 @@ class _TambahMataKuliahPageState extends State<TambahMataKuliahPage> {
     super.dispose();
   }
 
-  void _back() {
-    if (context.canPop()) {
-      context.pop();
+  void _save() {
+    if (!_formKey.currentState!.validate()) return;
+
+    final kode = _kodeController.text.trim();
+    if (mataKuliahRepository.codeExists(
+      kode,
+      excludingId: widget.initialItem?.id,
+    )) {
+      _showError('Kode mata kuliah tersebut sudah terdaftar.');
+      return;
+    }
+
+    final item = MataKuliah(
+      id: widget.initialItem?.id ?? mataKuliahRepository.generateId(),
+      kode: kode,
+      nama: _namaController.text.trim(),
+      sks: int.parse(_sks),
+      programStudiKode: _prodi,
+      semester: int.parse(_semester),
+      status: _status,
+    );
+
+    if (widget.initialItem == null) {
+      mataKuliahRepository.add(item);
     } else {
-      context.go(AdminRoutePaths.dataAkademik);
+      mataKuliahRepository.update(item);
+    }
+
+    if (context.canPop()) {
+      context.pop(true);
+    } else {
+      context.go(AdminRoutePaths.mataKuliah);
     }
   }
 
-  void _save() {
-    if (!_formKey.currentState!.validate()) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Mata kuliah berhasil ditambahkan')),
-    );
-    _back();
+  void _showError(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
   Widget build(BuildContext context) {
     return AdminFormScaffold(
-      title: 'Tambah Mata Kuliah',
+      title: widget.initialItem == null
+          ? 'Tambah Mata Kuliah'
+          : 'Edit Mata Kuliah',
       form: Form(
         key: _formKey,
         child: Column(
@@ -89,12 +136,14 @@ class _TambahMataKuliahPageState extends State<TambahMataKuliahPage> {
               label: 'Program Studi',
               required: true,
               value: _prodi,
-              items: _programStudi,
+              items: _programStudi.keys.toList(),
+              itemLabels: _programStudi,
               onChanged: (value) => setState(() => _prodi = value),
             ),
             const SizedBox(height: 16),
             LabeledDropdown(
-              label: 'Semester Saran',
+              label: 'Semester',
+              required: true,
               value: _semester,
               items: _semesterOptions,
               onChanged: (value) => setState(() => _semester = value),
@@ -103,9 +152,13 @@ class _TambahMataKuliahPageState extends State<TambahMataKuliahPage> {
             LabeledDropdown(
               label: 'Status',
               required: true,
-              value: _status,
-              items: _statusOptions,
-              onChanged: (value) => setState(() => _status = value),
+              value: _status.name == 'aktif' ? 'Aktif' : 'Non-Aktif',
+              items: const ['Aktif', 'Non-Aktif'],
+              onChanged: (value) => setState(
+                () => _status = value == 'Aktif'
+                    ? MataKuliahStatus.aktif
+                    : MataKuliahStatus.nonAktif,
+              ),
             ),
           ],
         ),
@@ -151,7 +204,11 @@ class AdminFormScaffold extends StatelessWidget {
               () => context.canPop()
                   ? context.pop()
                   : context.go(AdminRoutePaths.dataAkademik),
+          onPressed: () => context.canPop()
+              ? context.pop()
+              : context.go(AdminRoutePaths.mataKuliah),
           icon: Icon(Icons.arrow_back_ios_new_rounded, color: cs.primary),
+          tooltip: 'Kembali',
         ),
         title: Text(
           title,
@@ -186,7 +243,9 @@ class AdminFormScaffold extends StatelessWidget {
                 height: 48,
                 child: FilledButton(
                   onPressed: onSave,
-                  child: const Text('Simpan'),
+                  child: Text(
+                    title.startsWith('Edit') ? 'Simpan Perubahan' : 'Simpan',
+                  ),
                 ),
               ),
             ),

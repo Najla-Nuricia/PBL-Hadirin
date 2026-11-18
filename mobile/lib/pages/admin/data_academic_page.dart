@@ -15,7 +15,7 @@ void _openModule(BuildContext context, String title) {
       context.go(AdminRoutePaths.ruangan);
       break;
     case 'Mata Kuliah':
-      context.go(AdminRoutePaths.tambahMataKuliah);
+      context.go(AdminRoutePaths.mataKuliah);
       break;
     case 'Dosen':
       context.go(AdminRoutePaths.dosen);

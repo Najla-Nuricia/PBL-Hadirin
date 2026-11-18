@@ -63,6 +63,7 @@ class LabeledDropdown extends StatelessWidget {
     required this.items,
     required this.onChanged,
     this.required = false,
+    this.itemLabels,
   });
 
   final String label;
@@ -70,6 +71,7 @@ class LabeledDropdown extends StatelessWidget {
   final List<String> items;
   final ValueChanged<String> onChanged;
   final bool required;
+  final Map<String, String>? itemLabels;
 
   @override
   Widget build(BuildContext context) {
@@ -89,7 +91,8 @@ class LabeledDropdown extends StatelessWidget {
           style: TextStyle(fontSize: 13, color: cs.onSurface),
           decoration: _decoration(context),
           items: [
-            for (final i in items) DropdownMenuItem(value: i, child: Text(i)),
+            for (final i in items)
+              DropdownMenuItem(value: i, child: Text(itemLabels?[i] ?? i)),
           ],
           onChanged: (v) {
             if (v != null) onChanged(v);
