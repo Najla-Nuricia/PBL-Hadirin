@@ -52,7 +52,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 200));
 
       expect(find.text('Kirim Verifikasi Wajah'), findsOneWidget);
-      expect(find.text('Pilih Foto dari Galeri / File'), findsOneWidget);
+      expect(find.text('Coba Buka Kamera Lagi'), findsOneWidget);
     },
   );
 }

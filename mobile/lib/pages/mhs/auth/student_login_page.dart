@@ -53,14 +53,15 @@ class _StudentLoginPageState extends State<StudentLoginPage> {
       }
 
       context.go(StudentRoutePaths.beranda);
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
+      final msg = e is RemoteApiException
+          ? e.message
+          : 'Gagal masuk. Periksa koneksi server.';
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(content: Text('Gagal masuk. Periksa koneksi server.')),
-        );
+        ..showSnackBar(SnackBar(content: Text(msg)));
     }
   }
 
