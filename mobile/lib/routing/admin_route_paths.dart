@@ -6,8 +6,21 @@ abstract final class AdminRoutePaths {
   static const tahunAjaran = '/admin/tahun-ajaran';
   static const tambahTahunAjaranSegment = 'tambah';
   static const tambahTahunAjaran = '$tahunAjaran/$tambahTahunAjaranSegment';
-  static const tambahKelas = '/admin/kelas/tambah';
-  static const tambahRuangan = '/admin/ruangan/tambah';
+
+  /// Sub-segment umum untuk halaman form tambah data.
+  static const tambahSegment = 'tambah';
+
+  // Modul Kelas
+  static const kelas = '/admin/kelas';
+  static const tambahKelas = '$kelas/$tambahSegment';
+
+  // Modul Ruangan
+  static const ruangan = '/admin/ruangan';
+  static const tambahRuangan = '$ruangan/$tambahSegment';
+
+  // Modul Dosen
+  static const dosen = '/admin/dosen';
+  static const tambahDosen = '$dosen/$tambahSegment';
+
   static const tambahMataKuliah = '/admin/mata-kuliah/tambah';
-  static const tambahDosen = '/admin/dosen/tambah';
 }

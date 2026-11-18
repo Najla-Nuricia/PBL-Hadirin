@@ -52,9 +52,7 @@ class _TahunAjaranListPageState extends State<TahunAjaranListPage> {
 
   Future<void> _openTambah() async {
     final added = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => const TambahTahunAjaranPage(),
-      ),
+      MaterialPageRoute(builder: (_) => const TambahTahunAjaranPage()),
     );
     if (added == true) _refresh();
   }
@@ -159,8 +157,11 @@ class _TahunAjaranListPageState extends State<TahunAjaranListPage> {
           ),
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
-                  icon: Icon(Icons.close,
-                      color: colorScheme.onSurfaceVariant, size: 18),
+                  icon: Icon(
+                    Icons.close,
+                    color: colorScheme.onSurfaceVariant,
+                    size: 18,
+                  ),
                   onPressed: () {
                     _searchController.clear();
                   },
@@ -192,15 +193,15 @@ class _TahunAjaranListPageState extends State<TahunAjaranListPage> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.calendar_today_outlined,
-              size: 48, color: colorScheme.onSurfaceVariant),
+          Icon(
+            Icons.calendar_today_outlined,
+            size: 48,
+            color: colorScheme.onSurfaceVariant,
+          ),
           const SizedBox(height: 12),
           Text(
             'Tidak ada tahun ajaran ditemukan.',
-            style: TextStyle(
-              color: colorScheme.onSurfaceVariant,
-              fontSize: 14,
-            ),
+            style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
           ),
         ],
       ),

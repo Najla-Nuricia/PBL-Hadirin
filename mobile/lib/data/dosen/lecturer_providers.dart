@@ -26,8 +26,8 @@ class AttendanceFilterNotifier extends Notifier<AttendanceStatus?> {
 
 final attendanceFilterProvider =
     NotifierProvider<AttendanceFilterNotifier, AttendanceStatus?>(
-  AttendanceFilterNotifier.new,
-);
+      AttendanceFilterNotifier.new,
+    );
 
 final filteredStudentsProvider = Provider<List<StudentAttendance>>((ref) {
   final students = ref.watch(attendanceSessionProvider).students;
@@ -36,7 +36,10 @@ final filteredStudentsProvider = Provider<List<StudentAttendance>>((ref) {
   return students.where((s) => s.status == filter).toList();
 });
 
-final studentByIdProvider = Provider.family<StudentAttendance?, String>((ref, id) {
+final studentByIdProvider = Provider.family<StudentAttendance?, String>((
+  ref,
+  id,
+) {
   for (final s in ref.watch(attendanceSessionProvider).students) {
     if (s.id == id) return s;
   }
@@ -56,5 +59,5 @@ class LeaveDecisionNotifier extends Notifier<Map<String, LeaveDecision>> {
 
 final leaveDecisionProvider =
     NotifierProvider<LeaveDecisionNotifier, Map<String, LeaveDecision>>(
-  LeaveDecisionNotifier.new,
-);
+      LeaveDecisionNotifier.new,
+    );

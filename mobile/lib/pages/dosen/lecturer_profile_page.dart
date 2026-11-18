@@ -1,4 +1,4 @@
-﻿import 'dart:typed_data';
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -11,10 +11,7 @@ import 'widgets/logout_confirmation_dialog.dart';
 const _maxPhotoSizeInBytes = 5 * 1024 * 1024;
 
 class LecturerProfilePage extends StatefulWidget {
-  const LecturerProfilePage({
-    required this.profile,
-    super.key,
-  });
+  const LecturerProfilePage({required this.profile, super.key});
 
   final LecturerProfile profile;
 
@@ -379,11 +376,7 @@ class _LecturerInformationRow extends StatelessWidget {
                   color: colorScheme.surfaceContainerHighest,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(
-                  icon,
-                  size: 16,
-                  color: colorScheme.primary,
-                ),
+                child: Icon(icon, size: 16, color: colorScheme.primary),
               ),
               const SizedBox(width: 11),
               Expanded(

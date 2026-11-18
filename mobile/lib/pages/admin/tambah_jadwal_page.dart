@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../data/admin/dosen.dart';
 import '../../data/admin/jadwal.dart';
+import '../../data/admin/kelas.dart';
+import '../../data/admin/ruangan.dart';
 import '../../data/admin/tahun_ajaran.dart';
 import '../../routing/admin_route_paths.dart';
 import 'widgets/jadwal_form_widgets.dart';
@@ -109,6 +112,46 @@ class _TambahJadwalPageState extends State<TambahJadwalPage> {
           'untuk tingkat ${mataKuliah.tingkat}.';
     }
     return null;
+  }
+
+  /// Kode program studi untuk [nama] prodi (null bila tidak dikenal).
+  String? _programStudiKode(String nama) {
+    for (final prodi in JadwalMasterData.programStudi) {
+      if (prodi.nama == nama) return prodi.kode;
+    }
+    return null;
+  }
+
+  /// Tingkat kelas diturunkan dari nama, contoh: "TI-3A" -> 3.
+  int? _tingkatDariNama(String nama) {
+    final match = RegExp(r'-(\d)').firstMatch(nama);
+    return match == null ? null : int.tryParse(match.group(1)!);
+  }
+
+  /// Gabungan kelas master + kelas yang ditambahkan admin lewat modul Kelas.
+  List<KelasKuliah> _kelasOptions() {
+    final byName = <String, KelasKuliah>{
+      for (final item in JadwalMasterData.kelasByProgramStudi(
+        _programStudi.kode,
+      ))
+        item.nama: item,
+    };
+    for (final kelas in kelasRepository.getAll()) {
+      final kode = _programStudiKode(kelas.programStudi);
+      if (kode == null ||
+          kode != _programStudi.kode ||
+          byName.containsKey(kelas.nama)) {
+        continue;
+      }
+      final tingkat = _tingkatDariNama(kelas.nama);
+      if (tingkat == null) continue;
+      byName[kelas.nama] = KelasKuliah(
+        nama: kelas.nama,
+        tingkat: tingkat,
+        programStudiKode: kode,
+      );
+    }
+    return byName.values.toList();
   }
 
   String? _validateSesiSelesai(SesiKuliah? sesi) {
@@ -285,7 +328,7 @@ class _TambahJadwalPageState extends State<TambahJadwalPage> {
         const JadwalFieldLabel(label: 'Dosen Pengampu', required: true),
         JadwalSearchPickerField<Dosen>(
           value: _dosen,
-          options: JadwalMasterData.dosen,
+          options: dosenRepository.getAll(),
           itemLabel: (item) => item.nama,
           itemSubtitle: (item) => 'NIP ${item.nip}',
           searchText: (item) => '${item.nama} ${item.nip}',
@@ -314,7 +357,7 @@ class _TambahJadwalPageState extends State<TambahJadwalPage> {
         JadwalSearchPickerField<KelasKuliah>(
           key: ValueKey('kelas-${_programStudi.kode}'),
           value: _kelas,
-          options: JadwalMasterData.kelasByProgramStudi(_programStudi.kode),
+          options: _kelasOptions(),
           itemLabel: (item) => item.nama,
           itemSubtitle: (item) => 'Tingkat ${item.tingkat}',
           searchText: (item) => item.nama,
@@ -344,7 +387,7 @@ class _TambahJadwalPageState extends State<TambahJadwalPage> {
                   const JadwalFieldLabel(label: 'Ruangan', required: true),
                   JadwalSearchPickerField<Ruangan>(
                     value: _ruangan,
-                    options: JadwalMasterData.ruangan,
+                    options: ruanganRepository.getAll(),
                     itemLabel: (item) => item.nama,
                     searchText: (item) => '${item.nama} ${item.kode}',
                     hintText: 'Cari Ruang (LPR)...',

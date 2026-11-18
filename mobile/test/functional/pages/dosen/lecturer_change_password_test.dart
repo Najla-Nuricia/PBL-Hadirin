@@ -26,7 +26,9 @@ void main() {
   }
 
   Finder field(String label) => find.descendant(
-    of: find.ancestor(of: find.text(label), matching: find.byType(Column)).first,
+    of: find
+        .ancestor(of: find.text(label), matching: find.byType(Column))
+        .first,
     matching: find.byType(TextFormField),
   );
 

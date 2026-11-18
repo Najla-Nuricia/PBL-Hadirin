@@ -17,7 +17,12 @@ const _programStudi = [
 const _statusOptions = ['Aktif', 'Non-Aktif'];
 
 class TambahKelasPage extends StatefulWidget {
-  const TambahKelasPage({super.key});
+  const TambahKelasPage({super.key, this.kelas});
+
+  /// Jika diisi, halaman berjalan dalam mode ubah (update).
+  final Kelas? kelas;
+
+  bool get isEditing => kelas != null;
 
   @override
   State<TambahKelasPage> createState() => _TambahKelasPageState();
@@ -37,14 +42,30 @@ class _TambahKelasPageState extends State<TambahKelasPage> {
   void initState() {
     super.initState();
     final all = tahunAjaranRepository.getAll();
-    _tahunOptions = [for (final t in all) t.tahun];
+    final existing = widget.kelas;
+    // Pastikan tahun ajaran data lama tetap tersedia di dropdown.
+    _tahunOptions = {
+      for (final t in all) t.tahun,
+      if (existing != null) existing.tahunAjaran,
+    }.toList();
     // Default: tahun ajaran aktif, jika tidak ada pakai yang pertama.
-    _tahun = all
-        .firstWhere(
-          (t) => t.status == TahunAjaranStatus.aktif,
-          orElse: () => all.first,
-        )
-        .tahun;
+    _tahun =
+        existing?.tahunAjaran ??
+        all
+            .firstWhere(
+              (t) => t.status == TahunAjaranStatus.aktif,
+              orElse: () => all.first,
+            )
+            .tahun;
+
+    if (existing != null) {
+      _namaCtrl.text = existing.nama;
+      _kapasitasCtrl.text = existing.kapasitas.toString();
+      if (_programStudi.contains(existing.programStudi)) {
+        _prodi = existing.programStudi;
+      }
+      _status = existing.status.label;
+    }
   }
 
   @override
@@ -58,7 +79,7 @@ class _TambahKelasPageState extends State<TambahKelasPage> {
     if (context.canPop()) {
       context.pop();
     } else {
-      context.go(AdminRoutePaths.dataAkademik);
+      context.go(AdminRoutePaths.kelas);
     }
   }
 
@@ -66,8 +87,16 @@ class _TambahKelasPageState extends State<TambahKelasPage> {
     if (!_formKey.currentState!.validate()) return;
 
     final nama = _namaCtrl.text.trim();
+    final current = widget.kelas;
+    final status = _status == 'Aktif'
+        ? KelasStatus.aktif
+        : KelasStatus.nonAktif;
 
-    if (kelasRepository.exists(tahunAjaran: _tahun, nama: nama)) {
+    if (kelasRepository.exists(
+      tahunAjaran: _tahun,
+      nama: nama,
+      excludeId: current?.id,
+    )) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Kelas $nama sudah ada di tahun ajaran $_tahun'),
@@ -77,20 +106,36 @@ class _TambahKelasPageState extends State<TambahKelasPage> {
       return;
     }
 
-    kelasRepository.add(
-      Kelas(
-        id: kelasRepository.generateId(),
-        tahunAjaran: _tahun,
-        programStudi: _prodi,
-        nama: nama,
-        kapasitas: int.parse(_kapasitasCtrl.text),
-        status: _status == 'Aktif' ? KelasStatus.aktif : KelasStatus.nonAktif,
-      ),
-    );
+    if (current == null) {
+      kelasRepository.add(
+        Kelas(
+          id: kelasRepository.generateId(),
+          tahunAjaran: _tahun,
+          programStudi: _prodi,
+          nama: nama,
+          kapasitas: int.parse(_kapasitasCtrl.text),
+          status: status,
+        ),
+      );
+    } else {
+      kelasRepository.update(
+        current.copyWith(
+          tahunAjaran: _tahun,
+          programStudi: _prodi,
+          nama: nama,
+          kapasitas: int.parse(_kapasitasCtrl.text),
+          status: status,
+        ),
+      );
+    }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Kelas berhasil ditambahkan'),
+      SnackBar(
+        content: Text(
+          current == null
+              ? 'Kelas berhasil ditambahkan'
+              : 'Kelas berhasil diperbarui',
+        ),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -117,7 +162,7 @@ class _TambahKelasPageState extends State<TambahKelasPage> {
           ),
         ),
         title: Text(
-          'Tambah Kelas',
+          widget.isEditing ? 'Ubah Kelas' : 'Tambah Kelas',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
@@ -214,7 +259,7 @@ class _TambahKelasPageState extends State<TambahKelasPage> {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  child: const Text('Simpan'),
+                  child: Text(widget.isEditing ? 'Simpan Perubahan' : 'Simpan'),
                 ),
               ),
             ),

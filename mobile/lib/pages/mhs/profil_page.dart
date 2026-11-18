@@ -56,8 +56,9 @@ class _ProfilPageState extends State<ProfilPage> {
         _fullName = profile.fullName.isNotEmpty ? profile.fullName : _fullName;
         _nim = profile.studentId.isNotEmpty ? profile.studentId : _nim;
         _email = profile.email;
-        _phoneNumber =
-            profile.phoneNumber.trim().isEmpty ? 'Belum diisi' : profile.phoneNumber;
+        _phoneNumber = profile.phoneNumber.trim().isEmpty
+            ? 'Belum diisi'
+            : profile.phoneNumber;
       });
     } catch (_) {}
   }
@@ -89,9 +90,7 @@ class _ProfilPageState extends State<ProfilPage> {
               ? 'Belum diisi'
               : saved.phoneNumber;
         });
-        studentAuthRepository.updateProfile(
-          fullName: saved.fullName,
-        );
+        studentAuthRepository.updateProfile(fullName: saved.fullName);
         _showMessage('Profil berhasil diperbarui.');
       } catch (error) {
         if (!mounted) return;
@@ -106,9 +105,7 @@ class _ProfilPageState extends State<ProfilPage> {
       _email = updatedProfile.email;
       _phoneNumber = updatedProfile.phoneNumber;
     });
-    studentAuthRepository.updateProfile(
-      fullName: updatedProfile.fullName,
-    );
+    studentAuthRepository.updateProfile(fullName: updatedProfile.fullName);
     _showMessage('Profil berhasil diperbarui.');
   }
 

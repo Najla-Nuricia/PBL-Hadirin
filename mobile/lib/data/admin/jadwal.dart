@@ -45,11 +45,45 @@ class MataKuliah {
   int get tingkat => (semester + 1) ~/ 2;
 }
 
+enum DosenStatus { aktif, nonAktif }
+
+extension DosenStatusLabel on DosenStatus {
+  String get label => switch (this) {
+    DosenStatus.aktif => 'Aktif',
+    DosenStatus.nonAktif => 'Non-Aktif',
+  };
+}
+
 class Dosen {
-  const Dosen({required this.nip, required this.nama});
+  const Dosen({
+    required this.nip,
+    required this.nama,
+    this.email,
+    this.programStudi,
+    this.status = DosenStatus.aktif,
+  });
 
   final String nip;
   final String nama;
+  final String? email;
+  final String? programStudi;
+  final DosenStatus status;
+
+  Dosen copyWith({
+    String? nip,
+    String? nama,
+    String? email,
+    String? programStudi,
+    DosenStatus? status,
+  }) {
+    return Dosen(
+      nip: nip ?? this.nip,
+      nama: nama ?? this.nama,
+      email: email ?? this.email,
+      programStudi: programStudi ?? this.programStudi,
+      status: status ?? this.status,
+    );
+  }
 }
 
 class ProgramStudi {
@@ -73,10 +107,21 @@ class KelasKuliah {
 }
 
 class Ruangan {
-  const Ruangan({required this.kode, required this.nama});
+  const Ruangan({required this.kode, required this.nama, this.kapasitas});
 
   final String kode;
   final String nama;
+
+  /// Kapasitas tempat duduk (opsional).
+  final int? kapasitas;
+
+  Ruangan copyWith({String? kode, String? nama, int? kapasitas}) {
+    return Ruangan(
+      kode: kode ?? this.kode,
+      nama: nama ?? this.nama,
+      kapasitas: kapasitas ?? this.kapasitas,
+    );
+  }
 }
 
 class SesiKuliah {
