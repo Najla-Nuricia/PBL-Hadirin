@@ -88,10 +88,7 @@ class _RiwayatPageState extends State<RiwayatPage> {
                       _buildFilter(
                         label: 'Semester',
                         value: _selectedSemester,
-                        items: const [
-                          'Ganjil 2026/2027',
-                          'Genap 2025/2026',
-                        ],
+                        items: const ['Ganjil 2026/2027', 'Genap 2025/2026'],
                         onChanged: (value) {
                           if (value != null) {
                             setState(() => _selectedSemester = value);
@@ -131,7 +128,9 @@ class _RiwayatPageState extends State<RiwayatPage> {
                           child: Text(
                             'Belum ada riwayat untuk status ini.',
                             textAlign: TextAlign.center,
-                            style: TextStyle(color: colorScheme.onSurfaceVariant),
+                            style: TextStyle(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
                           ),
                         )
                       else
@@ -199,8 +198,10 @@ class _RiwayatPageState extends State<RiwayatPage> {
           initialValue: value,
           isDense: true,
           decoration: InputDecoration(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 12,
+              vertical: 10,
+            ),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
               borderSide: BorderSide(color: colorScheme.outline),
@@ -241,11 +242,7 @@ class _RiwayatPageState extends State<RiwayatPage> {
           color: colorScheme.tertiary,
         ),
         const SizedBox(width: 8),
-        _Counter(
-          label: 'Alfa',
-          value: _summary.alfa,
-          color: colorScheme.error,
-        ),
+        _Counter(label: 'Alfa', value: _summary.alfa, color: colorScheme.error),
       ],
     );
   }
@@ -368,18 +365,18 @@ class _AttendanceTile extends StatelessWidget {
 }
 
 String _statusLabel(AttendanceStatus status) => switch (status) {
-      AttendanceStatus.hadir => 'Hadir',
-      AttendanceStatus.izin => 'Izin',
-      AttendanceStatus.sakit => 'Sakit',
-      AttendanceStatus.alfa => 'Alfa',
-    };
+  AttendanceStatus.hadir => 'Hadir',
+  AttendanceStatus.izin => 'Izin',
+  AttendanceStatus.sakit => 'Sakit',
+  AttendanceStatus.alfa => 'Alfa',
+};
 
 AttendanceStatus _statusFromLabel(String label) => switch (label) {
-      'Hadir' => AttendanceStatus.hadir,
-      'Izin' => AttendanceStatus.izin,
-      'Sakit' => AttendanceStatus.sakit,
-      _ => AttendanceStatus.alfa,
-    };
+  'Hadir' => AttendanceStatus.hadir,
+  'Izin' => AttendanceStatus.izin,
+  'Sakit' => AttendanceStatus.sakit,
+  _ => AttendanceStatus.alfa,
+};
 
 Color _statusColor(ColorScheme colorScheme, AttendanceStatus status) =>
     switch (status) {

@@ -45,12 +45,13 @@ class _SuratPageState extends State<SuratPage> {
     if (!studentAuthRepository.hasRemoteSession) return;
     try {
       final schedules = await studentDataService.loadSchedules();
-      final names = schedules
-          .map((item) => item.courseName.trim())
-          .where((name) => name.isNotEmpty)
-          .toSet()
-          .toList()
-        ..sort();
+      final names =
+          schedules
+              .map((item) => item.courseName.trim())
+              .where((name) => name.isNotEmpty)
+              .toSet()
+              .toList()
+            ..sort();
       if (!mounted || names.isEmpty) return;
       setState(() {
         _courses = names;
@@ -79,8 +80,10 @@ class _SuratPageState extends State<SuratPage> {
     setState(() => _isSubmitting = true);
     try {
       final jenis = _selectedType == 0 ? _selectedAbsenceType : 'kompensasi';
-      final tanggal =
-          (_selectedDate ?? DateTime.now()).toIso8601String().split('T').first;
+      final tanggal = (_selectedDate ?? DateTime.now())
+          .toIso8601String()
+          .split('T')
+          .first;
       final alasan = _notesController.text.trim().isNotEmpty
           ? _notesController.text.trim()
           : 'Pengajuan surat $jenis';
@@ -110,9 +113,9 @@ class _SuratPageState extends State<SuratPage> {
     } catch (e) {
       if (mounted) {
         final msg = e.toString().replaceFirst('Exception: ', '');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal mengirim surat: $msg')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Gagal mengirim surat: $msg')));
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
@@ -146,9 +149,8 @@ class _SuratPageState extends State<SuratPage> {
       });
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal memilih file: $e')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Gagal memilih file: $e')));
     }
   }
 
@@ -355,11 +357,17 @@ class _SuratPageState extends State<SuratPage> {
                   ? const SizedBox(
                       width: 18,
                       height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
                     )
                   : const Text(
                       'Kirim Surat',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
             ),
           ),
@@ -452,8 +460,9 @@ class _SuratPageState extends State<SuratPage> {
   }
 
   Widget _buildCourseDropdown(ColorScheme colorScheme) {
-    final safeValue =
-        _courses.contains(_selectedCourse) ? _selectedCourse : null;
+    final safeValue = _courses.contains(_selectedCourse)
+        ? _selectedCourse
+        : null;
     return DropdownButtonFormField<String>(
       key: ValueKey(safeValue),
       initialValue: safeValue,
@@ -471,11 +480,13 @@ class _SuratPageState extends State<SuratPage> {
 
   Widget _buildDateField(ColorScheme colorScheme) {
     final effectiveDate = _selectedDate ?? DateTime.now();
-    final formatted = '${effectiveDate.day.toString().padLeft(2, '0')}/'
+    final formatted =
+        '${effectiveDate.day.toString().padLeft(2, '0')}/'
         '${effectiveDate.month.toString().padLeft(2, '0')}/'
         '${effectiveDate.year}';
-    final displayText =
-        _selectedDate == null ? '$formatted (Hari ini)' : formatted;
+    final displayText = _selectedDate == null
+        ? '$formatted (Hari ini)'
+        : formatted;
     return InkWell(
       onTap: _pickDate,
       borderRadius: BorderRadius.circular(10),

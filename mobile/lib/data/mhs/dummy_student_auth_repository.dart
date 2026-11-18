@@ -1,4 +1,5 @@
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
@@ -31,8 +32,8 @@ class DummyStudentAuthRepository extends ChangeNotifier {
     this.latency = const Duration(milliseconds: 600),
     http.Client? httpClient,
     this.useRemoteApi = false,
-  })  : _accounts = {for (final account in seedAccounts) account.nim: account},
-        _client = httpClient ?? http.Client();
+  }) : _accounts = {for (final account in seedAccounts) account.nim: account},
+       _client = httpClient ?? http.Client();
 
   static const demoAccount = StudentAccount(
     nim: '2341720001',
@@ -114,14 +115,17 @@ class DummyStudentAuthRepository extends ChangeNotifier {
             final userData = data['user'] as Map<String, dynamic>?;
 
             final account = StudentAccount(
-              nim: (userData?['nim'] as String?) ??
+              nim:
+                  (userData?['nim'] as String?) ??
                   (data['nim'] as String?) ??
                   nim,
-              fullName: (userData?['fullName'] as String?) ??
+              fullName:
+                  (userData?['fullName'] as String?) ??
                   (userData?['name'] as String?) ??
                   (data['name'] as String?) ??
                   'Mahasiswa',
-              className: (userData?['className'] as String?) ??
+              className:
+                  (userData?['className'] as String?) ??
                   (userData?['kelas'] as String?) ??
                   (data['className'] as String?) ??
                   (data['kelas'] as String?) ??
@@ -296,7 +300,10 @@ class DummyStudentAuthRepository extends ChangeNotifier {
               .post(
                 loginUri,
                 headers: {'Content-Type': 'application/json'},
-                body: jsonEncode({'nim': draft.nim, 'password': draft.password}),
+                body: jsonEncode({
+                  'nim': draft.nim,
+                  'password': draft.password,
+                }),
               )
               .timeout(_requestTimeout);
 
@@ -316,15 +323,16 @@ class DummyStudentAuthRepository extends ChangeNotifier {
           )..headers['Authorization'] = 'Bearer $token';
 
           for (var i = 0; i < facePhotoBytes.length; i++) {
-            final name = i < facePhotoPaths.length &&
-                    facePhotoPaths[i].trim().isNotEmpty
+            final name =
+                i < facePhotoPaths.length && facePhotoPaths[i].trim().isNotEmpty
                 ? facePhotoPaths[i].split(RegExp(r'[/\\]')).last
                 : 'face_${i + 1}.jpg';
             uploadReq.files.add(
               http.MultipartFile.fromBytes(
                 'files',
                 facePhotoBytes[i],
-                filename: name.endsWith('.png') ||
+                filename:
+                    name.endsWith('.png') ||
                         name.endsWith('.jpg') ||
                         name.endsWith('.jpeg')
                     ? name
@@ -334,8 +342,8 @@ class DummyStudentAuthRepository extends ChangeNotifier {
           }
 
           final streamed = await uploadReq.send().timeout(
-                const Duration(seconds: 30),
-              );
+            const Duration(seconds: 30),
+          );
           final faceRes = await http.Response.fromStream(streamed);
           if (faceRes.statusCode != 201 && faceRes.statusCode != 200) {
             throw RemoteApiException(

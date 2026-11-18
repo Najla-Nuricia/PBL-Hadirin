@@ -7,7 +7,12 @@ import '../../routing/admin_route_paths.dart';
 import 'widgets/labeled_fields.dart';
 
 class TambahRuanganPage extends StatefulWidget {
-  const TambahRuanganPage({super.key});
+  const TambahRuanganPage({super.key, this.ruangan});
+
+  /// Jika diisi, halaman berjalan dalam mode ubah (update).
+  final Ruangan? ruangan;
+
+  bool get isEditing => ruangan != null;
 
   @override
   State<TambahRuanganPage> createState() => _TambahRuanganPageState();
@@ -15,11 +20,26 @@ class TambahRuanganPage extends StatefulWidget {
 
 class _TambahRuanganPageState extends State<TambahRuanganPage> {
   final _formKey = GlobalKey<FormState>();
+  final _kodeController = TextEditingController();
   final _namaController = TextEditingController();
+  final _kapasitasController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    final ruangan = widget.ruangan;
+    if (ruangan != null) {
+      _kodeController.text = ruangan.kode;
+      _namaController.text = ruangan.nama;
+      _kapasitasController.text = ruangan.kapasitas?.toString() ?? '';
+    }
+  }
 
   @override
   void dispose() {
+    _kodeController.dispose();
     _namaController.dispose();
+    _kapasitasController.dispose();
     super.dispose();
   }
 
@@ -27,28 +47,47 @@ class _TambahRuanganPageState extends State<TambahRuanganPage> {
     if (context.canPop()) {
       context.pop();
     } else {
-      context.go(AdminRoutePaths.dataAkademik);
+      context.go(AdminRoutePaths.ruangan);
     }
   }
 
   void _save() {
     if (!_formKey.currentState!.validate()) return;
 
+    final kode = _kodeController.text.trim().toUpperCase();
     final nama = _namaController.text.trim();
-    if (ruanganRepository.exists(nama)) {
+    final kapasitasText = _kapasitasController.text.trim();
+    final current = widget.ruangan;
+
+    if (kode != current?.kode && ruanganRepository.exists(kode)) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Ruangan $nama sudah terdaftar'),
+          content: Text('Ruangan $kode sudah terdaftar'),
           behavior: SnackBarBehavior.floating,
         ),
       );
       return;
     }
 
-    ruanganRepository.add(Ruangan(kode: nama, nama: nama));
+    final ruangan = Ruangan(
+      kode: kode,
+      nama: nama,
+      kapasitas: kapasitasText.isEmpty ? null : int.parse(kapasitasText),
+    );
+
+    if (current == null) {
+      ruanganRepository.add(ruangan);
+    } else {
+      ruanganRepository.update(current.kode, ruangan);
+    }
+
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Ruangan berhasil ditambahkan'),
+      SnackBar(
+        content: Text(
+          current == null
+              ? 'Ruangan berhasil ditambahkan'
+              : 'Ruangan berhasil diperbarui',
+        ),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -75,7 +114,7 @@ class _TambahRuanganPageState extends State<TambahRuanganPage> {
           ),
         ),
         title: Text(
-          'Tambah Ruangan',
+          widget.isEditing ? 'Ubah Ruangan' : 'Tambah Ruangan',
           style: TextStyle(
             fontSize: 14,
             fontWeight: FontWeight.w600,
@@ -95,14 +134,47 @@ class _TambahRuanganPageState extends State<TambahRuanganPage> {
                 padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
                 child: Form(
                   key: _formKey,
-                  child: LabeledTextField(
-                    label: 'Nama Ruangan',
-                    required: true,
-                    controller: _namaController,
-                    hint: 'Contoh : LPR1',
-                    validator: (value) => (value == null || value.trim().isEmpty)
-                        ? 'Nama ruangan wajib diisi'
-                        : null,
+                  child: Column(
+                    children: [
+                      LabeledTextField(
+                        label: 'Kode Ruangan',
+                        required: true,
+                        controller: _kodeController,
+                        hint: 'LPR1',
+                        helper: 'Kode unik ruangan, contoh: LPR1, J301',
+                        validator: (value) {
+                          final v = (value ?? '').trim();
+                          if (v.isEmpty) return 'Kode ruangan wajib diisi';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      LabeledTextField(
+                        label: 'Nama Ruangan',
+                        required: true,
+                        controller: _namaController,
+                        hint: 'Contoh : LPR1',
+                        validator: (value) =>
+                            (value == null || value.trim().isEmpty)
+                            ? 'Nama ruangan wajib diisi'
+                            : null,
+                      ),
+                      const SizedBox(height: 16),
+                      LabeledTextField(
+                        label: 'Kapasitas',
+                        controller: _kapasitasController,
+                        numeric: true,
+                        hint: '40',
+                        helper: 'Opsional, isi jumlah kursi ruangan',
+                        validator: (value) {
+                          final v = (value ?? '').trim();
+                          if (v.isEmpty) return null;
+                          return int.parse(v) <= 0
+                              ? 'Kapasitas harus lebih dari 0'
+                              : null;
+                        },
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -127,7 +199,7 @@ class _TambahRuanganPageState extends State<TambahRuanganPage> {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  child: const Text('Simpan'),
+                  child: Text(widget.isEditing ? 'Simpan Perubahan' : 'Simpan'),
                 ),
               ),
             ),
