@@ -22,5 +22,7 @@ abstract final class AdminRoutePaths {
   static const dosen = '/admin/dosen';
   static const tambahDosen = '$dosen/$tambahSegment';
 
-  static const tambahMataKuliah = '/admin/mata-kuliah/tambah';
+  // Modul Mata Kuliah
+  static const mataKuliah = '/admin/mata-kuliah';
+  static const tambahMataKuliah = '$mataKuliah/$tambahSegment';
 }

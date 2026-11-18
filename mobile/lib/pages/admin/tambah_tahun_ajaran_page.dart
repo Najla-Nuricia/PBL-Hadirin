@@ -352,13 +352,11 @@ class _TambahTahunAjaranPageState extends State<TambahTahunAjaranPage> {
                                   color: colorScheme.onPrimary,
                                 ),
                               )
-                            : const Text(
-                                'Simpan tahun ajaran',
-                                  : Text(
-                                      widget.initialItem == null
-                                          ? 'Simpan tahun ajaran'
-                                          : 'Simpan perubahan',
-                                style: TextStyle(
+                            : Text(
+                                widget.initialItem == null
+                                    ? 'Simpan tahun ajaran'
+                                    : 'Simpan perubahan',
+                                style: const TextStyle(
                                   fontWeight: FontWeight.w600,
                                   fontSize: 14,
                                 ),
