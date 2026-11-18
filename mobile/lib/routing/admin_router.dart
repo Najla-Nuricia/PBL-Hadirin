@@ -84,10 +84,12 @@ GoRouter createAdminRouter({bool showOnboarding = false}) => GoRouter(
     GoRoute(
       path: AdminRoutePaths.mataKuliah,
       builder: (context, state) => const MataKuliahListPage(),
-    ),
-    GoRoute(
-      path: AdminRoutePaths.tambahMataKuliah,
-      builder: (context, state) => const TambahMataKuliahPage(),
+      routes: [
+        GoRoute(
+          path: AdminRoutePaths.tambahSegment,
+          builder: (context, state) => const TambahMataKuliahPage(),
+        ),
+      ],
     ),
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) =>

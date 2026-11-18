@@ -171,8 +171,14 @@ GoRouter createStudentRouter({bool showOnboarding = false}) => GoRouter(
       ],
     ),
     GoRoute(
-      path: AdminRoutePaths.tambahMataKuliah,
-      builder: (context, state) => const TambahMataKuliahPage(),
+      path: AdminRoutePaths.mataKuliah,
+      builder: (context, state) => const MataKuliahListPage(),
+      routes: [
+        GoRoute(
+          path: AdminRoutePaths.tambahSegment,
+          builder: (context, state) => const TambahMataKuliahPage(),
+        ),
+      ],
     ),
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) =>

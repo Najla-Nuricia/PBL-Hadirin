@@ -204,9 +204,6 @@ class AdminFormScaffold extends StatelessWidget {
               () => context.canPop()
                   ? context.pop()
                   : context.go(AdminRoutePaths.dataAkademik),
-          onPressed: () => context.canPop()
-              ? context.pop()
-              : context.go(AdminRoutePaths.mataKuliah),
           icon: Icon(Icons.arrow_back_ios_new_rounded, color: cs.primary),
           tooltip: 'Kembali',
         ),
