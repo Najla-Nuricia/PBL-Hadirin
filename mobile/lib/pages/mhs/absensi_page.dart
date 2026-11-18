@@ -25,6 +25,8 @@ const _cameraPermissionErrorCodes = {
   'AudioAccessDenied',
   'AudioAccessDeniedWithoutPrompt',
   'AudioAccessRestricted',
+  'permissionDenied',
+  'NotAllowedError',
 };
 
 /// Halaman presensi dua tahap: validasi sesi QR + GPS kampus dan verifikasi wajah via kamera.
@@ -139,32 +141,53 @@ class _AbsensiPageState extends State<AbsensiPage>
       }
       _cameras = cameras;
 
-      final selected = cameras.firstWhere(
-        (c) => c.lensDirection == _preferredLens,
-        orElse: () => cameras.first,
-      );
-      controller = CameraController(
-        selected,
-        ResolutionPreset.medium,
-        enableAudio: false,
-      );
-      await controller.initialize();
-      if (!mounted || _currentStep != 1) {
-        await controller.dispose();
-        return;
+      final preferred = cameras
+          .where((c) => c.lensDirection == _preferredLens)
+          .toList();
+      final candidates = [
+        ...preferred,
+        ...cameras.where((c) => !preferred.contains(c)),
+      ];
+
+      CameraException? lastCameraError;
+      for (final candidate in candidates) {
+        CameraController? candidateController;
+        try {
+          candidateController = CameraController(
+            candidate,
+            ResolutionPreset.medium,
+            enableAudio: false,
+          );
+          await candidateController.initialize();
+          if (!mounted || _currentStep != 1) {
+            await candidateController.dispose();
+            return;
+          }
+          controller = candidateController;
+          setState(() {
+            _cameraController = candidateController;
+            _cameraStatus = _CameraStatus.ready;
+          });
+          return;
+        } on CameraException catch (e) {
+          lastCameraError = e;
+          await candidateController?.dispose();
+        }
       }
-      setState(() {
-        _cameraController = controller;
-        _cameraStatus = _CameraStatus.ready;
-      });
+
+      if (lastCameraError != null) {
+        throw lastCameraError;
+      }
     } on CameraException catch (error) {
       await controller?.dispose();
       debugPrint('Attendance camera initialization failed: ${error.code}');
-      _setCameraStatus(
-        _cameraPermissionErrorCodes.contains(error.code)
-            ? _CameraStatus.permissionDenied
-            : _CameraStatus.failed,
-      );
+      if (_cameraPermissionErrorCodes.contains(error.code)) {
+        _setCameraStatus(_CameraStatus.permissionDenied);
+      } else if (error.code == 'cameraNotFound') {
+        _setCameraStatus(_CameraStatus.unavailable);
+      } else {
+        _setCameraStatus(_CameraStatus.failed);
+      }
     } catch (error) {
       await controller?.dispose();
       debugPrint('Attendance camera unavailable on this platform: $error');
@@ -598,6 +621,33 @@ class _AbsensiPageState extends State<AbsensiPage>
                           : _currentStep == 1 &&
                                 _cameraStatus == _CameraStatus.initializing
                           ? const CircularProgressIndicator(strokeWidth: 2.5)
+                          : (_currentStep == 1 &&
+                                  (_cameraStatus == _CameraStatus.unavailable ||
+                                      _cameraStatus == _CameraStatus.failed ||
+                                      _cameraStatus == _CameraStatus.permissionDenied))
+                          ? InkWell(
+                              onTap: _pickFaceProbePhoto,
+                              borderRadius: BorderRadius.circular(14),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.add_photo_alternate_outlined,
+                                    color: colorScheme.primary,
+                                    size: 38,
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Pilih Foto Wajah',
+                                    style: TextStyle(
+                                      color: colorScheme.primary,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
                           : Icon(
                               _currentStep == 0
                                   ? Icons.qr_code_scanner
@@ -660,9 +710,11 @@ class _AbsensiPageState extends State<AbsensiPage>
     final cameraHint = switch (_cameraStatus) {
       _CameraStatus.initializing => 'Membuka kamera perangkat...',
       _CameraStatus.permissionDenied =>
-        'Izin kamera ditolak. Berikan izin kamera atau pilih foto dari file.',
-      _CameraStatus.unavailable => 'Kamera langsung tidak tersedia di perangkat ini; gunakan Pilih Foto (File).',
-      _CameraStatus.failed => 'Kamera gagal dibuka. Coba muat ulang kamera atau pilih foto dari file.',
+        'Izin kamera ditolak. Berikan izin di browser/pengaturan atau gunakan Pilih Foto (File).',
+      _CameraStatus.unavailable =>
+        'Kamera langsung tidak terdeteksi (cameraNotFound). Gunakan tombol "Pilih Foto dari Galeri / File".',
+      _CameraStatus.failed =>
+        'Kamera gagal dibuka. Coba buka kamera lagi atau gunakan tombol "Pilih Foto dari Galeri / File".',
       _CameraStatus.ready =>
         _probeImageBytes == null
             ? 'Arahkan wajah ke bingkai kamera lalu tekan Ambil Foto Wajah'
@@ -878,28 +930,40 @@ class _AbsensiPageState extends State<AbsensiPage>
                       }
                     },
               icon: const Icon(Icons.refresh),
-              label: const Text('Ambil Ulang dari Kamera'),
+              label: const Text('Ganti / Ambil Ulang Foto'),
             ),
           )
         else if (_cameraStatus == _CameraStatus.permissionDenied ||
-            _cameraStatus == _CameraStatus.failed)
+            _cameraStatus == _CameraStatus.failed ||
+            _cameraStatus == _CameraStatus.unavailable)
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: OutlinedButton.icon(
               onPressed: _isInitializingCamera ? null : _initializeCamera,
-              icon: const Icon(Icons.videocam_outlined),
+              icon: const Icon(Icons.refresh),
               label: const Text('Coba Buka Kamera Lagi'),
             ),
           ),
-        OutlinedButton.icon(
-          onPressed: _isSubmitting ? null : _pickFaceProbePhoto,
-          icon: const Icon(Icons.photo_library_outlined),
-          label: Text(
-            _probeImageName != null
-                ? 'Ganti Foto (${_probeImageName!})'
-                : 'Pilih Foto dari Galeri / File',
+        if (_probeImageBytes == null && !cameraReady)
+          FilledButton.icon(
+            onPressed: _isSubmitting ? null : _pickFaceProbePhoto,
+            icon: const Icon(Icons.photo_library_outlined),
+            label: Text(
+              _probeImageName != null
+                  ? 'Ganti Foto (${_probeImageName!})'
+                  : 'Pilih Foto dari Galeri / File',
+            ),
+          )
+        else
+          OutlinedButton.icon(
+            onPressed: _isSubmitting ? null : _pickFaceProbePhoto,
+            icon: const Icon(Icons.photo_library_outlined),
+            label: Text(
+              _probeImageName != null
+                  ? 'Ganti Foto (${_probeImageName!})'
+                  : 'Pilih Foto dari Galeri / File',
+            ),
           ),
-        ),
       ],
     );
   }
