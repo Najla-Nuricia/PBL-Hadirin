@@ -101,29 +101,29 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
                     controller: _passwordController,
                     obscureText: !_isPasswordVisible,
                     onFieldSubmitted: (_) => _submit(),
-                    decoration: _inputDecoration(
-                      context,
-                      hintText: 'Masukkan Password',
-                    ).copyWith(
-                      suffixIcon: IconButton(
-                        onPressed: () => setState(
-                          () => _isPasswordVisible = !_isPasswordVisible,
+                    decoration:
+                        _inputDecoration(
+                          context,
+                          hintText: 'Masukkan Password',
+                        ).copyWith(
+                          suffixIcon: IconButton(
+                            onPressed: () => setState(
+                              () => _isPasswordVisible = !_isPasswordVisible,
+                            ),
+                            tooltip: _isPasswordVisible
+                                ? 'Sembunyikan password'
+                                : 'Tampilkan password',
+                            icon: Icon(
+                              _isPasswordVisible
+                                  ? Icons.visibility_off_outlined
+                                  : Icons.visibility_outlined,
+                              size: 19,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
                         ),
-                        tooltip: _isPasswordVisible
-                            ? 'Sembunyikan password'
-                            : 'Tampilkan password',
-                        icon: Icon(
-                          _isPasswordVisible
-                              ? Icons.visibility_off_outlined
-                              : Icons.visibility_outlined,
-                          size: 19,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                    validator: (value) => (value ?? '').isEmpty
-                        ? 'Password wajib diisi.'
-                        : null,
+                    validator: (value) =>
+                        (value ?? '').isEmpty ? 'Password wajib diisi.' : null,
                   ),
                   const SizedBox(height: 32),
                   SizedBox(
@@ -152,10 +152,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
           ),
         ),
       ),
-      bottomNavigationBar: Container(
-        height: 5,
-        color: colorScheme.primary,
-      ),
+      bottomNavigationBar: Container(height: 5, color: colorScheme.primary),
     );
   }
 
@@ -167,10 +164,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
 
     return InputDecoration(
       hintText: hintText,
-      hintStyle: TextStyle(
-        color: colorScheme.onSurfaceVariant,
-        fontSize: 12,
-      ),
+      hintStyle: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12),
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),

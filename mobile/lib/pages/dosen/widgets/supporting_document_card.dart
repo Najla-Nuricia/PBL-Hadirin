@@ -35,8 +35,11 @@ class SupportingDocumentCard extends StatelessWidget {
                   color: scheme.primaryContainer,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(Icons.insert_drive_file_outlined,
-                    size: 20, color: scheme.primary),
+                child: Icon(
+                  Icons.insert_drive_file_outlined,
+                  size: 20,
+                  color: scheme.primary,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -47,11 +50,17 @@ class SupportingDocumentCard extends StatelessWidget {
                       document.fileName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     Text(
                       document.sizeLabel,
-                      style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: scheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),

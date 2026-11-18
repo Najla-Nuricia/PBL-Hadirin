@@ -10,12 +10,11 @@ void main() {
     studentAuthRepository.logout();
   });
 
-  testWidgets('SuratPage displays Sakit/Izin radios and Kompensasi tab', (tester) async {
+  testWidgets('SuratPage displays Sakit/Izin radios and Kompensasi tab', (
+    tester,
+  ) async {
     await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.light,
-        home: const SuratPage(),
-      ),
+      MaterialApp(theme: AppTheme.light, home: const SuratPage()),
     );
     await tester.pumpAndSettle();
 
@@ -38,23 +37,22 @@ void main() {
     expect(find.text('Pilih mata kuliah terlebih dahulu.'), findsOneWidget);
   });
 
-  testWidgets('AbsensiPage enters camera step gracefully when camera plugin unavailable', (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.light,
-        home: const AbsensiPage(),
-      ),
-    );
-    await tester.pumpAndSettle();
+  testWidgets(
+    'AbsensiPage enters camera step gracefully when camera plugin unavailable',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(theme: AppTheme.light, home: const AbsensiPage()),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.textContaining('JTI Polinema'), findsOneWidget);
-    await tester.ensureVisible(find.text('Lanjutkan ke Scan Wajah'));
-    await tester.tap(find.text('Lanjutkan ke Scan Wajah'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 200));
+      expect(find.textContaining('JTI Polinema'), findsOneWidget);
+      await tester.ensureVisible(find.text('Lanjutkan ke Scan Wajah'));
+      await tester.tap(find.text('Lanjutkan ke Scan Wajah'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
 
-    expect(find.text('Kirim Verifikasi Wajah'), findsOneWidget);
-    expect(find.text('Pilih Foto dari Galeri / File'), findsOneWidget);
-  });
+      expect(find.text('Kirim Verifikasi Wajah'), findsOneWidget);
+      expect(find.text('Pilih Foto dari Galeri / File'), findsOneWidget);
+    },
+  );
 }
-

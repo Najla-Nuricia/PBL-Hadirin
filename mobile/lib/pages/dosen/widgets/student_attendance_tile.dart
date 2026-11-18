@@ -24,7 +24,8 @@ class StudentAttendanceTile extends StatelessWidget {
     return Semantics(
       button: true,
       excludeSemantics: true,
-      label: '${student.name}, NIM ${student.nim}, '
+      label:
+          '${student.name}, NIM ${student.nim}, '
           'status ${student.status.label}, '
           '${student.checkInTime == null ? "belum absen" : "jam $time"}. '
           'Ketuk untuk melihat detail.',
@@ -69,7 +70,10 @@ class StudentAttendanceTile extends StatelessWidget {
                 const SizedBox(width: 8),
                 Text(
                   time,
-                  style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: scheme.onSurfaceVariant,
+                  ),
                 ),
                 const SizedBox(width: 10),
                 StatusBadge(status: student.status),

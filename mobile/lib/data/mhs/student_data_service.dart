@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+
 import 'package:http/http.dart' as http;
 
 import '../api_config.dart';
@@ -10,7 +11,7 @@ import 'student_schedule.dart';
 
 class StudentDataService {
   StudentDataService({http.Client? httpClient})
-      : _client = httpClient ?? http.Client();
+    : _client = httpClient ?? http.Client();
 
   static const _timeout = Duration(seconds: 8);
   final http.Client _client;
@@ -25,9 +26,7 @@ class StudentDataService {
 
   Map<String, String> get _authOnlyHeaders {
     final token = studentAuthRepository.currentAccessToken;
-    return {
-      if (token != null) 'Authorization': 'Bearer $token',
-    };
+    return {if (token != null) 'Authorization': 'Bearer $token'};
   }
 
   bool get _hasRemoteSession => studentAuthRepository.hasRemoteSession;
@@ -35,7 +34,8 @@ class StudentDataService {
   /// Pastikan sesi remote aktif, jika belum coba login dengan akun saat ini / demo
   Future<void> _ensureSession() async {
     if (!_hasRemoteSession) {
-      final acc = studentAuthRepository.currentAccount ??
+      final acc =
+          studentAuthRepository.currentAccount ??
           DummyStudentAuthRepository.demoAccount;
       try {
         await studentAuthRepository.login(
@@ -65,12 +65,12 @@ class StudentDataService {
       final res = await _client.get(uri, headers: _headers).timeout(_timeout);
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
-        final fullName = (data['fullName'] as String?) ??
+        final fullName =
+            (data['fullName'] as String?) ??
             (data['nama_lengkap'] as String?) ??
             '';
-        final className = (data['className'] as String?) ??
-            (data['kelas'] as String?) ??
-            '';
+        final className =
+            (data['className'] as String?) ?? (data['kelas'] as String?) ?? '';
         studentAuthRepository.updateCurrentAccount(
           fullName: fullName.isNotEmpty ? fullName : null,
           className: className.isNotEmpty ? className : null,
@@ -79,7 +79,8 @@ class StudentDataService {
           fullName: fullName,
           studentId: (data['nim'] as String?) ?? '',
           email: (data['email'] as String?) ?? '',
-          phoneNumber: (data['phoneNumber'] as String?) ??
+          phoneNumber:
+              (data['phoneNumber'] as String?) ??
               (data['no_hp'] as String?) ??
               '',
           role: (data['role'] as String?) ?? 'Mahasiswa',
@@ -133,8 +134,7 @@ class StudentDataService {
 
     if (res.statusCode == 200) {
       final decoded = jsonDecode(res.body) as Map<String, dynamic>;
-      final data =
-          (decoded['data'] as Map<String, dynamic>?) ?? decoded;
+      final data = (decoded['data'] as Map<String, dynamic>?) ?? decoded;
       final updatedName = (data['fullName'] as String?) ?? fullName;
       final updatedClass = (data['className'] as String?) ?? className ?? '';
       studentAuthRepository.updateCurrentAccount(
@@ -169,20 +169,23 @@ class StudentDataService {
         return list.map((item) {
           final m = item as Map<String, dynamic>;
           return StudentSchedule(
-            courseName: (m['courseName'] as String?) ??
+            courseName:
+                (m['courseName'] as String?) ??
                 (m['matkul_nama'] as String?) ??
                 (m['course_name'] as String?) ??
                 '',
-            startTime: (m['jam_mulai'] as String?) ??
+            startTime:
+                (m['jam_mulai'] as String?) ??
                 (m['start_time'] as String?) ??
                 '',
-            endTime: (m['jam_selesai'] as String?) ??
+            endTime:
+                (m['jam_selesai'] as String?) ??
                 (m['end_time'] as String?) ??
                 '',
-            room: (m['ruangan_nama'] as String?) ??
-                (m['room'] as String?) ??
-                '-',
-            lecturerName: (m['dosen_nama'] as String?) ??
+            room:
+                (m['ruangan_nama'] as String?) ?? (m['room'] as String?) ?? '-',
+            lecturerName:
+                (m['dosen_nama'] as String?) ??
                 (m['lecturer_name'] as String?) ??
                 '-',
             dayOfWeek: (m['day_of_week'] as int?) ?? 1,
@@ -222,22 +225,27 @@ class StudentDataService {
   }) async {
     await _ensureSession();
     if (_hasRemoteSession) {
-      final query = (status != null && status.isNotEmpty) ? '?status=$status' : '';
-      final uri =
-          Uri.parse('${ApiConfig.baseUrl}/mahasiswa/presensi/riwayat$query');
+      final query = (status != null && status.isNotEmpty)
+          ? '?status=$status'
+          : '';
+      final uri = Uri.parse(
+        '${ApiConfig.baseUrl}/mahasiswa/presensi/riwayat$query',
+      );
       final res = await _client.get(uri, headers: _headers).timeout(_timeout);
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body) as Map<String, dynamic>;
         final list = decoded['data'] as List<dynamic>? ?? const [];
         return list.map((item) {
           final m = item as Map<String, dynamic>;
-          final rawDate = (m['tanggal'] as String?) ?? (m['date'] as String?) ?? '-';
+          final rawDate =
+              (m['tanggal'] as String?) ?? (m['date'] as String?) ?? '-';
           final parsedDay = rawDate.contains('-') && rawDate.length >= 10
               ? rawDate.split('-').last
               : rawDate;
           return StudentAttendanceRecord(
             date: parsedDay,
-            courseName: (m['courseName'] as String?) ??
+            courseName:
+                (m['courseName'] as String?) ??
                 (m['matkul_nama'] as String?) ??
                 '-',
             time: (m['time'] as String?) ?? (m['jam_masuk'] as String?) ?? '-',
@@ -252,11 +260,11 @@ class StudentDataService {
   }
 
   AttendanceStatus _parseStatus(String raw) => switch (raw.toLowerCase()) {
-        'hadir' => AttendanceStatus.hadir,
-        'izin' => AttendanceStatus.izin,
-        'sakit' => AttendanceStatus.sakit,
-        _ => AttendanceStatus.alfa,
-      };
+    'hadir' => AttendanceStatus.hadir,
+    'izin' => AttendanceStatus.izin,
+    'sakit' => AttendanceStatus.sakit,
+    _ => AttendanceStatus.alfa,
+  };
 
   Future<ClassReminder?> loadClassReminder() async {
     await _ensureSession();
@@ -268,14 +276,17 @@ class StudentDataService {
         final data = decoded['data'] as Map<String, dynamic>?;
         if (data == null) return null;
         return ClassReminder(
-          message: (data['message'] as String?) ??
+          message:
+              (data['message'] as String?) ??
               (data['status_label'] as String?) ??
               'Jadwal Berikutnya',
-          courseName: (data['courseName'] as String?) ??
+          courseName:
+              (data['courseName'] as String?) ??
               (data['matkul_nama'] as String?) ??
               '',
           time: (data['time'] as String?) ?? '',
-          room: (data['room'] as String?) ??
+          room:
+              (data['room'] as String?) ??
               (data['ruangan_nama'] as String?) ??
               '-',
         );
@@ -476,8 +487,9 @@ class StudentDataService {
     String? tanggal,
   }) async {
     try {
-      final uri =
-          Uri.parse('${ApiConfig.baseUrl}/mahasiswa/pengajuan/$pengajuanId');
+      final uri = Uri.parse(
+        '${ApiConfig.baseUrl}/mahasiswa/pengajuan/$pengajuanId',
+      );
       final payload = <String, dynamic>{};
       if (alasan != null) payload['alasan'] = alasan;
       if (matakuliah != null) payload['matakuliah'] = matakuliah;
@@ -494,10 +506,12 @@ class StudentDataService {
 
   Future<bool> deletePengajuan(String pengajuanId) async {
     try {
-      final uri =
-          Uri.parse('${ApiConfig.baseUrl}/mahasiswa/pengajuan/$pengajuanId');
-      final res =
-          await _client.delete(uri, headers: _headers).timeout(_timeout);
+      final uri = Uri.parse(
+        '${ApiConfig.baseUrl}/mahasiswa/pengajuan/$pengajuanId',
+      );
+      final res = await _client
+          .delete(uri, headers: _headers)
+          .timeout(_timeout);
       return res.statusCode == 200;
     } catch (_) {
       return false;
@@ -612,8 +626,9 @@ class StudentDataService {
   Future<bool> deleteMahasiswa(String nim) async {
     try {
       final uri = Uri.parse('${ApiConfig.baseUrl}/mahasiswa/$nim');
-      final res =
-          await _client.delete(uri, headers: _headers).timeout(_timeout);
+      final res = await _client
+          .delete(uri, headers: _headers)
+          .timeout(_timeout);
       return res.statusCode == 200;
     } catch (_) {
       return false;

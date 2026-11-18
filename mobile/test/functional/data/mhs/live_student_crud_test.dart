@@ -34,13 +34,16 @@ void main() {
       expect(summary.alfa, isNonNegative);
     });
 
-    test('loadClassReminder returns upcoming reminder when available', () async {
-      final reminder = await studentDataService.loadClassReminder();
-      if (reminder != null) {
-        expect(reminder.courseName.isNotEmpty, isTrue);
-        expect(reminder.time.isNotEmpty, isTrue);
-      }
-    });
+    test(
+      'loadClassReminder returns upcoming reminder when available',
+      () async {
+        final reminder = await studentDataService.loadClassReminder();
+        if (reminder != null) {
+          expect(reminder.courseName.isNotEmpty, isTrue);
+          expect(reminder.time.isNotEmpty, isTrue);
+        }
+      },
+    );
   });
 
   group('3. CRUD Operations', () {
@@ -61,8 +64,9 @@ void main() {
         expect(created, isTrue);
 
         // READ
-        final list =
-            await studentDataService.listMahasiswa(search: 'Mahasiswa Baru QA');
+        final list = await studentDataService.listMahasiswa(
+          search: 'Mahasiswa Baru QA',
+        );
         expect(list.any((m) => m['nim'] == testNim), isTrue);
 
         // UPDATE
@@ -79,38 +83,42 @@ void main() {
       }
     });
 
-    test('CRUD Pengajuan Surat Ketidakhadiran (Create, Read, Update, Delete)', () async {
-      String? pengajuanId;
-      try {
-        // CREATE
-        final res = await studentDataService.submitPengajuan(
-          jenis: 'izin',
-          alasan: 'Lomba Robotika Nasional',
-          matakuliah: 'Pemrograman Web',
-          tanggal: '2026-11-20',
-          dokumenPath: 'robotika.pdf',
-        );
-        expect(res['data'], isNotNull);
-        pengajuanId = res['data']['id'] as String;
+    test(
+      'CRUD Pengajuan Surat Ketidakhadiran (Create, Read, Update, Delete)',
+      () async {
+        String? pengajuanId;
+        try {
+          // CREATE
+          final res = await studentDataService.submitPengajuan(
+            jenis: 'izin',
+            alasan: 'Lomba Robotika Nasional',
+            matakuliah: 'Pemrograman Web',
+            tanggal: '2026-11-20',
+            dokumenPath: 'robotika.pdf',
+          );
+          expect(res['data'], isNotNull);
+          pengajuanId = res['data']['id'] as String;
 
-        // READ
-        final list = await studentDataService.loadPengajuanList();
-        expect(list.any((p) => p['id'] == pengajuanId), isTrue);
+          // READ
+          final list = await studentDataService.loadPengajuanList();
+          expect(list.any((p) => p['id'] == pengajuanId), isTrue);
 
-        // UPDATE
-        final updated = await studentDataService.updatePengajuan(
-          pengajuanId: pengajuanId,
-          alasan: 'Lomba Robotika Nasional (Final)',
-        );
-        expect(updated, isTrue);
-      } finally {
-        // DELETE
-        if (pengajuanId != null) {
-          final deleted = await studentDataService.deletePengajuan(pengajuanId);
-          expect(deleted, isTrue);
+          // UPDATE
+          final updated = await studentDataService.updatePengajuan(
+            pengajuanId: pengajuanId,
+            alasan: 'Lomba Robotika Nasional (Final)',
+          );
+          expect(updated, isTrue);
+        } finally {
+          // DELETE
+          if (pengajuanId != null) {
+            final deleted = await studentDataService.deletePengajuan(
+              pengajuanId,
+            );
+            expect(deleted, isTrue);
+          }
         }
-      }
-    });
+      },
+    );
   });
 }
-

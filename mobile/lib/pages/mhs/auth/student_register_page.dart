@@ -221,7 +221,8 @@ class _StudentRegisterPageState extends State<StudentRegisterPage> {
                                         width: 20,
                                         height: 20,
                                         child: CircularProgressIndicator(
-                                            strokeWidth: 2),
+                                          strokeWidth: 2,
+                                        ),
                                       ),
                                     )
                                   : null,
@@ -237,11 +238,11 @@ class _StudentRegisterPageState extends State<StudentRegisterPage> {
                             onChanged: _isSubmitting || _isLoadingKelas
                                 ? null
                                 : (value) =>
-                                    setState(() => _selectedKelas = value),
+                                      setState(() => _selectedKelas = value),
                             validator: (value) =>
                                 (value == null || value.trim().isEmpty)
-                                    ? 'Kelas wajib dipilih.'
-                                    : null,
+                                ? 'Kelas wajib dipilih.'
+                                : null,
                           ),
                         ],
                       ),
