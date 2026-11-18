@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/api_config.dart';
@@ -15,6 +17,16 @@ enum _CameraStatus {
   initializing,
   ready,
   unavailable,
+  permissionDenied,
+  failed,
+}
+
+enum _LocationStatus {
+  idle,
+  loading,
+  ready,
+  outsideRadius,
+  serviceDisabled,
   permissionDenied,
   failed,
 }
@@ -38,9 +50,10 @@ class AbsensiPage extends StatefulWidget {
 
 class _AbsensiPageState extends State<AbsensiPage>
     with TickerProviderStateMixin, WidgetsBindingObserver {
-  // Default coordinates correspond to JTI Polinema campus geofence.
-  static const double _defaultLatitude = -7.946714;
-  static const double _defaultLongitude = 112.615668;
+  // Titik pusat geofence kampus JTI Polinema; validasi radius dilakukan backend.
+  static const double _campusLatitude = -7.946714;
+  static const double _campusLongitude = 112.615668;
+  static const double _geofenceRadiusMeters = 200;
 
   int _currentStep = 0; // 0 = Scan/Token QR, 1 = Verifikasi Wajah (Kamera)
   bool _isLoadingSessions = false;
@@ -48,6 +61,12 @@ class _AbsensiPageState extends State<AbsensiPage>
   bool _isCapturing = false;
   bool _isInitializingCamera = false;
   bool _attendanceDone = false;
+
+  _LocationStatus _locationStatus = _LocationStatus.idle;
+  Position? _currentPosition;
+  double? _distanceToCampusMeters;
+  String? _locationMessage;
+  Future<void>? _locationFuture;
 
   CameraController? _cameraController;
   List<CameraDescription> _cameras = const [];
@@ -80,6 +99,7 @@ class _AbsensiPageState extends State<AbsensiPage>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
     _loadInitialData();
+    _refreshLocation();
   }
 
   @override
@@ -248,6 +268,130 @@ class _AbsensiPageState extends State<AbsensiPage>
   String _cleanError(Object error) =>
       error.toString().replaceFirst('Exception: ', '');
 
+  Future<void> _refreshAll() async {
+    await Future.wait([_loadInitialData(), _refreshLocation()]);
+  }
+
+  Future<void> _refreshLocation() {
+    final pending = _locationFuture;
+    if (pending != null) return pending;
+    final future = _fetchLocation();
+    _locationFuture = future;
+    return future.whenComplete(() {
+      if (identical(_locationFuture, future)) _locationFuture = null;
+    });
+  }
+
+  Future<void> _fetchLocation() async {
+    if (mounted) {
+      setState(() {
+        _locationStatus = _LocationStatus.loading;
+        _locationMessage = null;
+      });
+    }
+
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        _setLocationFailure(
+          _LocationStatus.serviceDisabled,
+          'GPS/lokasi perangkat mati. Aktifkan lokasi untuk melanjutkan presensi.',
+        );
+        return;
+      }
+
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied) {
+        _setLocationFailure(
+          _LocationStatus.permissionDenied,
+          'Izin lokasi ditolak. Presensi membutuhkan akses lokasi perangkat.',
+        );
+        return;
+      }
+      if (permission == LocationPermission.deniedForever) {
+        _setLocationFailure(
+          _LocationStatus.permissionDenied,
+          'Izin lokasi ditolak permanen. Aktifkan lewat pengaturan aplikasi.',
+        );
+        return;
+      }
+
+      Position? position;
+      String? warning;
+      try {
+        position = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+            accuracy: LocationAccuracy.high,
+            timeLimit: Duration(seconds: 15),
+          ),
+        );
+      } on TimeoutException {
+        position = await Geolocator.getLastKnownPosition();
+        if (position == null) rethrow;
+        warning = 'Menggunakan lokasi terakhir yang tersimpan.';
+      }
+
+      if (!mounted) return;
+      final distance = Geolocator.distanceBetween(
+        position.latitude,
+        position.longitude,
+        _campusLatitude,
+        _campusLongitude,
+      );
+      setState(() {
+        _currentPosition = position;
+        _distanceToCampusMeters = distance;
+        _locationStatus = distance <= _geofenceRadiusMeters
+            ? _LocationStatus.ready
+            : _LocationStatus.outsideRadius;
+        _locationMessage = warning;
+      });
+    } catch (e) {
+      debugPrint('Gagal mengambil lokasi presensi: $e');
+      _setLocationFailure(
+        _LocationStatus.failed,
+        'Gagal mengambil lokasi GPS: ${_cleanError(e)}',
+      );
+    }
+  }
+
+  void _setLocationFailure(_LocationStatus status, String message) {
+    if (!mounted) return;
+    setState(() {
+      _locationStatus = status;
+      _currentPosition = null;
+      _distanceToCampusMeters = null;
+      _locationMessage = message;
+    });
+  }
+
+  Future<Position?> _ensureLocationForSubmit() async {
+    final status = _locationStatus;
+    final position = _currentPosition;
+    if (position != null &&
+        (status == _LocationStatus.ready ||
+            status == _LocationStatus.outsideRadius)) {
+      return position;
+    }
+    await _refreshLocation();
+    return _currentPosition;
+  }
+
+  Future<void> _openLocationSettings() async {
+    try {
+      if (_locationStatus == _LocationStatus.serviceDisabled) {
+        await Geolocator.openLocationSettings();
+      } else {
+        await Geolocator.openAppSettings();
+      }
+    } catch (e) {
+      _showSnackBar('Tidak bisa membuka pengaturan lokasi: $e');
+    }
+  }
+
   void _showSnackBar(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
@@ -266,6 +410,15 @@ class _AbsensiPageState extends State<AbsensiPage>
       return;
     }
 
+    final position = await _ensureLocationForSubmit();
+    if (position == null) {
+      final message = _locationMessage ??
+          'Lokasi GPS belum tersedia. Coba ambil ulang lokasi.';
+      setState(() => _errorMessage = message);
+      _showSnackBar(message);
+      return;
+    }
+
     setState(() {
       _errorMessage = null;
       _lastRecordResponse = null;
@@ -274,8 +427,9 @@ class _AbsensiPageState extends State<AbsensiPage>
     try {
       final res = await studentDataService.submitQrAttendance(
         qrToken: qrToken,
-        latitude: _defaultLatitude,
-        longitude: _defaultLongitude,
+        latitude: position.latitude,
+        longitude: position.longitude,
+        accuracy: position.accuracy,
       );
       if (!mounted) return;
       setState(() {
@@ -346,6 +500,15 @@ class _AbsensiPageState extends State<AbsensiPage>
             ? _activeSessions.first['sesi_presensi_id'] as String?
             : null);
 
+    final position = await _ensureLocationForSubmit();
+    if (position == null) {
+      final message = _locationMessage ??
+          'Lokasi GPS belum tersedia. Coba ambil ulang lokasi.';
+      setState(() => _errorMessage = message);
+      _showSnackBar(message);
+      return;
+    }
+
     setState(() => _errorMessage = null);
     _setSubmitting(true);
     try {
@@ -354,8 +517,9 @@ class _AbsensiPageState extends State<AbsensiPage>
         filename: _probeImageName ?? 'probe.jpg',
         sesiPresensiId: effectiveSessionId,
         qrToken: qrToken.isNotEmpty ? qrToken : null,
-        latitude: _defaultLatitude,
-        longitude: _defaultLongitude,
+        latitude: position.latitude,
+        longitude: position.longitude,
+        accuracy: position.accuracy,
       );
       if (!mounted) return;
       final sim = res['similarity'] ?? res['similarity_score'];
@@ -394,7 +558,7 @@ class _AbsensiPageState extends State<AbsensiPage>
             _buildStepper(colorScheme),
             Expanded(
               child: RefreshIndicator(
-                onRefresh: _loadInitialData,
+                onRefresh: _refreshAll,
                 child: SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
@@ -892,51 +1056,143 @@ class _AbsensiPageState extends State<AbsensiPage>
   }
 
   Widget _buildLocationCard(ColorScheme colorScheme) {
+    final position = _currentPosition;
+    final distance = _distanceToCampusMeters;
+    final isLoading = _locationStatus == _LocationStatus.loading;
+    final isReady = _locationStatus == _LocationStatus.ready;
+    final isOutside = _locationStatus == _LocationStatus.outsideRadius;
+    final hasError = _locationStatus == _LocationStatus.failed;
+    final needsSettings =
+        _locationStatus == _LocationStatus.serviceDisabled ||
+            _locationStatus == _LocationStatus.permissionDenied;
+
+    final statusColor = isReady
+        ? colorScheme.primary
+        : isOutside || hasError || needsSettings
+            ? colorScheme.error
+            : colorScheme.onSurfaceVariant;
+
+    final coordinates = position != null
+        ? '${position.latitude.toStringAsFixed(6)}, '
+            '${position.longitude.toStringAsFixed(6)}'
+        : isLoading
+            ? 'Mengambil koordinat GPS...'
+            : 'Lokasi tidak tersedia';
+
+    final details = <String>[
+      if (position != null)
+        'Akurasi ±${position.accuracy.toStringAsFixed(0)} m',
+      if (position != null && distance != null)
+        '${distance.toStringAsFixed(0)} m dari titik kampus',
+      if (isOutside)
+        'di luar radius ${_geofenceRadiusMeters.toStringAsFixed(0)} m',
+      ?_locationMessage,
+    ];
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: colorScheme.outlineVariant),
+        border: Border.all(
+          color: isOutside || needsSettings
+              ? colorScheme.error.withValues(alpha: 0.4)
+              : colorScheme.outlineVariant,
+        ),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Icon(
-            Icons.location_on_outlined,
-            color: colorScheme.primary,
-            size: 22,
-          ),
-          const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          Row(
             children: [
-              Text(
-                'Lokasi Geofence Kampus',
-                style: TextStyle(
-                  color: colorScheme.onSurfaceVariant,
-                  fontSize: 11,
+              Icon(
+                Icons.location_on_outlined,
+                color: statusColor,
+                size: 22,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Lokasi Presensi · JTI Polinema',
+                      style: TextStyle(
+                        color: colorScheme.onSurfaceVariant,
+                        fontSize: 11,
+                      ),
+                    ),
+                    Text(
+                      coordinates,
+                      style: TextStyle(
+                        color: colorScheme.onSurface,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
+                    if (details.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        details.join(' · '),
+                        style: TextStyle(
+                          color: isOutside ? colorScheme.error : statusColor,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ),
-              Text(
-                'JTI Polinema ($_defaultLatitude, $_defaultLongitude)',
-                style: TextStyle(
-                  color: colorScheme.onSurface,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
+              const SizedBox(width: 8),
+              if (isLoading)
+                Icon(
+                  Icons.location_searching,
+                  color: statusColor,
+                  size: 22,
+                )
+              else if (isReady || isOutside)
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: statusColor,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    isReady ? Icons.check : Icons.priority_high,
+                    color: colorScheme.onPrimary,
+                    size: 16,
+                  ),
+                )
+              else
+                IconButton(
+                  onPressed: _isSubmitting ? null : _refreshLocation,
+                  icon: const Icon(Icons.refresh, size: 20),
+                  tooltip: 'Ambil ulang lokasi',
+                  visualDensity: VisualDensity.compact,
                 ),
-              ),
             ],
           ),
-          const Spacer(),
-          Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(
-              color: colorScheme.primary,
-              shape: BoxShape.circle,
+          if (needsSettings) ...[
+            const SizedBox(height: 4),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: _openLocationSettings,
+                icon: const Icon(Icons.settings_outlined, size: 16),
+                label: const Text('Buka Pengaturan Lokasi'),
+              ),
             ),
-            child: Icon(Icons.check, color: colorScheme.onPrimary, size: 16),
-          ),
+          ] else if (isOutside) ...[
+            const SizedBox(height: 2),
+            Align(
+              alignment: Alignment.centerRight,
+              child: Text(
+                'Anda di luar area kampus',
+                style: TextStyle(color: colorScheme.error, fontSize: 11),
+              ),
+            ),
+          ],
         ],
       ),
     );
