@@ -5,7 +5,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../data/api_config.dart';
 import '../../data/mhs/dummy_student_auth_repository.dart';
 import '../../data/mhs/student_data_service.dart';
 import '../../routing/student_route_paths.dart';
@@ -217,7 +216,6 @@ class _AbsensiPageState extends State<AbsensiPage>
   }
 
   Future<void> _loadInitialData() async {
-    if (!studentAuthRepository.hasRemoteSession) return;
     setState(() {
       _isLoadingSessions = true;
       _errorMessage = null;
@@ -328,12 +326,6 @@ class _AbsensiPageState extends State<AbsensiPage>
   }
 
   Future<void> _submitFaceAttendance() async {
-    if (!studentAuthRepository.hasRemoteSession) {
-      _showSnackBar(
-        'Sesi server belum aktif (${ApiConfig.baseUrl}). Masuk ulang terlebih dahulu.',
-      );
-      return;
-    }
     if (_probeImageBytes == null || _probeImageBytes!.isEmpty) {
       setState(
         () => _errorMessage =

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -43,6 +44,9 @@ class DummyStudentAuthRepository extends ChangeNotifier {
   );
 
   static const _requestTimeout = Duration(seconds: 8);
+
+  bool get _isFlutterTest =>
+      !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
 
   final Duration latency;
   final bool useRemoteApi;
@@ -146,9 +150,18 @@ class DummyStudentAuthRepository extends ChangeNotifier {
             notifyListeners();
             return null;
           }
+          throw RemoteApiException(
+            _extractDetail(response, 'Login gagal (${response.statusCode}).'),
+            statusCode: response.statusCode,
+          );
         }
-      } catch (_) {
-        // Offline / Flutter testWidgets mock fallback below.
+      } catch (e) {
+        if (e is RemoteApiException) rethrow;
+        if (!_isFlutterTest) {
+          throw RemoteApiException(
+            'Gagal terhubung ke server backend di ${ApiConfig.baseUrl}. Pastikan server backend sedang aktif.',
+          );
+        }
       }
     }
 
@@ -285,8 +298,14 @@ class DummyStudentAuthRepository extends ChangeNotifier {
           rethrow;
         } on RemoteApiException {
           rethrow;
-        } catch (_) {
-          // Offline / Flutter testWidgets fallback below.
+        } catch (e) {
+          if (_isFlutterTest) {
+            // Offline / Flutter testWidgets fallback below.
+          } else {
+            throw RemoteApiException(
+              'Gagal terhubung ke server backend di ${ApiConfig.baseUrl}. Pastikan server backend sedang aktif.',
+            );
+          }
         }
       }
 
@@ -312,47 +331,55 @@ class DummyStudentAuthRepository extends ChangeNotifier {
             token = loginData['access_token'] as String?;
             if (token != null) {
               _pendingFaceTokens[draft.nim] = token;
+              currentAccessToken = token;
             }
-          }
-        }
-
-        if (token != null) {
-          final uploadReq = http.MultipartRequest(
-            'POST',
-            Uri.parse('${ApiConfig.baseUrl}/mahasiswa/wajah/register'),
-          )..headers['Authorization'] = 'Bearer $token';
-
-          for (var i = 0; i < facePhotoBytes.length; i++) {
-            final name =
-                i < facePhotoPaths.length && facePhotoPaths[i].trim().isNotEmpty
-                ? facePhotoPaths[i].split(RegExp(r'[/\\]')).last
-                : 'face_${i + 1}.jpg';
-            uploadReq.files.add(
-              http.MultipartFile.fromBytes(
-                'files',
-                facePhotoBytes[i],
-                filename:
-                    name.endsWith('.png') ||
-                        name.endsWith('.jpg') ||
-                        name.endsWith('.jpeg')
-                    ? name
-                    : 'face_${i + 1}.jpg',
-              ),
-            );
-          }
-
-          final streamed = await uploadReq.send().timeout(
-            const Duration(seconds: 30),
-          );
-          final faceRes = await http.Response.fromStream(streamed);
-          if (faceRes.statusCode != 201 && faceRes.statusCode != 200) {
+          } else {
             throw RemoteApiException(
-              _extractDetail(faceRes, 'Gagal mendaftarkan foto wajah.'),
-              statusCode: faceRes.statusCode,
+              _extractDetail(loginRes, 'Gagal mengautentikasi akun untuk registrasi foto wajah.'),
+              statusCode: loginRes.statusCode,
             );
           }
-          _pendingFaceTokens.remove(draft.nim);
         }
+
+        if (token == null) {
+          throw const RemoteApiException('Token autentikasi tidak tersedia untuk registrasi wajah.');
+        }
+
+        final uploadReq = http.MultipartRequest(
+          'POST',
+          Uri.parse('${ApiConfig.baseUrl}/mahasiswa/wajah/register'),
+        )..headers['Authorization'] = 'Bearer $token';
+
+        for (var i = 0; i < facePhotoBytes.length; i++) {
+          final name =
+              i < facePhotoPaths.length && facePhotoPaths[i].trim().isNotEmpty
+              ? facePhotoPaths[i].split(RegExp(r'[/\\]')).last
+              : 'face_${i + 1}.jpg';
+          uploadReq.files.add(
+            http.MultipartFile.fromBytes(
+              'files',
+              facePhotoBytes[i],
+              filename:
+                  name.endsWith('.png') ||
+                      name.endsWith('.jpg') ||
+                      name.endsWith('.jpeg')
+                  ? name
+                  : 'face_${i + 1}.jpg',
+            ),
+          );
+        }
+
+        final streamed = await uploadReq.send().timeout(
+          const Duration(seconds: 30),
+        );
+        final faceRes = await http.Response.fromStream(streamed);
+        if (faceRes.statusCode != 201 && faceRes.statusCode != 200) {
+          throw RemoteApiException(
+            _extractDetail(faceRes, 'Gagal mendaftarkan foto wajah.'),
+            statusCode: faceRes.statusCode,
+          );
+        }
+        _pendingFaceTokens.remove(draft.nim);
       }
     }
 
@@ -367,8 +394,10 @@ class DummyStudentAuthRepository extends ChangeNotifier {
       className: draft.className,
       password: draft.password,
       facePhotoPaths: List.unmodifiable(facePhotoPaths),
+      token: currentAccessToken,
     );
     _accounts[account.nim] = account;
+    _currentAccount = account;
     notifyListeners();
     return account;
   }
