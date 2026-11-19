@@ -398,42 +398,6 @@ class StudentDataService {
     throw Exception(_extractError(res, 'Verifikasi wajah presensi gagal'));
   }
 
-  /// Presensi berbasis GPS saja (tanpa QR/foto), tervalidasi geofence kampus.
-  Future<Map<String, dynamic>> submitGpsAttendance({
-    required double latitude,
-    required double longitude,
-    double? accuracy,
-    String? sesiPresensiId,
-    String? catatan,
-  }) async {
-    await _ensureSession();
-    if (!_hasRemoteSession && studentAuthRepository.useRemoteApi) {
-      throw Exception(
-        'Sesi login server belum aktif. Pastikan backend aktif di ${ApiConfig.baseUrl} lalu masuk ulang.',
-      );
-    }
-    final uri = Uri.parse('${ApiConfig.baseUrl}/attendance/gps');
-    final res = await _client
-        .post(
-          uri,
-          headers: _headers,
-          body: jsonEncode({
-            'latitude': latitude,
-            'longitude': longitude,
-            'accuracy': ?accuracy,
-            if (sesiPresensiId != null && sesiPresensiId.isNotEmpty)
-              'sesi_presensi_id': sesiPresensiId,
-            if (catatan != null && catatan.isNotEmpty) 'catatan': catatan,
-          }),
-        )
-        .timeout(_timeout);
-
-    if (res.statusCode == 200) {
-      return jsonDecode(res.body) as Map<String, dynamic>;
-    }
-    throw Exception(_extractError(res, 'Presensi GPS gagal'));
-  }
-
   // ── Pengajuan Surat Izin / Sakit ────────────────────────────────────────
 
   Future<Map<String, dynamic>> submitPengajuan({
