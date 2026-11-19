@@ -64,7 +64,6 @@ class _AbsensiPageState extends State<AbsensiPage>
   String? _probeImageName;
   String? _statusMessage;
   String? _errorMessage;
-  Map<String, dynamic>? _lastRecordResponse;
 
   DeviceLocation? _location;
   bool _isLocating = false;
@@ -447,7 +446,6 @@ class _AbsensiPageState extends State<AbsensiPage>
 
     setState(() {
       _errorMessage = null;
-      _lastRecordResponse = null;
     });
     _setSubmitting(true);
     try {
@@ -462,7 +460,6 @@ class _AbsensiPageState extends State<AbsensiPage>
       if (!mounted) return;
       setState(() {
         _attendanceDone = true;
-        _lastRecordResponse = res;
         _statusMessage =
             (res['message'] as String?) ?? 'Presensi QR berhasil dicatat!';
       });
@@ -485,7 +482,6 @@ class _AbsensiPageState extends State<AbsensiPage>
       _errorMessage = null;
       _attendanceDone = false;
       _statusMessage = null;
-      _lastRecordResponse = null;
     });
     _initializeCamera();
   }
@@ -530,7 +526,6 @@ class _AbsensiPageState extends State<AbsensiPage>
       if (!mounted) return;
       setState(() {
         _attendanceDone = true;
-        _lastRecordResponse = res;
         _statusMessage =
             '${(res['message'] as String?) ?? 'Presensi wajah berhasil!'}$simSuffix';
       });
@@ -568,10 +563,7 @@ class _AbsensiPageState extends State<AbsensiPage>
                       _buildScanArea(colorScheme),
                       const SizedBox(height: 16),
                       _buildStatusBanner(colorScheme),
-                      if (_attendanceDone && _lastRecordResponse != null) ...[
-                        const SizedBox(height: 12),
-                        _buildStorageProofCard(colorScheme),
-                      ],
+
                       if (_currentStep == 0) ...[
                         const SizedBox(height: 16),
                         _buildSessionSelector(colorScheme),
@@ -955,44 +947,6 @@ class _AbsensiPageState extends State<AbsensiPage>
                   : colorScheme.onSurfaceVariant),
         fontSize: 13,
         fontWeight: (isError || isSuccess) ? FontWeight.w600 : FontWeight.w400,
-      ),
-    );
-  }
-
-  Widget _buildStorageProofCard(ColorScheme colorScheme) {
-    final rec = _lastRecordResponse ?? const {};
-    final photoPath = rec['face_photo_path'] as String?;
-    final kehadiranId = rec['kehadiran_id'] as String?;
-    if (photoPath == null && kehadiranId == null) {
-      return const SizedBox.shrink();
-    }
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: colorScheme.secondaryContainer.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colorScheme.secondary.withValues(alpha: 0.5)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (kehadiranId != null)
-            Text(
-              'ID Kehadiran: $kehadiranId',
-              style: TextStyle(
-                color: colorScheme.onSurfaceVariant,
-                fontSize: 11,
-              ),
-            ),
-          if (photoPath != null)
-            Text(
-              'Storage Foto: foto-presensi/$photoPath',
-              style: TextStyle(
-                color: colorScheme.onSurfaceVariant,
-                fontSize: 11,
-              ),
-            ),
-        ],
       ),
     );
   }
