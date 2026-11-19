@@ -27,9 +27,7 @@ void main() {
   }
 
   Finder field(String label) => find.descendant(
-    of: find
-        .ancestor(of: find.text(label), matching: find.byType(Column))
-        .first,
+    of: find.ancestor(of: find.text(label), matching: find.byType(Column)).first,
     matching: find.byType(TextFormField),
   );
 
@@ -135,7 +133,10 @@ void main() {
       await tester.enterText(field('Konfirmasi Kata Sandi'), 'pendek');
       await tapButton(tester, find.widgetWithText(FilledButton, 'Daftar'));
 
-      expect(find.text('Kata sandi minimal 8 karakter.'), findsOneWidget);
+      expect(
+        find.text('Kata sandi minimal 8 karakter.'),
+        findsOneWidget,
+      );
       expect(currentPath(), LecturerRoutePaths.register);
     });
 
@@ -166,10 +167,7 @@ void main() {
       await tester.enterText(field('Konfirmasi Kata Sandi'), 'rahasia123');
       await tapButton(tester, find.widgetWithText(FilledButton, 'Daftar'));
 
-      expect(
-        find.text('Email sudah terdaftar. Silakan login.'),
-        findsOneWidget,
-      );
+      expect(find.text('Email sudah terdaftar. Silakan login.'), findsOneWidget);
       expect(currentPath(), LecturerRoutePaths.register);
     });
 

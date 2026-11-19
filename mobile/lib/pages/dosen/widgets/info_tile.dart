@@ -31,18 +31,11 @@ class InfoTile extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                label,
-                style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
-              ),
+              Text(label,
+                  style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant)),
               const SizedBox(height: 2),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
+              Text(value,
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
             ],
           ),
         ),

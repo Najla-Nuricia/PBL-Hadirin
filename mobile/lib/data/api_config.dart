@@ -1,5 +1,4 @@
 import 'dart:io' show Platform;
-
 import 'package:flutter/foundation.dart';
 
 abstract final class ApiConfig {

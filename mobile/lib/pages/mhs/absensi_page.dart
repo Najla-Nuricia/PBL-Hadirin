@@ -490,14 +490,12 @@ class _AbsensiPageState extends State<AbsensiPage>
     }
     if (_probeImageBytes == null || _probeImageBytes!.isEmpty) {
       setState(
-        () => _errorMessage =
-            'Ambil foto dari kamera atau pilih foto wajah terlebih dahulu.',
+        () => _errorMessage = 'Ambil foto dari kamera atau pilih foto wajah terlebih dahulu.',
       );
       return;
     }
     final qrToken = _qrTokenController.text.trim();
-    final effectiveSessionId =
-        _selectedSessionId ??
+    final effectiveSessionId = _selectedSessionId ??
         (_activeSessions.isNotEmpty
             ? _activeSessions.first['sesi_presensi_id'] as String?
             : null);
@@ -660,7 +658,9 @@ class _AbsensiPageState extends State<AbsensiPage>
       padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        border: Border(bottom: BorderSide(color: colorScheme.outlineVariant)),
+        border: Border(
+          bottom: BorderSide(color: colorScheme.outlineVariant),
+        ),
       ),
       child: Row(
         children: [
@@ -694,8 +694,7 @@ class _AbsensiPageState extends State<AbsensiPage>
 
   Widget _buildScanArea(ColorScheme colorScheme) {
     final isDone = _attendanceDone;
-    final showLiveCamera =
-        _currentStep == 1 &&
+    final showLiveCamera = _currentStep == 1 &&
         !isDone &&
         _probeImageBytes == null &&
         _cameraStatus == _CameraStatus.ready &&
@@ -742,8 +741,8 @@ class _AbsensiPageState extends State<AbsensiPage>
                   color: isDone
                       ? colorScheme.secondary
                       : showLiveCamera
-                      ? Colors.white70
-                      : colorScheme.onSurfaceVariant.withValues(alpha: 0.35),
+                          ? Colors.white70
+                          : colorScheme.onSurfaceVariant.withValues(alpha: 0.35),
                   width: 2,
                 ),
                 borderRadius: BorderRadius.circular(showLiveCamera ? 90 : 14),
@@ -758,27 +757,25 @@ class _AbsensiPageState extends State<AbsensiPage>
                               size: 52,
                             )
                           : (_currentStep == 1 && _probeImageBytes != null)
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Image.memory(
-                                _probeImageBytes!,
-                                fit: BoxFit.cover,
-                                width: 146,
-                                height: 146,
-                              ),
-                            )
-                          : _currentStep == 1 &&
-                                _cameraStatus == _CameraStatus.initializing
-                          ? const CircularProgressIndicator(strokeWidth: 2.5)
-                          : Icon(
-                              _currentStep == 0
-                                  ? Icons.qr_code_scanner
-                                  : Icons.face_retouching_natural,
-                              color: colorScheme.primary.withValues(
-                                alpha: 0.65,
-                              ),
-                              size: 52,
-                            ),
+                              ? ClipRRect(
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: Image.memory(
+                                    _probeImageBytes!,
+                                    fit: BoxFit.cover,
+                                    width: 146,
+                                    height: 146,
+                                  ),
+                                )
+                              : _currentStep == 1 &&
+                                      _cameraStatus == _CameraStatus.initializing
+                                  ? const CircularProgressIndicator(strokeWidth: 2.5)
+                                  : Icon(
+                                      _currentStep == 0
+                                          ? Icons.qr_code_scanner
+                                          : Icons.face_retouching_natural,
+                                      color: colorScheme.primary.withValues(alpha: 0.65),
+                                      size: 52,
+                                    ),
                     ),
             ),
           ),
@@ -805,10 +802,7 @@ class _AbsensiPageState extends State<AbsensiPage>
             Positioned(
               bottom: 12,
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: colorScheme.surface.withValues(alpha: 0.85),
                   borderRadius: BorderRadius.circular(8),
@@ -833,8 +827,10 @@ class _AbsensiPageState extends State<AbsensiPage>
       _CameraStatus.initializing => 'Membuka kamera perangkat...',
       _CameraStatus.permissionDenied =>
         'Izin kamera ditolak. Berikan izin kamera atau pilih foto dari file.',
-      _CameraStatus.unavailable => 'Kamera langsung tidak tersedia di perangkat ini; gunakan Pilih Foto (File).',
-      _CameraStatus.failed => 'Kamera gagal dibuka. Coba muat ulang kamera atau pilih foto dari file.',
+      _CameraStatus.unavailable =>
+        'Kamera langsung tidak tersedia di perangkat ini; gunakan Pilih Foto (File).',
+      _CameraStatus.failed =>
+        'Kamera gagal dibuka. Coba muat ulang kamera atau pilih foto dari file.',
       _CameraStatus.ready =>
         _probeImageBytes == null
             ? 'Arahkan wajah ke bingkai kamera lalu tekan Ambil Foto Wajah'
@@ -842,8 +838,7 @@ class _AbsensiPageState extends State<AbsensiPage>
       _CameraStatus.idle => 'Siapkan verifikasi wajah MobileFaceNet',
     };
 
-    final message =
-        _errorMessage ??
+    final message = _errorMessage ??
         _statusMessage ??
         (_currentStep == 0
             ? 'Pilih sesi aktif atau masukkan token QR dosen di depan kelas'
@@ -857,9 +852,7 @@ class _AbsensiPageState extends State<AbsensiPage>
       style: TextStyle(
         color: isError
             ? colorScheme.error
-            : (isSuccess
-                  ? colorScheme.secondary
-                  : colorScheme.onSurfaceVariant),
+            : (isSuccess ? colorScheme.secondary : colorScheme.onSurfaceVariant),
         fontSize: 13,
         fontWeight: (isError || isSuccess) ? FontWeight.w600 : FontWeight.w400,
       ),
@@ -894,18 +887,12 @@ class _AbsensiPageState extends State<AbsensiPage>
           if (kehadiranId != null)
             Text(
               'ID Kehadiran: $kehadiranId',
-              style: TextStyle(
-                color: colorScheme.onSurfaceVariant,
-                fontSize: 11,
-              ),
+              style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11),
             ),
           if (photoPath != null)
             Text(
               'Storage Foto: foto-presensi/$photoPath',
-              style: TextStyle(
-                color: colorScheme.onSurfaceVariant,
-                fontSize: 11,
-              ),
+              style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11),
             ),
         ],
       ),
@@ -943,8 +930,9 @@ class _AbsensiPageState extends State<AbsensiPage>
       );
     }
 
-    final validSelection =
-        _activeSessions.any((s) => s['sesi_presensi_id'] == _selectedSessionId)
+    final validSelection = _activeSessions.any(
+      (s) => s['sesi_presensi_id'] == _selectedSessionId,
+    )
         ? _selectedSessionId
         : null;
 
@@ -955,10 +943,7 @@ class _AbsensiPageState extends State<AbsensiPage>
       decoration: InputDecoration(
         labelText: 'Sesi Presensi Aktif',
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 10,
-        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       ),
       items: _activeSessions.map((session) {
         final id = session['sesi_presensi_id'] as String;
@@ -985,8 +970,7 @@ class _AbsensiPageState extends State<AbsensiPage>
       onChanged: (_) => setState(() {}),
       decoration: InputDecoration(
         labelText: 'Token QR Sesi',
-        hintText:
-            'Masukkan token QR dari dosen (opsional jika pakai sesi aktif)',
+        hintText: 'Masukkan token QR dari dosen (opsional jika pakai sesi aktif)',
         prefixIcon: const Icon(Icons.qr_code_2),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
       ),
@@ -994,8 +978,7 @@ class _AbsensiPageState extends State<AbsensiPage>
   }
 
   Widget _buildFacePreviewCard(ColorScheme colorScheme) {
-    final cameraReady =
-        _cameraStatus == _CameraStatus.ready &&
+    final cameraReady = _cameraStatus == _CameraStatus.ready &&
         _cameraController != null &&
         _cameraController!.value.isInitialized;
 
@@ -1019,9 +1002,7 @@ class _AbsensiPageState extends State<AbsensiPage>
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: FilledButton.tonalIcon(
-              onPressed: (_isSubmitting || _isCapturing)
-                  ? null
-                  : _captureFromCamera,
+              onPressed: (_isSubmitting || _isCapturing) ? null : _captureFromCamera,
               icon: _isCapturing
                   ? const SizedBox(
                       width: 16,
@@ -1029,9 +1010,7 @@ class _AbsensiPageState extends State<AbsensiPage>
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.camera_alt),
-              label: Text(
-                _isCapturing ? 'Mengambil foto...' : 'Ambil Foto Wajah',
-              ),
+              label: Text(_isCapturing ? 'Mengambil foto...' : 'Ambil Foto Wajah'),
             ),
           )
         else if (_probeImageBytes != null)

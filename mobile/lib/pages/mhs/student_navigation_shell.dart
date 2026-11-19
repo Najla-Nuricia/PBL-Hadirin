@@ -161,7 +161,10 @@ class _NavbarItem extends StatelessWidget {
 }
 
 class _CenterNavbarLabel extends StatelessWidget {
-  const _CenterNavbarLabel({required this.label, required this.onTap});
+  const _CenterNavbarLabel({
+    required this.label,
+    required this.onTap,
+  });
 
   final String label;
   final VoidCallback onTap;

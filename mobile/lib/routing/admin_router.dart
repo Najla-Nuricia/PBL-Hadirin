@@ -3,10 +3,7 @@ import 'package:go_router/go_router.dart';
 import '../pages/admin/admin_navigation_shell.dart';
 import '../pages/admin/auth/admin_login_page.dart';
 import '../pages/admin/data_academic_page.dart';
-import '../pages/admin/dosen_list_page.dart';
 import '../pages/admin/jadwal_list_page.dart';
-import '../pages/admin/kelas_list_page.dart';
-import '../pages/admin/ruangan_list_page.dart';
 import '../pages/admin/mata_kuliah_list_page.dart';
 import '../pages/admin/tahun_ajaran_list_page.dart';
 import '../pages/admin/tambah_jadwal_page.dart';
@@ -52,44 +49,24 @@ GoRouter createAdminRouter({bool showOnboarding = false}) => GoRouter(
       ],
     ),
     GoRoute(
-      path: AdminRoutePaths.kelas,
-      builder: (context, state) => const KelasListPage(),
-      routes: [
-        GoRoute(
-          path: AdminRoutePaths.tambahSegment,
-          builder: (context, state) => const TambahKelasPage(),
-        ),
-      ],
+      path: AdminRoutePaths.tambahKelas,
+      builder: (context, state) => const TambahKelasPage(),
     ),
     GoRoute(
-      path: AdminRoutePaths.ruangan,
-      builder: (context, state) => const RuanganListPage(),
-      routes: [
-        GoRoute(
-          path: AdminRoutePaths.tambahSegment,
-          builder: (context, state) => const TambahRuanganPage(),
-        ),
-      ],
-    ),
-    GoRoute(
-      path: AdminRoutePaths.dosen,
-      builder: (context, state) => const DosenListPage(),
-      routes: [
-        GoRoute(
-          path: AdminRoutePaths.tambahSegment,
-          builder: (context, state) => const TambahDosenPage(),
-        ),
-      ],
+      path: AdminRoutePaths.tambahRuangan,
+      builder: (context, state) => const TambahRuanganPage(),
     ),
     GoRoute(
       path: AdminRoutePaths.mataKuliah,
       builder: (context, state) => const MataKuliahListPage(),
-      routes: [
-        GoRoute(
-          path: AdminRoutePaths.tambahSegment,
-          builder: (context, state) => const TambahMataKuliahPage(),
-        ),
-      ],
+    ),
+    GoRoute(
+      path: AdminRoutePaths.tambahMataKuliah,
+      builder: (context, state) => const TambahMataKuliahPage(),
+    ),
+    GoRoute(
+      path: AdminRoutePaths.tambahDosen,
+      builder: (context, state) => const TambahDosenPage(),
     ),
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) =>

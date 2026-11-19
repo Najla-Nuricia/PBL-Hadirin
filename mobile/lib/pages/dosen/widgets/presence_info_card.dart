@@ -6,11 +6,7 @@ import 'section_card.dart';
 import 'status_badge.dart';
 
 class PresenceInfoCard extends StatelessWidget {
-  const PresenceInfoCard({
-    super.key,
-    required this.student,
-    required this.date,
-  });
+  const PresenceInfoCard({super.key, required this.student, required this.date});
 
   final StudentAttendance student;
   final DateTime date;
@@ -30,10 +26,7 @@ class PresenceInfoCard extends StatelessWidget {
           const Divider(height: 1),
           _Row(label: 'Jam Absen', value: _bold(student.checkInTime ?? '-')),
           const Divider(height: 1),
-          _Row(
-            label: 'Status',
-            value: StatusBadge(status: student.status),
-          ),
+          _Row(label: 'Status', value: StatusBadge(status: student.status)),
           const Divider(height: 1),
           _Row(label: 'Keterangan', value: _bold(student.note ?? '-')),
         ],
@@ -42,10 +35,10 @@ class PresenceInfoCard extends StatelessWidget {
   }
 
   Widget _bold(String text) => Text(
-    text,
-    textAlign: TextAlign.end,
-    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-  );
+        text,
+        textAlign: TextAlign.end,
+        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+      );
 }
 
 class _Row extends StatelessWidget {
@@ -69,9 +62,7 @@ class _Row extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 16),
-          Expanded(
-            child: Align(alignment: Alignment.centerRight, child: value),
-          ),
+          Expanded(child: Align(alignment: Alignment.centerRight, child: value)),
         ],
       ),
     );

@@ -7,19 +7,10 @@ import '../../routing/lecturer_route_paths.dart';
 
 const _hari = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
 const _bulan = [
-  'Januari',
-  'Februari',
-  'Maret',
-  'April',
-  'Mei',
-  'Juni',
-  'Juli',
-  'Agustus',
-  'September',
-  'Oktober',
-  'November',
-  'Desember',
+  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
 ];
+
 
 String _formatTanggal(DateTime d) =>
     '${_hari[d.weekday - 1]}, ${d.day} ${_bulan[d.month - 1]} ${d.year}';
@@ -85,11 +76,8 @@ class _CekPresensiPageState extends State<CekPresensiPage> {
             child: InkWell(
               borderRadius: BorderRadius.circular(10),
               onTap: _back,
-              child: Icon(
-                Icons.chevron_left_rounded,
-                size: 24,
-                color: cs.onSurface,
-              ),
+              child: Icon(Icons.chevron_left_rounded,
+                  size: 24, color: cs.onSurface),
             ),
           ),
         ),
@@ -151,12 +139,9 @@ class _CekPresensiPageState extends State<CekPresensiPage> {
                 onPressed: _tampilkan,
                 style: FilledButton.styleFrom(
                   shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                      borderRadius: BorderRadius.circular(12)),
                   textStyle: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                  ),
+                      fontSize: 14, fontWeight: FontWeight.w700),
                 ),
                 child: const Text('Tampilkan Data'),
               ),
@@ -177,26 +162,24 @@ class _Label extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
-          color: cs.onSurface.withValues(alpha: 0.75),
-        ),
-      ),
+      child: Text(text,
+          style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: cs.onSurface.withValues(alpha: 0.75))),
     );
   }
 }
 
 BoxDecoration _boxDecoration(ColorScheme cs) => BoxDecoration(
-  color: cs.surface,
-  borderRadius: BorderRadius.circular(14),
-  border: Border.all(color: cs.outlineVariant),
-  boxShadow: const [
-    BoxShadow(color: Color(0x0D000000), blurRadius: 6, offset: Offset(0, 2)),
-  ],
-);
+      color: cs.surface,
+      borderRadius: BorderRadius.circular(14),
+      border: Border.all(color: cs.outlineVariant),
+      boxShadow: const [
+        BoxShadow(
+            color: Color(0x0D000000), blurRadius: 6, offset: Offset(0, 2)),
+      ],
+    );
 
 class _SelectBox extends StatelessWidget {
   const _SelectBox({
@@ -221,26 +204,19 @@ class _SelectBox extends StatelessWidget {
         child: DropdownButton<String>(
           value: value,
           isExpanded: true,
-          icon: Icon(
-            Icons.keyboard_arrow_down_rounded,
-            color: cs.onSurfaceVariant,
-          ),
+          icon: Icon(Icons.keyboard_arrow_down_rounded,
+              color: cs.onSurfaceVariant),
           borderRadius: BorderRadius.circular(12),
           dropdownColor: cs.surface,
           style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: cs.onSurface,
-          ),
+              fontSize: 14, fontWeight: FontWeight.w500, color: cs.onSurface),
           selectedItemBuilder: (_) => [
             for (final i in items)
-              Row(
-                children: [
-                  Icon(icon, size: 18, color: cs.primary),
-                  const SizedBox(width: 12),
-                  Text(i),
-                ],
-              ),
+              Row(children: [
+                Icon(icon, size: 18, color: cs.primary),
+                const SizedBox(width: 12),
+                Text(i),
+              ]),
           ],
           items: [
             for (final i in items) DropdownMenuItem(value: i, child: Text(i)),
@@ -272,16 +248,14 @@ class _DateBox extends StatelessWidget {
             Icon(Icons.calendar_today_outlined, size: 18, color: cs.primary),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                text,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: cs.onSurface,
-                ),
-              ),
+              child: Text(text,
+                  style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: cs.onSurface)),
             ),
-            Icon(Icons.keyboard_arrow_down_rounded, color: cs.onSurfaceVariant),
+            Icon(Icons.keyboard_arrow_down_rounded,
+                color: cs.onSurfaceVariant),
           ],
         ),
       ),
@@ -302,25 +276,23 @@ class _SummaryCard extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
 
     Widget row(String k, String v) => Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(
-        children: [
-          Text(k, style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Text(
-              v,
-              textAlign: TextAlign.right,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: cs.onSurface,
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          child: Row(
+            children: [
+              Text(k,
+                  style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Text(v,
+                    textAlign: TextAlign.right,
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: cs.onSurface)),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
-    );
+        );
 
     final divider = Divider(height: 1, thickness: 1, color: cs.outlineVariant);
 
@@ -331,14 +303,11 @@ class _SummaryCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Ringkasan Pilihan',
-            style: TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: cs.onSurface,
-            ),
-          ),
+          Text('Ringkasan Pilihan',
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: cs.onSurface)),
           const SizedBox(height: 6),
           row('Kelas', kelas),
           divider,

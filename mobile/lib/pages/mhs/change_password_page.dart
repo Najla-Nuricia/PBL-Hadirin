@@ -57,8 +57,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     if (!mounted) return;
     setState(() => _isSubmitting = false);
 
-    final message =
-        errorMessage ??
+    final message = errorMessage ??
         (changed
             ? 'Kata sandi berhasil diubah.'
             : 'Kata sandi saat ini salah.');

@@ -42,8 +42,7 @@ class _BerandaPageState extends State<BerandaPage> {
         : (studentAuthRepository.currentAccount?.nim ?? _account.nim);
     final cls = (_profile?.className.isNotEmpty == true)
         ? _profile!.className
-        : (studentAuthRepository.currentAccount?.className ??
-              _account.className);
+        : (studentAuthRepository.currentAccount?.className ?? _account.className);
     return cls.isNotEmpty ? '$nim · $cls' : nim;
   }
 
@@ -76,9 +75,7 @@ class _BerandaPageState extends State<BerandaPage> {
     final current = studentAuthRepository.currentAccount;
     if (!mounted) return;
     setState(() {
-      if (_profile != null &&
-          current != null &&
-          current.nim == _profile!.studentId) {
+      if (_profile != null && current != null && current.nim == _profile!.studentId) {
         _profile = StudentProfile(
           fullName: current.fullName,
           studentId: _profile!.studentId,
@@ -158,21 +155,14 @@ class _BerandaPageState extends State<BerandaPage> {
                               padding: const EdgeInsets.all(16),
                               child: Column(
                                 children: [
-                                  Icon(
-                                    Icons.warning_amber_rounded,
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .onErrorContainer,
-                                  ),
+                                  Icon(Icons.warning_amber_rounded,
+                                      color: Theme.of(context).colorScheme.onErrorContainer),
                                   const SizedBox(height: 8),
                                   Text(
                                     'Gagal memuat data: $_loadError',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .onErrorContainer,
-                                    ),
+                                        color: Theme.of(context).colorScheme.onErrorContainer),
                                   ),
                                   const SizedBox(height: 8),
                                   TextButton(
@@ -184,37 +174,34 @@ class _BerandaPageState extends State<BerandaPage> {
                             ),
                           ),
                         )
-                      else ...[
-                        if (_showReminder && _reminder != null)
-                          _ReminderBanner(
-                            reminder: _reminder!,
-                            onDismiss: () =>
-                                setState(() => _showReminder = false),
-                          ),
-                        if (_showReminder && _reminder != null)
-                          const SizedBox(height: 12),
-                        _QuickActions(
-                          onAbsensiTap: () =>
-                              context.go(StudentRoutePaths.absensi),
-                          onSuratTap: () => context.go(StudentRoutePaths.surat),
+                      else ...[ 
+                      if (_showReminder && _reminder != null)
+                        _ReminderBanner(
+                          reminder: _reminder!,
+                          onDismiss: () => setState(() => _showReminder = false),
                         ),
-                        const SizedBox(height: 16),
-                        _AttendanceSummaryCard(
-                          summary: _summary,
-                          onViewAll: () =>
-                              context.go(StudentRoutePaths.riwayat),
-                        ),
-                        const SizedBox(height: 16),
-                        _ScheduleSection(
-                          selectedDay: _selectedDay,
-                          schedules: _schedules,
-                          onDaySelected: (day) =>
-                              setState(() => _selectedDay = day),
-                          alarmToggles: _alarmToggles,
-                          onAlarmToggle: (index, val) =>
-                              setState(() => _alarmToggles[index] = val),
-                        ),
-                      ], // end else
+                      if (_showReminder && _reminder != null)
+                        const SizedBox(height: 12),
+                    _QuickActions(
+                      onAbsensiTap: () => context.go(StudentRoutePaths.absensi),
+                      onSuratTap: () => context.go(StudentRoutePaths.surat),
+                    ),
+                    const SizedBox(height: 16),
+                    _AttendanceSummaryCard(
+                      summary: _summary,
+                      onViewAll: () => context.go(StudentRoutePaths.riwayat),
+                    ),
+                    const SizedBox(height: 16),
+                      _ScheduleSection(
+                        selectedDay: _selectedDay,
+                        schedules: _schedules,
+                        onDaySelected: (day) =>
+                            setState(() => _selectedDay = day),
+                        alarmToggles: _alarmToggles,
+                        onAlarmToggle: (index, val) =>
+                            setState(() => _alarmToggles[index] = val),
+                      ),
+                    ], // end else
                     ],
                   ),
                 ),
