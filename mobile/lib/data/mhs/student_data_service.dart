@@ -394,6 +394,7 @@ class StudentDataService {
     Uint8List? fileBytes,
     String? fileName,
   }) async {
+    await _ensureSession();
     if (!_hasRemoteSession && studentAuthRepository.useRemoteApi) {
       throw Exception(
         'Sesi login server belum aktif. Pastikan backend aktif di ${ApiConfig.baseUrl} lalu masuk ulang.',
@@ -449,6 +450,7 @@ class StudentDataService {
   }
 
   Future<List<Map<String, dynamic>>> loadPengajuanList() async {
+    await _ensureSession();
     try {
       final uri = Uri.parse('${ApiConfig.baseUrl}/mahasiswa/pengajuan');
       final res = await _client.get(uri, headers: _headers).timeout(_timeout);

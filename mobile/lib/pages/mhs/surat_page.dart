@@ -5,7 +5,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../data/mhs/dummy_student_auth_repository.dart';
 import '../../data/mhs/student_data_service.dart';
 
 class SuratPage extends StatefulWidget {
@@ -42,7 +41,6 @@ class _SuratPageState extends State<SuratPage> {
   }
 
   Future<void> _loadCourseOptions() async {
-    if (!studentAuthRepository.hasRemoteSession) return;
     try {
       final schedules = await studentDataService.loadSchedules();
       final names = schedules

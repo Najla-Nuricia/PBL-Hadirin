@@ -27,6 +27,8 @@ const _cameraPermissionErrorCodes = {
   'CameraAccessDenied',
   'CameraAccessDeniedWithoutPrompt',
   'CameraAccessRestricted',
+  'permissionDenied',
+  'NotAllowedError',
 };
 
 enum _CameraStatus {
@@ -108,32 +110,52 @@ class _StudentFaceScanPageState extends State<StudentFaceScanPage>
         return;
       }
 
-      final camera = cameras.firstWhere(
-        (camera) => camera.lensDirection == CameraLensDirection.front,
-        orElse: () => cameras.first,
-      );
-      controller = CameraController(
-        camera,
-        ResolutionPreset.medium,
-        enableAudio: false,
-      );
-      await controller.initialize();
+      final preferred = cameras
+          .where((c) => c.lensDirection == CameraLensDirection.front)
+          .toList();
+      final candidates = [
+        ...preferred,
+        ...cameras.where((c) => !preferred.contains(c)),
+      ];
 
-      if (!mounted) {
-        await controller.dispose();
-        return;
+      CameraException? lastCameraError;
+      for (final candidate in candidates) {
+        CameraController? candidateController;
+        try {
+          candidateController = CameraController(
+            candidate,
+            ResolutionPreset.medium,
+            enableAudio: false,
+          );
+          await candidateController.initialize();
+          if (!mounted) {
+            await candidateController.dispose();
+            return;
+          }
+          controller = candidateController;
+          setState(() {
+            _controller = candidateController;
+            _cameraStatus = _CameraStatus.ready;
+          });
+          return;
+        } on CameraException catch (e) {
+          lastCameraError = e;
+          await candidateController?.dispose();
+        }
       }
-      setState(() {
-        _controller = controller;
-        _cameraStatus = _CameraStatus.ready;
-      });
+
+      if (lastCameraError != null) {
+        throw lastCameraError;
+      }
     } on CameraException catch (error) {
       await controller?.dispose();
       debugPrint('Camera initialization failed: ${error.code}');
       _setCameraStatus(
         _cameraPermissionErrorCodes.contains(error.code)
             ? _CameraStatus.permissionDenied
-            : _CameraStatus.failed,
+            : (error.code == 'cameraNotFound'
+                ? _CameraStatus.unavailable
+                : _CameraStatus.failed),
       );
     } catch (error) {
       // Platforms without a camera implementation (e.g. desktop) throw
