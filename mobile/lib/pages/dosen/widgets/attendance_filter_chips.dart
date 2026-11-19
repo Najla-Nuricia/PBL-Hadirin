@@ -22,7 +22,9 @@ class AttendanceFilterChips extends ConsumerWidget {
         showCheckmark: false,
         backgroundColor: scheme.surface,
         selectedColor: scheme.primaryContainer,
-        side: BorderSide(color: isSelected ? scheme.primary : scheme.outline),
+        side: BorderSide(
+          color: isSelected ? scheme.primary : scheme.outline,
+        ),
         labelStyle: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w600,
@@ -38,11 +40,7 @@ class AttendanceFilterChips extends ConsumerWidget {
           chip('Semua', selected == null, () => notifier.select(null)),
           for (final status in AttendanceStatus.values) ...[
             const SizedBox(width: 8),
-            chip(
-              status.label,
-              selected == status,
-              () => notifier.select(status),
-            ),
+            chip(status.label, selected == status, () => notifier.select(status)),
           ],
         ],
       ),

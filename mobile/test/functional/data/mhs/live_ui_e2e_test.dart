@@ -33,7 +33,10 @@ void main() {
       addTearDown(router.dispose);
 
       await tester.pumpWidget(
-        MaterialApp.router(theme: AppTheme.light, routerConfig: router),
+        MaterialApp.router(
+          theme: AppTheme.light,
+          routerConfig: router,
+        ),
       );
       await tester.pumpAndSettle();
 
@@ -101,7 +104,10 @@ void main() {
         expect(popupMenuItems, findsWidgets);
         await tester.tap(
           find
-              .descendant(of: popupMenuItems.first, matching: find.byType(Text))
+              .descendant(
+                of: popupMenuItems.first,
+                matching: find.byType(Text),
+              )
               .first,
         );
         await tester.pumpAndSettle();

@@ -179,15 +179,11 @@ class AdminFormScaffold extends StatelessWidget {
     required this.title,
     required this.form,
     required this.onSave,
-    this.onBack,
   });
 
   final String title;
   final Widget form;
   final VoidCallback onSave;
-
-  /// Override aksi tombol kembali (default: pop / kembali ke data akademik).
-  final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context) {
@@ -199,11 +195,9 @@ class AdminFormScaffold extends StatelessWidget {
         surfaceTintColor: Colors.transparent,
         centerTitle: true,
         leading: IconButton(
-          onPressed:
-              onBack ??
-              () => context.canPop()
-                  ? context.pop()
-                  : context.go(AdminRoutePaths.dataAkademik),
+          onPressed: () => context.canPop()
+              ? context.pop()
+              : context.go(AdminRoutePaths.mataKuliah),
           icon: Icon(Icons.arrow_back_ios_new_rounded, color: cs.primary),
           tooltip: 'Kembali',
         ),

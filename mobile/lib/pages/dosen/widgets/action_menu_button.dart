@@ -18,9 +18,8 @@ class ActionMenuButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final fg = isDestructive ? scheme.error : scheme.onSurface;
-    final iconBg = isDestructive
-        ? scheme.errorContainer
-        : scheme.surfaceContainerHighest;
+    final iconBg =
+        isDestructive ? scheme.errorContainer : scheme.surfaceContainerHighest;
     final iconFg = isDestructive ? scheme.error : scheme.onSurfaceVariant;
 
     return Semantics(
@@ -47,18 +46,10 @@ class ActionMenuButton extends StatelessWidget {
               Expanded(
                 child: Text(
                   label,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: fg,
-                  ),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: fg),
                 ),
               ),
-              Icon(
-                Icons.chevron_right,
-                size: 20,
-                color: scheme.onSurfaceVariant,
-              ),
+              Icon(Icons.chevron_right, size: 20, color: scheme.onSurfaceVariant),
             ],
           ),
         ),

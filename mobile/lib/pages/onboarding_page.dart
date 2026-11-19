@@ -244,7 +244,11 @@ class _OnboardingCircles extends StatelessWidget {
       child: IgnorePointer(
         child: CustomPaint(
           size: const Size.square(220),
-          painter: _CirclePatternPainter(color, strokeWidth: 22, filled: false),
+          painter: _CirclePatternPainter(
+            color,
+            strokeWidth: 22,
+            filled: false,
+          ),
         ),
       ),
     );

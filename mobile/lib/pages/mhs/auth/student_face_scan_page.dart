@@ -212,7 +212,9 @@ class _StudentFaceScanPageState extends State<StudentFaceScanPage>
     final remaining = _faceDirections.length - _capturedBytes.length;
     if (remaining <= 0) return;
 
-    final result = await FilePicker.pickFiles(type: FileType.image);
+    final result = await FilePicker.pickFiles(
+      type: FileType.image,
+    );
     if (!mounted || result.isEmpty) return;
 
     final addedBytes = <Uint8List>[];
@@ -259,9 +261,7 @@ class _StudentFaceScanPageState extends State<StudentFaceScanPage>
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
-            content: Text(
-              'Registrasi berhasil. Silakan login dengan NIM kamu.',
-            ),
+            content: Text('Registrasi berhasil. Silakan login dengan NIM kamu.'),
           ),
         );
       context.go(StudentRoutePaths.login);
