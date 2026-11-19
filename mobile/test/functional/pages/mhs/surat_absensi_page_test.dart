@@ -45,7 +45,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('JTI Polinema'), findsOneWidget);
+      // Kartu lokasi memakai GPS asli; statusnya async sehingga tidak di-assert
+      // di sini. Fokus test: halaman tetap masuk ke step kamera.
       await tester.ensureVisible(find.text('Lanjutkan ke Scan Wajah'));
       await tester.tap(find.text('Lanjutkan ke Scan Wajah'));
       await tester.pump();

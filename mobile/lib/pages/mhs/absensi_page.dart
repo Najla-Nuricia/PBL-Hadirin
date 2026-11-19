@@ -1,9 +1,14 @@
+import 'dart:convert';
+import 'dart:io' show Platform;
 import 'dart:typed_data';
 
 import 'package:camera/camera.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 
+import '../../data/location_service.dart';
 import '../../data/mhs/dummy_student_auth_repository.dart';
 import '../../data/mhs/student_data_service.dart';
 import '../../routing/student_route_paths.dart';
@@ -38,10 +43,7 @@ class AbsensiPage extends StatefulWidget {
 
 class _AbsensiPageState extends State<AbsensiPage>
     with TickerProviderStateMixin, WidgetsBindingObserver {
-  // Default coordinates correspond to JTI Polinema campus geofence.
-  static const double _defaultLatitude = -7.946714;
-  static const double _defaultLongitude = 112.615668;
-
+  // Koordinat perangkat diambil dari GPS asli (lihat LocationService).
   int _currentStep = 0; // 0 = Scan/Token QR, 1 = Verifikasi Wajah (Kamera)
   bool _isLoadingSessions = false;
   bool _isSubmitting = false;
@@ -62,9 +64,20 @@ class _AbsensiPageState extends State<AbsensiPage>
   String? _probeImageName;
   String? _statusMessage;
   String? _errorMessage;
-  Map<String, dynamic>? _lastRecordResponse;
 
-  final _qrTokenController = TextEditingController();
+  DeviceLocation? _location;
+  bool _isLocating = false;
+  String? _locationError;
+
+  MobileScannerController? _qrScanner;
+  bool _isStartingQrScanner = false;
+  String? _qrScannerError;
+  String? _handledQrToken;
+
+  // Di lingkungan flutter test plugin scanner tidak tersedia, jadi jangan mount.
+  bool get _isFlutterTest =>
+      !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
+
   late AnimationController _pulseController;
   late Animation<double> _pulseAnimation;
 
@@ -80,16 +93,26 @@ class _AbsensiPageState extends State<AbsensiPage>
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
     _loadInitialData();
+    _refreshLocation();
+    _startQrScanner();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_currentStep != 1) return;
     if (state == AppLifecycleState.inactive) {
-      _disposeCamera();
-    } else if (state == AppLifecycleState.resumed &&
-        _cameraController == null &&
-        !_attendanceDone) {
+      if (_currentStep == 0) {
+        _stopQrScanner();
+      } else {
+        _disposeCamera();
+      }
+      return;
+    }
+    if (state != AppLifecycleState.resumed) return;
+    _refreshLocation();
+    if (_attendanceDone) return;
+    if (_currentStep == 0) {
+      _startQrScanner();
+    } else if (_cameraController == null) {
       _initializeCamera();
     }
   }
@@ -108,8 +131,9 @@ class _AbsensiPageState extends State<AbsensiPage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _disposeCamera(notify: false);
+    _qrScanner?.dispose();
+    _qrScanner = null;
     _pulseController.dispose();
-    _qrTokenController.dispose();
     super.dispose();
   }
 
@@ -190,14 +214,12 @@ class _AbsensiPageState extends State<AbsensiPage>
       if (_cameraPermissionErrorCodes.contains(error.code)) {
         _setCameraStatus(_CameraStatus.permissionDenied);
         setState(() {
-          _errorMessage =
-              'Izin kamera belum aktif. Berikan izin kamera di browser/perangkat lalu tekan Coba Buka Kamera Lagi.';
+          _errorMessage = 'Izin kamera belum aktif. Berikan izin kamera di browser/perangkat lalu tekan Coba Buka Kamera Lagi.';
         });
       } else if (error.code == 'cameraNotFound') {
         _setCameraStatus(_CameraStatus.unavailable);
         setState(() {
-          _errorMessage =
-              'Kamera tidak terdeteksi (cameraNotFound). Pastikan webcam terhubung dan diizinkan.';
+          _errorMessage = 'Kamera tidak terdeteksi (cameraNotFound). Pastikan webcam terhubung dan diizinkan.';
         });
       } else {
         _setCameraStatus(_CameraStatus.failed);
@@ -297,32 +319,147 @@ class _AbsensiPageState extends State<AbsensiPage>
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Future<void> _submitQrOnly() async {
+  Future<void> _refreshLocation() async {
+    if (_isLocating) return;
+    setState(() {
+      _isLocating = true;
+      _locationError = null;
+    });
+    try {
+      final location = await locationService.currentPosition();
+      if (!mounted) return;
+      setState(() {
+        _location = location;
+        _locationError = null;
+      });
+    } on LocationException catch (e) {
+      if (!mounted) return;
+      setState(() => _locationError = e.message);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _locationError = 'Gagal membaca lokasi: $e');
+    } finally {
+      if (mounted) setState(() => _isLocating = false);
+    }
+  }
+
+  Future<void> _startQrScanner() async {
+    if (_isFlutterTest) return;
+    if (_qrScanner != null || _isStartingQrScanner) return;
+    _isStartingQrScanner = true;
+    final scanner = MobileScannerController(
+      autoStart: false,
+      formats: const [BarcodeFormat.qrCode],
+      detectionSpeed: DetectionSpeed.noDuplicates,
+    );
+    if (mounted) {
+      setState(() {
+        _qrScanner = scanner;
+        _qrScannerError = null;
+      });
+    }
+    try {
+      // Tunggu widget MobileScanner ter-mount & attach ke controller.
+      await WidgetsBinding.instance.endOfFrame;
+      await scanner.start();
+      if (!mounted) return;
+      setState(() => _qrScannerError = null);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _qrScannerError = 'Kamera pemindai QR tidak tersedia. Periksa izin kamera lalu coba lagi.';
+        _qrScanner = null;
+      });
+      await Future<void>.delayed(Duration.zero);
+      await scanner.dispose();
+    } finally {
+      _isStartingQrScanner = false;
+    }
+  }
+
+  Future<void> _stopQrScanner({bool notify = true}) async {
+    final scanner = _qrScanner;
+    if (scanner == null) return;
+    if (notify && mounted) {
+      setState(() => _qrScanner = null);
+      // Beri satu frame agar widget MobileScanner lepas dari controller.
+      await Future<void>.delayed(Duration.zero);
+    } else {
+      _qrScanner = null;
+    }
+    await scanner.dispose();
+  }
+
+  void _onQrDetected(BarcodeCapture capture) {
+    if (_isSubmitting || _attendanceDone) return;
+    for (final barcode in capture.barcodes) {
+      final raw = barcode.rawValue?.trim();
+      if (raw == null || raw.isEmpty) continue;
+      final token = _extractQrToken(raw);
+      if (token.isEmpty || token == _handledQrToken) continue;
+      _handledQrToken = token;
+      _submitQrAttendance(token);
+      return;
+    }
+  }
+
+  /// QR bisa berisi token mentah, URL (`?token=...`), atau JSON (`qr_token`).
+  String _extractQrToken(String raw) {
+    final trimmed = raw.trim();
+    final uri = Uri.tryParse(trimmed);
+    if (uri != null && uri.hasQuery) {
+      for (final key in const ['qr_token', 'token', 'code']) {
+        final value = uri.queryParameters[key]?.trim();
+        if (value != null && value.isNotEmpty) return value;
+      }
+    }
+    if (trimmed.startsWith('{')) {
+      try {
+        final decoded = jsonDecode(trimmed);
+        if (decoded is Map) {
+          for (final key in const ['qr_token', 'token', 'code']) {
+            final value = decoded[key];
+            if (value is String && value.trim().isNotEmpty) {
+              return value.trim();
+            }
+          }
+        }
+      } catch (_) {}
+    }
+    return trimmed;
+  }
+
+  Future<void> _submitQrAttendance(String qrToken) async {
     if (!studentAuthRepository.hasRemoteSession) {
+      _handledQrToken = null;
       _showSnackBar('Login terlebih dahulu untuk mencatat presensi QR.');
       return;
     }
-    final qrToken = _qrTokenController.text.trim();
-    if (qrToken.length < 4) {
-      setState(() => _errorMessage = 'Masukkan token QR minimal 4 karakter.');
+    final location = _location;
+    if (location == null) {
+      _handledQrToken = null;
+      setState(
+        () => _errorMessage = 'Lokasi belum terdeteksi. Aktifkan GPS lalu tekan Muat Ulang Lokasi.',
+      );
       return;
     }
 
     setState(() {
       _errorMessage = null;
-      _lastRecordResponse = null;
     });
     _setSubmitting(true);
     try {
       final res = await studentDataService.submitQrAttendance(
         qrToken: qrToken,
-        latitude: _defaultLatitude,
-        longitude: _defaultLongitude,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        accuracy: location.accuracy,
       );
+      if (!mounted) return;
+      await _stopQrScanner();
       if (!mounted) return;
       setState(() {
         _attendanceDone = true;
-        _lastRecordResponse = res;
         _statusMessage =
             (res['message'] as String?) ?? 'Presensi QR berhasil dicatat!';
       });
@@ -330,6 +467,7 @@ class _AbsensiPageState extends State<AbsensiPage>
     } catch (e) {
       if (!mounted) return;
       final msg = _cleanError(e);
+      _handledQrToken = null;
       setState(() => _errorMessage = msg);
       _showSnackBar(msg);
     } finally {
@@ -338,12 +476,12 @@ class _AbsensiPageState extends State<AbsensiPage>
   }
 
   void _proceedToFaceStep() {
+    _stopQrScanner();
     setState(() {
       _currentStep = 1;
       _errorMessage = null;
       _attendanceDone = false;
       _statusMessage = null;
-      _lastRecordResponse = null;
     });
     _initializeCamera();
   }
@@ -355,7 +493,13 @@ class _AbsensiPageState extends State<AbsensiPage>
       );
       return;
     }
-    final qrToken = _qrTokenController.text.trim();
+    final location = _location;
+    if (location == null) {
+      setState(
+        () => _errorMessage = 'Lokasi belum terdeteksi. Aktifkan GPS lalu tekan Muat Ulang Lokasi.',
+      );
+      return;
+    }
     final effectiveSessionId =
         _selectedSessionId ??
         (_activeSessions.isNotEmpty
@@ -369,9 +513,9 @@ class _AbsensiPageState extends State<AbsensiPage>
         imageBytes: _probeImageBytes!,
         filename: _probeImageName ?? 'probe.jpg',
         sesiPresensiId: effectiveSessionId,
-        qrToken: qrToken.isNotEmpty ? qrToken : null,
-        latitude: _defaultLatitude,
-        longitude: _defaultLongitude,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        accuracy: location.accuracy,
       );
       if (!mounted) return;
       final sim = res['similarity'] ?? res['similarity_score'];
@@ -382,7 +526,6 @@ class _AbsensiPageState extends State<AbsensiPage>
       if (!mounted) return;
       setState(() {
         _attendanceDone = true;
-        _lastRecordResponse = res;
         _statusMessage =
             '${(res['message'] as String?) ?? 'Presensi wajah berhasil!'}$simSuffix';
       });
@@ -420,15 +563,28 @@ class _AbsensiPageState extends State<AbsensiPage>
                       _buildScanArea(colorScheme),
                       const SizedBox(height: 16),
                       _buildStatusBanner(colorScheme),
-                      if (_attendanceDone && _lastRecordResponse != null) ...[
-                        const SizedBox(height: 12),
-                        _buildStorageProofCard(colorScheme),
-                      ],
+
                       if (_currentStep == 0) ...[
                         const SizedBox(height: 16),
                         _buildSessionSelector(colorScheme),
-                        const SizedBox(height: 12),
-                        _buildQrInput(colorScheme),
+                        if (_qrScannerError != null) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            _qrScannerError!,
+                            style: TextStyle(
+                              color: colorScheme.error,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          OutlinedButton.icon(
+                            onPressed: _isStartingQrScanner
+                                ? null
+                                : _startQrScanner,
+                            icon: const Icon(Icons.qr_code_scanner),
+                            label: const Text('Coba Buka Pemindai QR'),
+                          ),
+                        ],
                       ] else if (!_attendanceDone) ...[
                         const SizedBox(height: 16),
                         _buildFacePreviewCard(colorScheme),
@@ -465,6 +621,7 @@ class _AbsensiPageState extends State<AbsensiPage>
                   _currentStep = 0;
                   _errorMessage = null;
                 });
+                _startQrScanner();
               } else {
                 context.go(StudentRoutePaths.beranda);
               }
@@ -544,6 +701,8 @@ class _AbsensiPageState extends State<AbsensiPage>
 
   Widget _buildScanArea(ColorScheme colorScheme) {
     final isDone = _attendanceDone;
+    final qrScanner = _currentStep == 0 && !isDone ? _qrScanner : null;
+    final showQrScanner = qrScanner != null;
     final showLiveCamera =
         _currentStep == 1 &&
         !isDone &&
@@ -554,7 +713,7 @@ class _AbsensiPageState extends State<AbsensiPage>
 
     return Container(
       width: double.infinity,
-      height: showLiveCamera ? 290 : 210,
+      height: (showLiveCamera || showQrScanner) ? 290 : 210,
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(20),
@@ -567,7 +726,30 @@ class _AbsensiPageState extends State<AbsensiPage>
       child: Stack(
         alignment: Alignment.center,
         children: [
-          if (showLiveCamera)
+          if (showQrScanner)
+            Positioned.fill(
+              child: MobileScanner(
+                controller: qrScanner,
+                fit: BoxFit.cover,
+                onDetect: _onQrDetected,
+                errorBuilder: (context, error) => ColoredBox(
+                  color: colorScheme.surfaceContainerHighest,
+                  child: Center(
+                    child: Text(
+                      'Kamera pemindai QR tidak tersedia.',
+                      style: TextStyle(
+                        color: colorScheme.error,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+                placeholderBuilder: (context) =>
+                    ColoredBox(color: colorScheme.surfaceContainerHighest),
+              ),
+            )
+          else if (showLiveCamera)
             Positioned.fill(
               child: FittedBox(
                 fit: BoxFit.cover,
@@ -585,20 +767,26 @@ class _AbsensiPageState extends State<AbsensiPage>
               child: child,
             ),
             child: Container(
-              width: showLiveCamera ? 180 : 150,
-              height: showLiveCamera ? 180 : 150,
+              width: (showLiveCamera || showQrScanner) ? 180 : 150,
+              height: (showLiveCamera || showQrScanner) ? 180 : 150,
               decoration: BoxDecoration(
                 border: Border.all(
                   color: isDone
                       ? colorScheme.secondary
-                      : showLiveCamera
+                      : (showLiveCamera || showQrScanner)
                       ? Colors.white70
                       : colorScheme.onSurfaceVariant.withValues(alpha: 0.35),
                   width: 2,
                 ),
-                borderRadius: BorderRadius.circular(showLiveCamera ? 90 : 14),
+                borderRadius: BorderRadius.circular(
+                  showLiveCamera
+                      ? 90
+                      : showQrScanner
+                      ? 24
+                      : 14,
+                ),
               ),
-              child: showLiveCamera
+              child: (showLiveCamera || showQrScanner)
                   ? null
                   : Center(
                       child: isDone
@@ -621,9 +809,10 @@ class _AbsensiPageState extends State<AbsensiPage>
                                 _cameraStatus == _CameraStatus.initializing
                           ? const CircularProgressIndicator(strokeWidth: 2.5)
                           : (_currentStep == 1 &&
-                                  (_cameraStatus == _CameraStatus.unavailable ||
-                                      _cameraStatus == _CameraStatus.failed ||
-                                      _cameraStatus == _CameraStatus.permissionDenied))
+                                (_cameraStatus == _CameraStatus.unavailable ||
+                                    _cameraStatus == _CameraStatus.failed ||
+                                    _cameraStatus ==
+                                        _CameraStatus.permissionDenied))
                           ? Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
@@ -674,6 +863,28 @@ class _AbsensiPageState extends State<AbsensiPage>
                 ),
               ),
             ),
+          if (showQrScanner && !_isSubmitting)
+            Positioned(
+              bottom: 12,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: colorScheme.surface.withValues(alpha: 0.85),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Arahkan kamera ke QR',
+                  style: TextStyle(
+                    color: colorScheme.primary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
           if (_isSubmitting)
             Positioned(
               bottom: 12,
@@ -704,12 +915,9 @@ class _AbsensiPageState extends State<AbsensiPage>
   Widget _buildStatusBanner(ColorScheme colorScheme) {
     final cameraHint = switch (_cameraStatus) {
       _CameraStatus.initializing => 'Membuka kamera perangkat...',
-      _CameraStatus.permissionDenied =>
-        'Izin kamera belum aktif. Berikan izin kamera di browser/perangkat lalu tekan Coba Buka Kamera Lagi.',
-      _CameraStatus.unavailable =>
-        'Kamera langsung tidak terdeteksi (cameraNotFound). Pastikan webcam terhubung dan diizinkan.',
-      _CameraStatus.failed =>
-        'Kamera gagal dibuka. Pastikan kamera tidak dipakai aplikasi lain lalu tekan Coba Buka Kamera Lagi.',
+      _CameraStatus.permissionDenied => 'Izin kamera belum aktif. Berikan izin kamera di browser/perangkat lalu tekan Coba Buka Kamera Lagi.',
+      _CameraStatus.unavailable => 'Kamera langsung tidak terdeteksi (cameraNotFound). Pastikan webcam terhubung dan diizinkan.',
+      _CameraStatus.failed => 'Kamera gagal dibuka. Pastikan kamera tidak dipakai aplikasi lain lalu tekan Coba Buka Kamera Lagi.',
       _CameraStatus.ready =>
         _probeImageBytes == null
             ? 'Arahkan wajah ke bingkai kamera lalu tekan Ambil Foto Wajah'
@@ -721,7 +929,9 @@ class _AbsensiPageState extends State<AbsensiPage>
         _errorMessage ??
         _statusMessage ??
         (_currentStep == 0
-            ? 'Pilih sesi aktif atau masukkan token QR dosen di depan kelas'
+            ? (_qrScanner == null
+                  ? 'Pemindai QR tidak aktif. Tekan Coba Buka Pemindai QR.'
+                  : 'Arahkan kamera ke QR presensi')
             : cameraHint);
     final isError = _errorMessage != null;
     final isSuccess = !isError && _attendanceDone;
@@ -737,52 +947,6 @@ class _AbsensiPageState extends State<AbsensiPage>
                   : colorScheme.onSurfaceVariant),
         fontSize: 13,
         fontWeight: (isError || isSuccess) ? FontWeight.w600 : FontWeight.w400,
-      ),
-    );
-  }
-
-  Widget _buildStorageProofCard(ColorScheme colorScheme) {
-    final rec = _lastRecordResponse ?? const {};
-    final photoPath = rec['face_photo_path'] as String?;
-    final kehadiranId = rec['kehadiran_id'] as String?;
-    if (photoPath == null && kehadiranId == null) {
-      return const SizedBox.shrink();
-    }
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: colorScheme.secondaryContainer.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colorScheme.secondary.withValues(alpha: 0.5)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Bukti Tersimpan di Database',
-            style: TextStyle(
-              color: colorScheme.onSurface,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          if (kehadiranId != null)
-            Text(
-              'ID Kehadiran: $kehadiranId',
-              style: TextStyle(
-                color: colorScheme.onSurfaceVariant,
-                fontSize: 11,
-              ),
-            ),
-          if (photoPath != null)
-            Text(
-              'Storage Foto: foto-presensi/$photoPath',
-              style: TextStyle(
-                color: colorScheme.onSurfaceVariant,
-                fontSize: 11,
-              ),
-            ),
-        ],
       ),
     );
   }
@@ -851,20 +1015,6 @@ class _AbsensiPageState extends State<AbsensiPage>
         );
       }).toList(),
       onChanged: (val) => setState(() => _selectedSessionId = val),
-    );
-  }
-
-  Widget _buildQrInput(ColorScheme colorScheme) {
-    return TextField(
-      controller: _qrTokenController,
-      onChanged: (_) => setState(() {}),
-      decoration: InputDecoration(
-        labelText: 'Token QR Sesi',
-        hintText:
-            'Masukkan token QR dari dosen (opsional jika pakai sesi aktif)',
-        prefixIcon: const Icon(Icons.qr_code_2),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-      ),
     );
   }
 
@@ -942,51 +1092,81 @@ class _AbsensiPageState extends State<AbsensiPage>
   }
 
   Widget _buildLocationCard(ColorScheme colorScheme) {
+    final location = _location;
+    final hasError = _locationError != null;
+    final statusColor = hasError
+        ? colorScheme.error
+        : location != null
+        ? colorScheme.primary
+        : colorScheme.onSurfaceVariant;
+    final title = hasError
+        ? 'Lokasi Tidak Terdeteksi'
+        : location != null
+        ? 'Lokasi Perangkat'
+        : 'Mendeteksi Lokasi...';
+    final detail = hasError
+        ? _locationError!
+        : location != null
+        ? '${location.formattedCoordinates} (akurasi ${location.formattedAccuracy})'
+        : 'Mengambil koordinat GPS perangkat...';
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: colorScheme.outlineVariant),
+        border: Border.all(
+          color: hasError ? colorScheme.error : colorScheme.outlineVariant,
+        ),
       ),
       child: Row(
         children: [
-          Icon(
-            Icons.location_on_outlined,
-            color: colorScheme.primary,
-            size: 22,
-          ),
+          Icon(Icons.location_on_outlined, color: statusColor, size: 22),
           const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Lokasi Geofence Kampus',
-                style: TextStyle(
-                  color: colorScheme.onSurfaceVariant,
-                  fontSize: 11,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: colorScheme.onSurfaceVariant,
+                    fontSize: 11,
+                  ),
                 ),
-              ),
-              Text(
-                'JTI Polinema ($_defaultLatitude, $_defaultLongitude)',
-                style: TextStyle(
-                  color: colorScheme.onSurface,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
+                Text(
+                  detail,
+                  style: TextStyle(
+                    color: hasError ? colorScheme.error : colorScheme.onSurface,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const Spacer(),
-          Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(
-              color: colorScheme.primary,
-              shape: BoxShape.circle,
+              ],
             ),
-            child: Icon(Icons.check, color: colorScheme.onPrimary, size: 16),
           ),
+          const SizedBox(width: 8),
+          if (_isLocating)
+            Icon(Icons.location_searching, size: 22, color: statusColor)
+          else if (location != null)
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: colorScheme.primary,
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.check, color: colorScheme.onPrimary, size: 16),
+            )
+          else
+            IconButton(
+              onPressed: _refreshLocation,
+              icon: const Icon(Icons.refresh, size: 20),
+              tooltip: 'Muat Ulang Lokasi',
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+            ),
         ],
       ),
     );
@@ -1014,26 +1194,9 @@ class _AbsensiPageState extends State<AbsensiPage>
     }
 
     if (_currentStep == 0) {
-      final hasQrToken = _qrTokenController.text.trim().isNotEmpty;
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (hasQrToken) ...[
-            SizedBox(
-              height: 48,
-              child: FilledButton(
-                onPressed: _isSubmitting ? null : _submitQrOnly,
-                style: FilledButton.styleFrom(
-                  backgroundColor: colorScheme.primary,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                child: const Text('Catat Presensi QR Sekarang'),
-              ),
-            ),
-            const SizedBox(height: 10),
-          ],
           SizedBox(
             height: 52,
             child: FilledButton(

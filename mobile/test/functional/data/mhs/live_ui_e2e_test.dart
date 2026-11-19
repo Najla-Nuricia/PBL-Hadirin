@@ -76,7 +76,7 @@ void main() {
         router.routeInformationProvider.value.uri.path,
         StudentRoutePaths.absensi,
       );
-      expect(find.textContaining('JTI Polinema'), findsOneWidget);
+      expect(find.textContaining('Lokasi'), findsWidgets);
       await tester.ensureVisible(find.text('Lanjutkan ke Scan Wajah'));
       await tester.tap(find.text('Lanjutkan ke Scan Wajah'));
       await tester.pumpAndSettle();
