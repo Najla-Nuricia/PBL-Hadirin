@@ -317,7 +317,6 @@ class StudentDataService {
     required String qrToken,
     required double latitude,
     required double longitude,
-    required double accuracy,
   }) async {
     if (!_hasRemoteSession && studentAuthRepository.useRemoteApi) {
       throw Exception(
@@ -333,7 +332,6 @@ class StudentDataService {
             'qr_token': qrToken,
             'latitude': latitude,
             'longitude': longitude,
-            'accuracy': accuracy,
           }),
         )
         .timeout(_timeout);
@@ -351,7 +349,6 @@ class StudentDataService {
     String? qrToken,
     double? latitude,
     double? longitude,
-    double? accuracy,
   }) async {
     await _ensureSession();
     if (!_hasRemoteSession && studentAuthRepository.useRemoteApi) {
@@ -373,9 +370,6 @@ class StudentDataService {
     if (latitude != null && longitude != null) {
       req.fields['latitude'] = latitude.toString();
       req.fields['longitude'] = longitude.toString();
-    }
-    if (accuracy != null) {
-      req.fields['accuracy'] = accuracy.toString();
     }
     req.files.add(
       http.MultipartFile.fromBytes('file', imageBytes, filename: filename),

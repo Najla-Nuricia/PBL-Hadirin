@@ -28,8 +28,6 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>Hadirin membutuhkan akses kamera untuk scan wajah saat registrasi dan absensi.</string>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Hadirin membutuhkan akses lokasi untuk memvalidasi posisi Anda di area kampus saat presensi.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Hadirin membutuhkan akses galeri foto untuk mengubah foto profil.</string>
 	<key>UIApplicationSceneManifest</key>
