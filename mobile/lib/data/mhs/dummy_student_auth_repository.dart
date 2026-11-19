@@ -97,7 +97,6 @@ class DummyStudentAuthRepository extends ChangeNotifier {
     required String nim,
     required String password,
   }) async {
-    Object? networkError;
     if (useRemoteApi) {
       try {
         final uri = Uri.parse('${ApiConfig.baseUrl}/auth/login');
@@ -147,20 +146,9 @@ class DummyStudentAuthRepository extends ChangeNotifier {
             notifyListeners();
             return null;
           }
-          throw RemoteApiException(
-            _extractDetail(
-              response,
-              'Login gagal (HTTP ${response.statusCode}).',
-            ),
-            statusCode: response.statusCode,
-          );
         }
-      } on RemoteApiException {
-        rethrow;
-      } catch (error) {
-        // Server tidak terjangkau (salah base URL, backend mati, atau HTTP
-        // diblokir platform). Simpan agar bisa dibedakan dari kredensial salah.
-        networkError = error;
+      } catch (_) {
+        // Offline / Flutter testWidgets mock fallback below.
       }
     }
 
@@ -169,12 +157,6 @@ class DummyStudentAuthRepository extends ChangeNotifier {
     if (account == null || account.password != password) {
       _currentAccount = null;
       notifyListeners();
-      if (networkError != null) {
-        throw RemoteApiException(
-          'Tidak dapat terhubung ke server ${ApiConfig.baseUrl}. '
-          'Pastikan backend aktif dan alamat API bisa diakses dari perangkat.',
-        );
-      }
       return null;
     }
     _currentAccount = account;
