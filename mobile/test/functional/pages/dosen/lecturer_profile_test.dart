@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/routing/lecturer_route_paths.dart';
 import 'package:mobile/routing/lecturer_router.dart';
@@ -16,7 +17,9 @@ void main() {
     router.go(LecturerRoutePaths.profil);
 
     await tester.pumpWidget(
-      MaterialApp.router(routerConfig: router, theme: AppTheme.light),
+      ProviderScope(
+        child: MaterialApp.router(routerConfig: router, theme: AppTheme.light),
+      ),
     );
     await tester.pumpAndSettle();
 
@@ -60,7 +63,9 @@ void main() {
     router.go(LecturerRoutePaths.profil);
 
     await tester.pumpWidget(
-      MaterialApp.router(routerConfig: router, theme: AppTheme.light),
+      ProviderScope(
+        child: MaterialApp.router(routerConfig: router, theme: AppTheme.light),
+      ),
     );
     await tester.pumpAndSettle();
 
