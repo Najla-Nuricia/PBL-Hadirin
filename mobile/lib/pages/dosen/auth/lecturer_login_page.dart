@@ -1,7 +1,9 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../data/dosen/dummy_lecturer_auth_repository.dart';
+import '../../../data/dosen/lecturer_providers.dart';
 import '../../../routing/lecturer_route_paths.dart';
 import '../../../theme/style/auth_style.dart';
 import '../../mhs/auth/widgets/auth_buttons.dart';
@@ -9,14 +11,14 @@ import '../../mhs/auth/widgets/auth_header.dart';
 import '../../mhs/auth/widgets/auth_scaffold.dart';
 import '../../mhs/auth/widgets/auth_text_field.dart';
 
-class LecturerLoginPage extends StatefulWidget {
+class LecturerLoginPage extends ConsumerStatefulWidget {
   const LecturerLoginPage({super.key});
 
   @override
-  State<LecturerLoginPage> createState() => _LecturerLoginPageState();
+  ConsumerState<LecturerLoginPage> createState() => _LecturerLoginPageState();
 }
 
-class _LecturerLoginPageState extends State<LecturerLoginPage> {
+class _LecturerLoginPageState extends ConsumerState<LecturerLoginPage> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -34,31 +36,40 @@ class _LecturerLoginPageState extends State<LecturerLoginPage> {
 
     FocusScope.of(context).unfocus();
     setState(() => _isSubmitting = true);
-    final account = await lecturerAuthRepository.login(
-      email: _emailController.text.trim(),
-      password: _passwordController.text,
-    );
-    if (!mounted) return;
-    setState(() => _isSubmitting = false);
+    try {
+      final account = await lecturerAuthRepository.login(
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+      );
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
 
-    if (account == null) {
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(content: Text('Email atau password salah.')),
-        );
-      return;
+      if (account == null) {
+        _showMessage('Email atau password salah.');
+        return;
+      }
+
+      ref.invalidate(dosenDashboardProvider);
+      ref.read(attendanceQueryProvider.notifier).clear();
+      context.go(LecturerRoutePaths.beranda);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      final message = e is LecturerRemoteApiException
+          ? e.message
+          : 'Gagal masuk. Periksa koneksi ke server backend.';
+      _showMessage(message);
     }
+  }
 
-    context.go(LecturerRoutePaths.beranda);
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _showForgotPasswordUnavailable() {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(content: Text('Fitur lupa password belum tersedia.')),
-      );
+    _showMessage('Fitur lupa password belum tersedia.');
   }
 
   @override

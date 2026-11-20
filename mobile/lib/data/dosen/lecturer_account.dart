@@ -11,6 +11,7 @@ class LecturerAccount {
     this.phoneNumber = '-',
     this.role = 'Dosen',
     this.photoBytes,
+    this.token,
   });
 
   final String staffId;
@@ -20,6 +21,7 @@ class LecturerAccount {
   final String phoneNumber;
   final String role;
   final Uint8List? photoBytes;
+  final String? token;
 
   LecturerAccount copyWith({String? password, Uint8List? photoBytes}) {
     return LecturerAccount(
@@ -30,6 +32,7 @@ class LecturerAccount {
       phoneNumber: phoneNumber,
       role: role,
       photoBytes: photoBytes ?? this.photoBytes,
+      token: token,
     );
   }
 

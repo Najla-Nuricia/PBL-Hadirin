@@ -17,6 +17,17 @@ class LecturerProfile {
   final String role;
   final Uint8List? photoBytes;
 
+  /// Profil dosen dari respons login/dashboard backend.
+  factory LecturerProfile.fromJson(Map<String, dynamic> json) {
+    return LecturerProfile(
+      fullName: (json['fullName'] as String?) ?? '',
+      staffId: (json['staffId'] as String?) ?? (json['nip'] as String?) ?? '',
+      email: (json['email'] as String?) ?? '',
+      phoneNumber: (json['phoneNumber'] as String?) ?? '',
+      role: (json['role'] as String?) ?? 'Dosen',
+    );
+  }
+
   LecturerProfile copyWith({Uint8List? photoBytes}) {
     return LecturerProfile(
       fullName: fullName,

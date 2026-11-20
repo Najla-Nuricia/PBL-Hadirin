@@ -1,9 +1,12 @@
 // lib/pages/dosen/cek_presensi_page.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../data/dosen/lecturer_providers.dart';
 import '../../data/dosen/presensi_options.dart';
 import '../../routing/lecturer_route_paths.dart';
+import 'widgets/attendance_counts_card.dart';
 
 const _hari = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
 const _bulan = [
@@ -15,17 +18,29 @@ const _bulan = [
 String _formatTanggal(DateTime d) =>
     '${_hari[d.weekday - 1]}, ${d.day} ${_bulan[d.month - 1]} ${d.year}';
 
-class CekPresensiPage extends StatefulWidget {
+class CekPresensiPage extends ConsumerStatefulWidget {
   const CekPresensiPage({super.key});
 
   @override
-  State<CekPresensiPage> createState() => _CekPresensiPageState();
+  ConsumerState<CekPresensiPage> createState() => _CekPresensiPageState();
 }
 
-class _CekPresensiPageState extends State<CekPresensiPage> {
+class _CekPresensiPageState extends ConsumerState<CekPresensiPage> {
   String _kelas = lecturerKelasOptions.first;
   String _mataKuliah = lecturerMataKuliahOptions.first;
   DateTime _tanggal = DateTime.now();
+  bool _tanggalDipilih = false;
+
+  /// Opsi backend dipakai bila tersedia, opsi demo tetap menjadi fallback.
+  List<String> get _kelasOptions {
+    final backend = ref.watch(dosenDashboardProvider).value?.kelasOptions ?? const <String>[];
+    return {...backend, _kelas}.toList();
+  }
+
+  List<String> get _mataKuliahOptions {
+    final backend = ref.watch(dosenDashboardProvider).value?.mataKuliahOptions ?? const <String>[];
+    return {...backend, _mataKuliah}.toList();
+  }
 
   void _back() {
     if (context.canPop()) {
@@ -35,6 +50,12 @@ class _CekPresensiPageState extends State<CekPresensiPage> {
     }
   }
 
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
@@ -42,10 +63,43 @@ class _CekPresensiPageState extends State<CekPresensiPage> {
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
     );
-    if (picked != null) setState(() => _tanggal = picked);
+    if (picked != null) {
+      setState(() {
+        _tanggal = picked;
+        _tanggalDipilih = true;
+      });
+    }
   }
 
   void _tampilkan() {
+    final dashboardAsync = ref.read(dosenDashboardProvider);
+    if (dashboardAsync.isLoading) {
+      _showMessage('Data jadwal masih dimuat.');
+      return;
+    }
+
+    final dashboard = dashboardAsync.value;
+    final jadwal = dashboard?.findJadwal(
+      kelas: _kelas,
+      mataKuliah: _mataKuliah,
+    );
+    if (dashboard != null &&
+        !dashboard.isDemo &&
+        dashboard.jadwal.isNotEmpty &&
+        jadwal == null) {
+      _showMessage('Jadwal untuk pilihan ini tidak ditemukan.');
+      return;
+    }
+
+    ref.read(attendanceQueryProvider.notifier).select(
+          AttendanceQuery(
+            jadwalId: jadwal?.jadwalId ?? 'demo',
+            // Tanpa pilihan tanggal, backend memakai sesi terakhir jadwal.
+            tanggal: _tanggalDipilih ? _tanggal : null,
+          ),
+        );
+    ref.invalidate(attendanceSessionProvider);
+
     context.push(
       LecturerRoutePaths.daftarKehadiran,
       extra: PresensiFilter(
@@ -59,6 +113,8 @@ class _CekPresensiPageState extends State<CekPresensiPage> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final dashboard = ref.watch(dosenDashboardProvider).value;
+    final ringkasan = dashboard?.summary;
 
     return Scaffold(
       backgroundColor: cs.surfaceContainerHighest,
@@ -106,7 +162,7 @@ class _CekPresensiPageState extends State<CekPresensiPage> {
                   _SelectBox(
                     icon: Icons.school_outlined,
                     value: _kelas,
-                    items: lecturerKelasOptions,
+                    items: _kelasOptions,
                     onChanged: (v) => setState(() => _kelas = v!),
                   ),
                   const SizedBox(height: 16),
@@ -117,7 +173,7 @@ class _CekPresensiPageState extends State<CekPresensiPage> {
                   _SelectBox(
                     icon: Icons.calendar_today_outlined,
                     value: _mataKuliah,
-                    items: lecturerMataKuliahOptions,
+                    items: _mataKuliahOptions,
                     onChanged: (v) => setState(() => _mataKuliah = v!),
                   ),
                   const SizedBox(height: 20),
@@ -126,6 +182,17 @@ class _CekPresensiPageState extends State<CekPresensiPage> {
                     tanggal: _formatTanggal(_tanggal),
                     mataKuliah: _mataKuliah,
                   ),
+                  const SizedBox(height: 12),
+                  if (ringkasan != null)
+                    AttendanceCountsCard(summary: ringkasan),
+                  if (dashboard?.isDemo ?? false)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 8),
+                      child: Text(
+                        'Belum ada data jadwal dari server. Menampilkan data contoh.',
+                        style: TextStyle(fontSize: 11),
+                      ),
+                    ),
                 ],
               ),
             ),

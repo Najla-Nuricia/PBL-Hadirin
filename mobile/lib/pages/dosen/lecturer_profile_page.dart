@@ -2,43 +2,52 @@
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../data/dosen/dummy_lecturer_auth_repository.dart';
+import '../../data/dosen/lecturer_profile_preview.dart';
+import '../../data/dosen/lecturer_providers.dart';
 import '../../models/dosen/lecturer_profile.dart';
 import '../../routing/lecturer_route_paths.dart';
 import 'widgets/logout_confirmation_dialog.dart';
 
 const _maxPhotoSizeInBytes = 5 * 1024 * 1024;
 
-class LecturerProfilePage extends StatefulWidget {
+class LecturerProfilePage extends ConsumerStatefulWidget {
   const LecturerProfilePage({
-    required this.profile,
+    this.profile,
     super.key,
   });
 
-  final LecturerProfile profile;
+  /// Data lokal sebagai fallback saat backend belum merespons.
+  final LecturerProfile? profile;
 
   @override
-  State<LecturerProfilePage> createState() => _LecturerProfilePageState();
+  ConsumerState<LecturerProfilePage> createState() => _LecturerProfilePageState();
 }
 
-class _LecturerProfilePageState extends State<LecturerProfilePage> {
+class _LecturerProfilePageState extends ConsumerState<LecturerProfilePage> {
   Uint8List? _photoBytes;
   bool _isUpdatingPhoto = false;
+  LecturerProfile _profile = currentLecturerProfile();
 
   @override
   void initState() {
     super.initState();
-    _photoBytes = widget.profile.photoBytes;
+    _photoBytes = widget.profile?.photoBytes;
   }
 
   Future<void> _confirmLogout() async {
     final shouldLogout = await showLecturerLogoutDialog(
       context,
-      fullName: widget.profile.fullName,
-      email: widget.profile.email,
+      fullName: _profile.fullName,
+      email: _profile.email,
     );
     if (!shouldLogout || !mounted) return;
+    lecturerAuthRepository.logout();
+    ref.invalidate(dosenDashboardProvider);
+    ref.read(attendanceQueryProvider.notifier).clear();
     context.go(LecturerRoutePaths.login);
   }
 
@@ -83,6 +92,10 @@ class _LecturerProfilePageState extends State<LecturerProfilePage> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final dashboardAsync = ref.watch(dosenDashboardProvider);
+    _profile = dashboardAsync.value?.dosen ??
+        widget.profile ??
+        currentLecturerProfile();
 
     return Scaffold(
       backgroundColor: colorScheme.surfaceContainerHighest,
@@ -91,17 +104,27 @@ class _LecturerProfilePageState extends State<LecturerProfilePage> {
         child: Column(
           children: [
             _LecturerProfileHeader(
-              profile: widget.profile,
+              profile: _profile,
               photoBytes: _photoBytes,
               isUpdatingPhoto: _isUpdatingPhoto,
               onPickPhoto: _pickPhoto,
+              onRefresh: () => ref.invalidate(dosenDashboardProvider),
+              isRefreshing: dashboardAsync.isLoading,
             ),
+            if (dashboardAsync.hasError)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
+                child: Text(
+                  'Gagal memuat data akun dari server. Menampilkan data tersimpan.',
+                  style: TextStyle(fontSize: 12, color: colorScheme.error),
+                ),
+              ),
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(14, 14, 14, 20),
                 child: Column(
                   children: [
-                    _LecturerInformationCard(profile: widget.profile),
+                    _LecturerInformationCard(profile: _profile),
                     const SizedBox(height: 14),
                     _LecturerActionsCard(
                       onPickPhoto: _pickPhoto,
@@ -126,12 +149,16 @@ class _LecturerProfileHeader extends StatelessWidget {
     required this.photoBytes,
     required this.isUpdatingPhoto,
     required this.onPickPhoto,
+    required this.onRefresh,
+    required this.isRefreshing,
   });
 
   final LecturerProfile profile;
   final Uint8List? photoBytes;
   final bool isUpdatingPhoto;
   final VoidCallback onPickPhoto;
+  final VoidCallback onRefresh;
+  final bool isRefreshing;
 
   @override
   Widget build(BuildContext context) {
@@ -162,6 +189,22 @@ class _LecturerProfileHeader extends StatelessWidget {
                     color: colorScheme.onSurface,
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: IconButton(
+                    onPressed: onRefresh,
+                    icon: isRefreshing
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.refresh),
+                    iconSize: 19,
+                    color: colorScheme.primary,
+                    tooltip: 'Muat ulang data akun',
                   ),
                 ),
               ],

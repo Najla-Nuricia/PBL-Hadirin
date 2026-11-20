@@ -1,32 +1,37 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/dosen/dummy_lecturer_auth_repository.dart';
 import '../../data/dosen/lecturer_profile_preview.dart';
+import '../../data/dosen/lecturer_providers.dart';
 import '../../routing/lecturer_route_paths.dart';
 
 const _minimumPasswordLength = 8;
 
-class LecturerChangePasswordPage extends StatefulWidget {
+class LecturerChangePasswordPage extends ConsumerStatefulWidget {
   const LecturerChangePasswordPage({super.key, this.email});
 
   /// Akun yang kata sandinya diubah. Default ke akun dosen yang sedang login.
   final String? email;
 
   @override
-  State<LecturerChangePasswordPage> createState() =>
+  ConsumerState<LecturerChangePasswordPage> createState() =>
       _LecturerChangePasswordPageState();
 }
 
 class _LecturerChangePasswordPageState
-    extends State<LecturerChangePasswordPage> {
+    extends ConsumerState<LecturerChangePasswordPage> {
   final _formKey = GlobalKey<FormState>();
   final _currentController = TextEditingController();
   final _newController = TextEditingController();
   final _confirmationController = TextEditingController();
   bool _isSubmitting = false;
 
-  String get _email => widget.email ?? lecturerProfilePreview.email;
+  String get _email =>
+      widget.email ??
+      ref.read(dosenDashboardProvider).value?.dosen.email ??
+      currentLecturerProfile().email;
 
   @override
   void dispose() {
