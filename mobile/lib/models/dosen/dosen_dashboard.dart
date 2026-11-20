@@ -134,9 +134,64 @@ class DosenDashboard {
       .toSet()
       .toList();
 
-  DosenJadwalItem? findJadwal({required String kelas, required String mataKuliah}) {
+  static int? _isoDay(String? hari) => switch ((hari ?? '').toLowerCase()) {
+    'senin' => 1,
+    'selasa' => 2,
+    'rabu' => 3,
+    'kamis' => 4,
+    'jumat' => 5,
+    'sabtu' => 6,
+    'minggu' => 7,
+    _ => null,
+  };
+
+  static bool _sameName(String? a, String b) =>
+      (a ?? '').trim().toLowerCase() == b.trim().toLowerCase();
+
+  /// ID kelas dari nama kelas, untuk query `/dosen/matkul`.
+  String? kelasIdFor(String namaKelas) {
     for (final item in jadwal) {
-      if (item.matches(kelas: kelas, mataKuliah: mataKuliah)) return item;
+      if (_sameName(item.kelas, namaKelas) && item.kelasId.isNotEmpty) {
+        return item.kelasId;
+      }
+    }
+    for (final item in kelas) {
+      final id = (item['id'] ?? item['kelas_id']) as String?;
+      final name = (item['nama'] ?? item['kelas']) as String?;
+      if (_sameName(name, namaKelas) && id != null) return id;
+    }
+    return null;
+  }
+
+  /// Fallback client-side bila endpoint `/dosen/matkul` belum tersedia.
+  List<String> mataKuliahOptionsFor({
+    required String kelas,
+    required DateTime tanggal,
+  }) {
+    var items = jadwal
+        .where((j) => _sameName(j.kelas, kelas) && _isoDay(j.hari) == tanggal.weekday)
+        .toList();
+    if (items.isEmpty) {
+      items = jadwal.where((j) => _sameName(j.kelas, kelas)).toList();
+    }
+    return items
+        .map((j) => j.courseName)
+        .whereType<String>()
+        .where((name) => name.trim().isNotEmpty)
+        .toSet()
+        .toList();
+  }
+
+  DosenJadwalItem? findJadwal({
+    required String kelas,
+    required String mataKuliah,
+    DateTime? tanggal,
+  }) {
+    for (final item in jadwal) {
+      if (!item.matches(kelas: kelas, mataKuliah: mataKuliah)) continue;
+      final day = _isoDay(item.hari);
+      if (tanggal != null && day != null && day != tanggal.weekday) continue;
+      return item;
     }
     return null;
   }

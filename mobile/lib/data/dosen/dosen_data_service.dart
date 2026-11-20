@@ -8,6 +8,7 @@ import '../../models/dosen/attendance_status.dart';
 import '../../models/dosen/attendance_summary.dart';
 import '../../models/dosen/dosen_dashboard.dart';
 import '../../models/dosen/lecturer_profile.dart';
+import '../../models/dosen/matkul_option.dart';
 import 'dummy_lecturer_auth_repository.dart';
 import 'lecturer_dummy_data.dart';
 
@@ -61,6 +62,32 @@ class DosenDataService {
       throw Exception(_extractError(res, 'Gagal memuat ringkasan kehadiran'));
     }
     return _demoDashboard();
+  }
+
+  /// `GET /dosen/matkul?kelas_id=...&tanggal=...`
+  /// Mata kuliah difilter server berdasarkan jadwal dosen untuk kelas + hari.
+  Future<List<MatkulOption>> loadMatkulOptions({
+    required String kelasId,
+    required DateTime tanggal,
+  }) async {
+    if (!lecturerAuthRepository.hasRemoteSession || kelasId.isEmpty) {
+      return const <MatkulOption>[];
+    }
+    final uri = Uri.parse('${ApiConfig.baseUrl}/dosen/matkul').replace(
+      queryParameters: {'kelas_id': kelasId, 'tanggal': _isoDate(tanggal)},
+    );
+    final res = await _client.get(uri, headers: _headers).timeout(_timeout);
+    if (res.statusCode == 200) {
+      final decoded = jsonDecode(res.body) as Map<String, dynamic>;
+      return (decoded['data'] as List<dynamic>? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map(MatkulOption.fromJson)
+          .toList(growable: false);
+    }
+    if (res.statusCode == 401) {
+      throw Exception('Sesi login berakhir. Silakan masuk ulang.');
+    }
+    throw Exception(_extractError(res, 'Gagal memuat mata kuliah'));
   }
 
   /// `GET /dosen/jadwal/{jadwal_id}/kehadiran?tanggal=...`

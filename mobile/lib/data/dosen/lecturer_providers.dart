@@ -4,6 +4,7 @@ import '../../models/dosen/attendance_session.dart';
 import '../../models/dosen/attendance_status.dart';
 import '../../models/dosen/dosen_dashboard.dart';
 import '../../models/dosen/lecturer_profile.dart';
+import '../../models/dosen/matkul_option.dart';
 import '../../models/dosen/student_attendance.dart';
 import 'dosen_data_service.dart';
 import 'lecturer_dummy_data.dart';
@@ -13,6 +14,17 @@ import 'lecturer_profile_preview.dart';
 final dosenDashboardProvider = FutureProvider<DosenDashboard>((ref) {
   return dosenDataService.loadDashboard();
 });
+
+/// Opsi mata kuliah dari backend, bergantung pada kelas + tanggal.
+final dosenMatkulProvider =
+    FutureProvider.family<List<MatkulOption>, ({String kelasId, DateTime tanggal})>(
+  (ref, query) {
+    return dosenDataService.loadMatkulOptions(
+      kelasId: query.kelasId,
+      tanggal: query.tanggal,
+    );
+  },
+);
 
 /// Jadwal & tanggal yang dipilih di halaman Cek Daftar Presensi.
 class AttendanceQuery {

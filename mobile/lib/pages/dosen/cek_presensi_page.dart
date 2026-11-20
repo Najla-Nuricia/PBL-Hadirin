@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../data/dosen/lecturer_providers.dart';
 import '../../data/dosen/presensi_options.dart';
+import '../../models/dosen/dosen_dashboard.dart';
+import '../../models/dosen/matkul_option.dart';
 import '../../routing/lecturer_route_paths.dart';
 import 'widgets/attendance_counts_card.dart';
 
@@ -30,6 +32,24 @@ class _CekPresensiPageState extends ConsumerState<CekPresensiPage> {
   String _mataKuliah = lecturerMataKuliahOptions.first;
   DateTime _tanggal = DateTime.now();
   bool _tanggalDipilih = false;
+  MatkulOption? _selectedMatkul;
+
+  bool _isDemo(DosenDashboard? dashboard) =>
+      dashboard == null || dashboard.isDemo || dashboard.jadwal.isEmpty;
+
+  String _kelasId(DosenDashboard? dashboard) =>
+      _isDemo(dashboard) ? '' : (dashboard!.kelasIdFor(_kelas) ?? '');
+
+  List<MatkulOption> _apiOptions(DosenDashboard? dashboard) {
+    if (_isDemo(dashboard)) return const <MatkulOption>[];
+    return ref
+            .read(dosenMatkulProvider((
+              kelasId: _kelasId(dashboard),
+              tanggal: _tanggal,
+            )))
+            .value ??
+        const <MatkulOption>[];
+  }
 
   /// Opsi backend dipakai bila tersedia, opsi demo tetap menjadi fallback.
   List<String> get _kelasOptions {
@@ -37,9 +57,47 @@ class _CekPresensiPageState extends ConsumerState<CekPresensiPage> {
     return {...backend, _kelas}.toList();
   }
 
-  List<String> get _mataKuliahOptions {
-    final backend = ref.watch(dosenDashboardProvider).value?.mataKuliahOptions ?? const <String>[];
-    return {...backend, _mataKuliah}.toList();
+  /// Nama mata kuliah dari endpoint `/dosen/matkul`; fallback ke jadwal
+  /// dashboard saat endpoint belum merespons / mode demo.
+  List<String> _courseNames({
+    required DosenDashboard? dashboard,
+    required List<MatkulOption> apiOptions,
+  }) {
+    if (_isDemo(dashboard)) return lecturerMataKuliahOptions;
+    if (apiOptions.isNotEmpty) {
+      return apiOptions.map((m) => m.nama).where((n) => n.isNotEmpty).toList();
+    }
+    return dashboard!.mataKuliahOptionsFor(kelas: _kelas, tanggal: _tanggal);
+  }
+
+  List<String> _mataKuliahItems({
+    required DosenDashboard? dashboard,
+    required List<MatkulOption> apiOptions,
+  }) {
+    final names = _courseNames(dashboard: dashboard, apiOptions: apiOptions);
+    if (names.isEmpty) return [_mataKuliah];
+    return {_mataKuliah, ...names}.toList();
+  }
+
+  void _selectMatkul(String nama, List<MatkulOption> apiOptions) {
+    _mataKuliah = nama;
+    for (final option in apiOptions) {
+      if (option.nama == nama) {
+        _selectedMatkul = option;
+        return;
+      }
+    }
+    _selectedMatkul = null;
+  }
+
+  /// Reset pilihan saat kelas/tanggal berubah.
+  void _syncMataKuliah() {
+    final dashboard = ref.read(dosenDashboardProvider).value;
+    final apiOptions = _apiOptions(dashboard);
+    final names = _courseNames(dashboard: dashboard, apiOptions: apiOptions);
+    if (names.isNotEmpty && !names.contains(_mataKuliah)) {
+      setState(() => _selectMatkul(names.first, apiOptions));
+    }
   }
 
   void _back() {
@@ -67,6 +125,7 @@ class _CekPresensiPageState extends ConsumerState<CekPresensiPage> {
       setState(() {
         _tanggal = picked;
         _tanggalDipilih = true;
+        _syncMataKuliah();
       });
     }
   }
@@ -79,21 +138,29 @@ class _CekPresensiPageState extends ConsumerState<CekPresensiPage> {
     }
 
     final dashboard = dashboardAsync.value;
+    final apiOptions = _apiOptions(dashboard);
+    var selected = _selectedMatkul;
+    if (selected == null) {
+      for (final option in apiOptions) {
+        if (option.nama == _mataKuliah) {
+          selected = option;
+          break;
+        }
+      }
+    }
     final jadwal = dashboard?.findJadwal(
       kelas: _kelas,
       mataKuliah: _mataKuliah,
+      tanggal: _tanggal,
     );
-    if (dashboard != null &&
-        !dashboard.isDemo &&
-        dashboard.jadwal.isNotEmpty &&
-        jadwal == null) {
+    if (!_isDemo(dashboard) && jadwal == null && selected == null) {
       _showMessage('Jadwal untuk pilihan ini tidak ditemukan.');
       return;
     }
 
     ref.read(attendanceQueryProvider.notifier).select(
           AttendanceQuery(
-            jadwalId: jadwal?.jadwalId ?? 'demo',
+            jadwalId: selected?.jadwalId ?? jadwal?.jadwalId ?? 'demo',
             // Tanpa pilihan tanggal, backend memakai sesi terakhir jadwal.
             tanggal: _tanggalDipilih ? _tanggal : null,
           ),
@@ -115,6 +182,25 @@ class _CekPresensiPageState extends ConsumerState<CekPresensiPage> {
     final cs = Theme.of(context).colorScheme;
     final dashboard = ref.watch(dosenDashboardProvider).value;
     final ringkasan = dashboard?.summary;
+    final kelasId = _kelasId(dashboard);
+    final matkulQuery = (kelasId: kelasId, tanggal: _tanggal);
+    final matkulAsync = ref.watch(dosenMatkulProvider(matkulQuery));
+
+    ref.listen(dosenMatkulProvider(matkulQuery), (previous, next) {
+      final items = next.value;
+      if (items == null || items.isEmpty || !mounted) return;
+      if (!items.any((m) => m.nama == _mataKuliah)) {
+        setState(() => _selectMatkul(items.first.nama, items));
+      } else {
+        _selectedMatkul = items.firstWhere((m) => m.nama == _mataKuliah);
+      }
+    });
+
+    final apiOptions = matkulAsync.value ?? const <MatkulOption>[];
+    final mataKuliahItems = _mataKuliahItems(
+      dashboard: dashboard,
+      apiOptions: apiOptions,
+    );
 
     return Scaffold(
       backgroundColor: cs.surfaceContainerHighest,
@@ -163,7 +249,11 @@ class _CekPresensiPageState extends ConsumerState<CekPresensiPage> {
                     icon: Icons.school_outlined,
                     value: _kelas,
                     items: _kelasOptions,
-                    onChanged: (v) => setState(() => _kelas = v!),
+                    onChanged: (v) => setState(() {
+                      _kelas = v!;
+                      _selectedMatkul = null;
+                      _syncMataKuliah();
+                    }),
                   ),
                   const SizedBox(height: 16),
                   const _Label('Tanggal'),
@@ -173,8 +263,10 @@ class _CekPresensiPageState extends ConsumerState<CekPresensiPage> {
                   _SelectBox(
                     icon: Icons.calendar_today_outlined,
                     value: _mataKuliah,
-                    items: _mataKuliahOptions,
-                    onChanged: (v) => setState(() => _mataKuliah = v!),
+                    items: mataKuliahItems,
+                    onChanged: (v) => setState(() {
+                      _selectMatkul(v!, apiOptions);
+                    }),
                   ),
                   const SizedBox(height: 20),
                   _SummaryCard(
