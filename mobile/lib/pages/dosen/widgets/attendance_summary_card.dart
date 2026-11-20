@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../models/dosen/attendance_session.dart';
 import '../../../models/dosen/date_id.dart';
 import '../../../theme/style/lecturer_style.dart';
+import 'attendance_counts_card.dart';
 import 'section_card.dart';
 
 class AttendanceSummaryCard extends StatelessWidget {
@@ -14,30 +15,44 @@ class AttendanceSummaryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return SectionCard(
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: scheme.primaryContainer,
-              borderRadius: BorderRadius.circular(LecturerStyle.controlRadius),
-            ),
-            child: Icon(Icons.groups_outlined, color: scheme.primary),
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: scheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(LecturerStyle.controlRadius),
+                ),
+                child: Icon(Icons.groups_outlined, color: scheme.primary),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (session.courseName != null)
+                      _Line(label: 'Mata Kuliah', value: session.courseName!),
+                    _Line(label: 'Kelas', value: session.className),
+                    const SizedBox(height: 2),
+                    _Line(label: 'Tanggal', value: formatDateId(session.date)),
+                    const SizedBox(height: 2),
+                    _Line(
+                      label: 'Total Mahasiswa',
+                      value: '${session.ringkasan.total}',
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _Line(label: 'Kelas', value: session.className),
-                const SizedBox(height: 2),
-                _Line(label: 'Tanggal', value: formatDateId(session.date)),
-                const SizedBox(height: 2),
-                _Line(label: 'Total Mahasiswa', value: '${session.total}'),
-              ],
-            ),
-          ),
+          if (session.students.isNotEmpty) ...[
+            const Divider(height: 20),
+            AttendanceCountsView(summary: session.ringkasan),
+          ],
         ],
       ),
     );

@@ -23,7 +23,7 @@ class StudentDetailPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
     final student = ref.watch(studentByIdProvider(studentId));
-    final session = ref.watch(attendanceSessionProvider);
+    final session = ref.watch(attendanceSessionProvider).value;
     final decision = ref.watch(leaveDecisionProvider)[studentId];
 
     return Scaffold(
@@ -68,7 +68,10 @@ class StudentDetailPage extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    PresenceInfoCard(student: student, date: session.date),
+                    PresenceInfoCard(
+                      student: student,
+                      date: session?.date ?? DateTime.now(),
+                    ),
                     if (student.document != null) ...[
                       const SizedBox(height: 12),
                       SupportingDocumentCard(
