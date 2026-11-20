@@ -29,12 +29,33 @@ class StudentAttendanceRecord {
     required this.courseName,
     required this.time,
     required this.status,
+    this.kehadiranId,
+    this.dokumenUrl,
+    this.dokumenPath,
+    this.jenisPengajuan,
+    this.statusPengajuan,
   });
 
   final String date;
   final String courseName;
   final String time;
   final AttendanceStatus status;
+  final String? kehadiranId;
+
+  /// Signed URL surat yang diunggah mahasiswa lewat pengajuan.
+  final String? dokumenUrl;
+  final String? dokumenPath;
+  final String? jenisPengajuan;
+  final String? statusPengajuan;
+
+  bool get hasDocument =>
+      dokumenUrl != null && dokumenUrl!.trim().isNotEmpty;
+
+  String get documentName {
+    final raw = dokumenPath ?? '';
+    final name = raw.split(RegExp(r'[/\\]')).last;
+    return name.isEmpty ? 'Surat keterangan' : name;
+  }
 }
 
 const dummyAttendanceRecords = [
