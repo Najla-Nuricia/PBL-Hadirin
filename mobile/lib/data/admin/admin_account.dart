@@ -4,6 +4,7 @@ class AdminAccount {
     required this.username,
     required this.name,
     required this.role,
+    this.email = '',
     this.token,
     this.expiresIn,
   });
@@ -11,6 +12,7 @@ class AdminAccount {
   final String username;
   final String name;
   final String role;
+  final String email;
   final String? token;
   final int? expiresIn;
 

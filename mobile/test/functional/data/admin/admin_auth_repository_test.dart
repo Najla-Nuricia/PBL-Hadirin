@@ -97,6 +97,41 @@ void main() {
     expect(requests.last.path, '/auth/admin/me');
   });
 
+  test('email dan kata sandi admin dapat diperbarui pada sesi', () async {
+    final repository = AdminAuthRepository(
+      httpClient: MockClient((_) async => http.Response('', 400)),
+    );
+    await repository.login(username: 'admin', password: '123');
+
+    repository.updateEmail('admin.baru@hadirin.polinema.ac.id');
+    expect(
+      repository.currentAccount?.email,
+      'admin.baru@hadirin.polinema.ac.id',
+    );
+
+    expect(
+      repository.changePassword(
+        currentPassword: 'salah',
+        newPassword: 'rahasia123',
+      ),
+      isFalse,
+    );
+    expect(
+      repository.changePassword(
+        currentPassword: '123',
+        newPassword: 'rahasia123',
+      ),
+      isTrue,
+    );
+    expect(
+      repository.changePassword(
+        currentPassword: '123',
+        newPassword: 'rahasia456',
+      ),
+      isFalse,
+    );
+  });
+
   test('fallback demo tetap tersedia untuk QA offline', () async {
     final repository = AdminAuthRepository(
       allowDemoFallback: true,

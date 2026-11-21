@@ -40,6 +40,7 @@ class AdminAuthRepository extends ChangeNotifier {
     username: demoUsername,
     name: 'Administrator',
     role: 'Admin',
+    email: 'admin@hadirin.polinema.ac.id',
   );
 
   static const _requestTimeout = Duration(seconds: 8);
@@ -54,6 +55,7 @@ class AdminAuthRepository extends ChangeNotifier {
 
   String? currentAccessToken;
   AdminAccount? _currentAccount;
+  String? _currentPassword;
 
   AdminAccount? get currentAccount => _currentAccount;
   bool get hasRemoteSession => useRemoteApi && currentAccessToken != null;
@@ -102,10 +104,14 @@ class AdminAuthRepository extends ChangeNotifier {
               username: (data['username'] as String?) ?? identifier,
               name: (data['name'] as String?) ?? 'Administrator',
               role: (data['role'] as String?) ?? 'Admin',
+              email:
+                  (data['email'] as String?) ??
+                  (identifier.contains('@') ? identifier.toLowerCase() : ''),
               token: token,
               expiresIn: (data['expires_in'] as num?)?.toInt(),
             );
             currentAccessToken = token;
+            _currentPassword = password;
             _currentAccount = account;
             notifyListeners();
             return account;
@@ -191,6 +197,7 @@ class AdminAuthRepository extends ChangeNotifier {
     await Future<void>.delayed(_demoLatency);
     if (identifier == demoUsername && password == demoPassword) {
       _currentAccount = demoAccount;
+      _currentPassword = password;
       currentAccessToken = null;
       notifyListeners();
       return demoAccount;
@@ -199,9 +206,42 @@ class AdminAuthRepository extends ChangeNotifier {
     return null;
   }
 
+  /// Update email admin pada profil aktif.
+  ///
+  /// Backend Hadirin belum menyediakan endpoint ubah email admin, jadi
+  /// perubahan disimpan di sesi aplikasi sampai endpoint tersedia.
+  void updateEmail(String email) {
+    final account = _currentAccount;
+    if (account == null) return;
+    _currentAccount = AdminAccount(
+      username: account.username,
+      name: account.name,
+      role: account.role,
+      email: email.trim(),
+      token: account.token,
+      expiresIn: account.expiresIn,
+    );
+    notifyListeners();
+  }
+
+  /// Ganti kata sandi admin. Mengembalikan false jika kata sandi saat ini
+  /// salah, true jika berhasil diperbarui pada sesi aplikasi.
+  bool changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) {
+    if (_currentPassword == null || _currentPassword != currentPassword) {
+      return false;
+    }
+    _currentPassword = newPassword;
+    notifyListeners();
+    return true;
+  }
+
   void _clearSession() {
     currentAccessToken = null;
     _currentAccount = null;
+    _currentPassword = null;
     notifyListeners();
   }
 

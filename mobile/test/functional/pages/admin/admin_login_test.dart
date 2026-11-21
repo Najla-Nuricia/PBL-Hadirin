@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/routing/admin_router.dart';
+import 'package:mobile/routing/student_router.dart';
 import 'package:mobile/theme/app_theme.dart';
 
 void main() {
@@ -39,7 +40,8 @@ void main() {
     expect(find.text('Dosen'), findsOneWidget);
     expect(find.text('Kelas'), findsOneWidget);
     expect(find.text('Ruangan'), findsOneWidget);
-    expect(find.text('Tambah Jadwal'), findsOneWidget);
+    expect(find.text('Akun'), findsOneWidget);
+    expect(find.text('Tambah Jadwal'), findsNothing);
 
     await tester.tap(find.text('Jadwal'));
     await tester.pumpAndSettle();
@@ -48,11 +50,39 @@ void main() {
       AdminRoutePaths.jadwal,
     );
 
-    await tester.tap(find.text('Tambah Jadwal'));
+    await tester.tap(find.byTooltip('Tambah Jadwal'));
     await tester.pumpAndSettle();
     expect(
       router.routeInformationProvider.value.uri.path,
       AdminRoutePaths.tambahJadwal,
     );
+  });
+
+  testWidgets('student router admin shell memetakan tab dengan benar', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final router = createStudentRouter();
+    await tester.pumpWidget(
+      MaterialApp.router(routerConfig: router, theme: AppTheme.light),
+    );
+    await tester.pumpAndSettle();
+
+    router.go(AdminRoutePaths.jadwal);
+    await tester.pumpAndSettle();
+    expect(find.text('Daftar Jadwal'), findsOneWidget);
+
+    await tester.tap(find.text('Akun'));
+    await tester.pumpAndSettle();
+    expect(
+      router.routeInformationProvider.value.uri.path,
+      AdminRoutePaths.akun,
+    );
+    expect(find.text('Informasi Akun'), findsOneWidget);
+    expect(find.text('Daftar Jadwal'), findsNothing);
   });
 }
