@@ -1,6 +1,8 @@
 import 'package:go_router/go_router.dart';
 
+import '../pages/admin/admin_change_password_page.dart';
 import '../pages/admin/admin_navigation_shell.dart';
+import '../pages/admin/admin_profile_page.dart';
 import '../pages/admin/auth/admin_login_page.dart';
 import '../pages/admin/data_academic_page.dart';
 import '../pages/admin/jadwal_list_page.dart';
@@ -37,6 +39,14 @@ GoRouter createAdminRouter({bool showOnboarding = false}) => GoRouter(
     GoRoute(
       path: AdminRoutePaths.login,
       builder: (context, state) => const AdminLoginPage(),
+    ),
+    GoRoute(
+      path: AdminRoutePaths.tambahJadwal,
+      builder: (context, state) => const TambahJadwalPage(),
+    ),
+    GoRoute(
+      path: AdminRoutePaths.changePassword,
+      builder: (context, state) => const AdminChangePasswordPage(),
     ),
     GoRoute(
       path: AdminRoutePaths.tahunAjaran,
@@ -83,16 +93,16 @@ GoRouter createAdminRouter({bool showOnboarding = false}) => GoRouter(
         StatefulShellBranch(
           routes: [
             GoRoute(
-              path: AdminRoutePaths.tambahJadwal,
-              builder: (context, state) => const TambahJadwalPage(),
+              path: AdminRoutePaths.jadwal,
+              builder: (context, state) => const JadwalListPage(),
             ),
           ],
         ),
         StatefulShellBranch(
           routes: [
             GoRoute(
-              path: AdminRoutePaths.jadwal,
-              builder: (context, state) => const JadwalListPage(),
+              path: AdminRoutePaths.akun,
+              builder: (context, state) => const AdminProfilePage(),
             ),
           ],
         ),

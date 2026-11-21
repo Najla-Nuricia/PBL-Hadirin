@@ -11,4 +11,6 @@ abstract final class AdminRoutePaths {
   static const mataKuliah = '/admin/mata-kuliah';
   static const tambahMataKuliah = '/admin/mata-kuliah/tambah';
   static const tambahDosen = '/admin/dosen/tambah';
+  static const akun = '/admin/akun';
+  static const changePassword = '/admin/akun/ubah-kata-sandi';
 }

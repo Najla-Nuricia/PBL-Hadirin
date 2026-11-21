@@ -73,6 +73,11 @@ class _JadwalListPageState extends State<JadwalListPage> {
 
     return Scaffold(
       backgroundColor: colorScheme.surfaceContainerHighest,
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => context.go(AdminRoutePaths.tambahJadwal),
+        tooltip: 'Tambah Jadwal',
+        child: const Icon(Icons.add),
+      ),
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -90,7 +95,7 @@ class _JadwalListPageState extends State<JadwalListPage> {
                   );
 
                   return ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
                     children: [
                       _buildFilterCard(colorScheme),
                       const SizedBox(height: 16),

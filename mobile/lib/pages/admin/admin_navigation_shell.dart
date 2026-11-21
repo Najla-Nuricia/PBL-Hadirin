@@ -3,13 +3,23 @@ import 'package:go_router/go_router.dart';
 
 import '../../theme/style/navbar_style.dart';
 
+/// Bottom navigation Admin: Beranda, Jadwal, Akun.
+/// Tombol Tambah Jadwal tidak berada di sini — hanya di halaman Jadwal.
 const _adminNavbarItems = [
-  (icon: Icons.home_outlined, selectedIcon: Icons.home, label: 'Beranda'),
-  (icon: Icons.add, selectedIcon: Icons.add, label: 'Tambah Jadwal'),
+  (
+    icon: Icons.home_outlined,
+    selectedIcon: Icons.home,
+    label: 'Beranda',
+  ),
   (
     icon: Icons.calendar_month_outlined,
     selectedIcon: Icons.calendar_month,
     label: 'Jadwal',
+  ),
+  (
+    icon: Icons.person_outline,
+    selectedIcon: Icons.person,
+    label: 'Akun',
   ),
 ];
 
@@ -68,37 +78,18 @@ class _AdminBottomNavigationBar extends StatelessWidget {
         padding: EdgeInsets.only(bottom: bottomInset),
         child: SizedBox(
           height: NavbarStyle.navbarHeight,
-          child: Stack(
-            clipBehavior: Clip.none,
+          child: Row(
             children: [
-              Row(
-                children: [
-                  for (var index = 0; index < _adminNavbarItems.length; index++)
-                    Expanded(
-                      child: index == 1
-                          ? _AdminCenterNavbarLabel(
-                              label: _adminNavbarItems[index].label,
-                              onTap: () => onTap(index),
-                            )
-                          : _AdminNavbarItem(
-                              icon: _adminNavbarItems[index].icon,
-                              selectedIcon:
-                                  _adminNavbarItems[index].selectedIcon,
-                              label: _adminNavbarItems[index].label,
-                              selected: currentIndex == index,
-                              onTap: () => onTap(index),
-                            ),
-                    ),
-                ],
-              ),
-              Positioned(
-                top: -12,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: _AdminCenterNavbarButton(onTap: () => onTap(1)),
+              for (var index = 0; index < _adminNavbarItems.length; index++)
+                Expanded(
+                  child: _AdminNavbarItem(
+                    icon: _adminNavbarItems[index].icon,
+                    selectedIcon: _adminNavbarItems[index].selectedIcon,
+                    label: _adminNavbarItems[index].label,
+                    selected: currentIndex == index,
+                    onTap: () => onTap(index),
+                  ),
                 ),
-              ),
             ],
           ),
         ),
@@ -143,72 +134,6 @@ class _AdminNavbarItem extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _AdminCenterNavbarLabel extends StatelessWidget {
-  const _AdminCenterNavbarLabel({required this.label, required this.onTap});
-
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return InkWell(
-      onTap: onTap,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const SizedBox(height: 23),
-          Text(
-            label,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: colorScheme.onSurfaceVariant,
-              fontSize: 9,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AdminCenterNavbarButton extends StatelessWidget {
-  const _AdminCenterNavbarButton({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(13),
-        child: Ink(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: colorScheme.primary,
-            borderRadius: BorderRadius.circular(13),
-            boxShadow: [
-              BoxShadow(
-                color: colorScheme.primary.withValues(alpha: 0.25),
-                blurRadius: 8,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Icon(Icons.add, color: colorScheme.onPrimary, size: 28),
-        ),
       ),
     );
   }
