@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/mhs/dummy_student_auth_repository.dart';
+import '../../data/mhs/schedule_reminder_service.dart';
 import '../../data/mhs/student_account.dart';
 import '../../data/mhs/student_attendance.dart';
 import '../../data/mhs/student_data_service.dart';
@@ -113,6 +114,11 @@ class _BerandaPageState extends State<BerandaPage> {
           _alarmToggles.putIfAbsent(i, () => loadedSchedules[i].hasAlarm);
         }
       });
+      try {
+        await _restoreAlarmStates();
+      } catch (_) {
+        // Notifikasi tidak tersedia (mis. emulator/test): UI tetap tampil.
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -120,6 +126,61 @@ class _BerandaPageState extends State<BerandaPage> {
         _loadError = e.toString().replaceFirst('Exception: ', '');
       });
     }
+  }
+
+  /// Terapkan preferensi alarm yang tersimpan, lalu jadwalkan ulang.
+  Future<void> _restoreAlarmStates() async {
+    final states = await scheduleReminderService.loadEnabledStates();
+    for (var i = 0; i < _schedules.length; i++) {
+      final key = ScheduleReminderService.idFor(_schedules[i]).toString();
+      final saved = states[key];
+      if (saved != null) _alarmToggles[i] = saved;
+    }
+    if (!mounted) return;
+    await scheduleReminderService.sync(_schedules, _alarmToggles);
+  }
+
+  Future<void> _onAlarmToggle(int index, bool value) async {
+    setState(() => _alarmToggles[index] = value);
+    try {
+      await scheduleReminderService.saveEnabledState(
+        ScheduleReminderService.idFor(_schedules[index]),
+        value,
+      );
+      await scheduleReminderService.sync(_schedules, _alarmToggles);
+    } catch (_) {
+      _showAlarmError();
+    }
+  }
+
+  /// Tombol uji: bunyikan notifikasi + tampilkan banner tanpa tunggu 30 menit.
+  Future<void> _fireTestReminder() async {
+    final schedule = _schedules.isEmpty ? dummySchedules.first : _schedules.first;
+    try {
+      await scheduleReminderService.showTestReminder(schedule);
+    } catch (_) {
+      _showAlarmError();
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      _reminder = ClassReminder(
+        message: '${ScheduleReminderService.leadMinutes} menit lagi!',
+        courseName: schedule.courseName,
+        time: schedule.startTime,
+        room: schedule.room,
+      );
+      _showReminder = true;
+    });
+  }
+
+  void _showAlarmError() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Alarm tidak dapat diatur pada perangkat ini.'),
+      ),
+    );
   }
 
   @override
@@ -176,9 +237,14 @@ class _BerandaPageState extends State<BerandaPage> {
                         )
                       else ...[ 
                       if (_showReminder && _reminder != null)
-                        _ReminderBanner(
-                          reminder: _reminder!,
-                          onDismiss: () => setState(() => _showReminder = false),
+                        Semantics(
+                          label: 'Pengingat kelas',
+                          child: _ReminderBanner(
+                            reminder: _reminder!,
+                            onDismiss: () =>
+                                setState(() => _showReminder = false),
+                            onTest: _fireTestReminder,
+                          ),
                         ),
                       if (_showReminder && _reminder != null)
                         const SizedBox(height: 12),
@@ -198,8 +264,7 @@ class _BerandaPageState extends State<BerandaPage> {
                         onDaySelected: (day) =>
                             setState(() => _selectedDay = day),
                         alarmToggles: _alarmToggles,
-                        onAlarmToggle: (index, val) =>
-                            setState(() => _alarmToggles[index] = val),
+                        onAlarmToggle: _onAlarmToggle,
                       ),
                     ], // end else
                     ],
@@ -277,10 +342,15 @@ class _BerandaPageState extends State<BerandaPage> {
 // Reminder Banner
 // ─────────────────────────────────────────────────────────
 class _ReminderBanner extends StatelessWidget {
-  const _ReminderBanner({required this.reminder, required this.onDismiss});
+  const _ReminderBanner({
+    required this.reminder,
+    required this.onDismiss,
+    required this.onTest,
+  });
 
   final ClassReminder reminder;
   final VoidCallback onDismiss;
+  final VoidCallback onTest;
 
   @override
   Widget build(BuildContext context) {
@@ -323,6 +393,18 @@ class _ReminderBanner extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+          IconButton(
+            tooltip: 'Uji alarm',
+            onPressed: onTest,
+            icon: Icon(
+              Icons.alarm_outlined,
+              color: colorScheme.onTertiaryContainer,
+              size: 18,
+            ),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+            visualDensity: VisualDensity.compact,
           ),
           GestureDetector(
             onTap: onDismiss,
