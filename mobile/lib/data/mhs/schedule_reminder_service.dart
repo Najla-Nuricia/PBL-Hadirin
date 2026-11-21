@@ -11,30 +11,50 @@ import 'student_schedule.dart';
 
 /// Alarm pengingat kelas: notifikasi OS + suara, 30 menit sebelum kelas.
 ///
-/// Toggle disimpan di SharedPreferences dan dijadwalkan ulang setiap kali
-/// halaman beranda memuat jadwal.
+/// - ID notifikasi turunan dari hari + jam + nama matkul (stabil lintas run).
+/// - Toggle disimpan di SharedPreferences dan dijadwalkan ulang tiap kali
+///   beranda memuat jadwal, sehingga alarm tetap berjalan walau app ditutup.
 class ScheduleReminderService {
   ScheduleReminderService({FlutterLocalNotificationsPlugin? plugin})
     : _plugin = plugin ?? FlutterLocalNotificationsPlugin();
 
   static const int leadMinutes = 30;
-  static const _channelId = 'class_reminders';
+
+  /// Channel di-version karena audio usage diubah ke `alarm`.
+  /// Channel Android tidak bisa diubah attribernya setelah dibuat.
+  static const _channelId = 'class_reminders_v2';
   static const _channelName = 'Pengingat Kelas';
-  static const _prefKey = 'schedule_reminder.enabled';
+  static const _prefKey = 'schedule_reminder.enabled.v2';
+  static const _scheduledIdsKey = 'schedule_reminder.scheduled_ids.v2';
   static const _testNotificationId = 999999;
 
   final FlutterLocalNotificationsPlugin _plugin;
   Future<void>? _initFuture;
 
-  Future<void> init() => _initFuture ??= _initialize();
+  Future<void> init() {
+    final pending = _initFuture;
+    if (pending != null) return pending;
+
+    final future = _initialize();
+    _initFuture = future;
+    // Gagal init tidak boleh mengunci retry di sesi berikutnya.
+    future.then(
+      (_) {},
+      onError: (Object _) {
+        if (identical(_initFuture, future)) _initFuture = null;
+      },
+    );
+    return future;
+  }
 
   Future<void> _initialize() async {
     tz_data.initializeTimeZones();
     try {
       tz.setLocalLocation(tz.getLocation('Asia/Jakarta'));
-    } catch (_) {
-      // Pakai zona lokal bawaan kalau database timezone tidak tersedia.
+    } catch (e) {
+      debugPrint('REMINDER_TZ_FALLBACK: $e');
     }
+
     await _plugin.initialize(
       settings: const InitializationSettings(
         android: AndroidInitializationSettings('@mipmap/ic_launcher'),
@@ -46,27 +66,52 @@ class ScheduleReminderService {
         ),
       ),
     );
-    await requestPermissions();
+    await requestNotificationPermission();
   }
 
-  /// Minta izin notifikasi (Android 13+) dan exact alarm (Android 12+).
-  Future<void> requestPermissions() async {
+  /// Izin notifikasi (Android 13+). Tidak boleh menggagalkan inisialisasi.
+  Future<void> requestNotificationPermission() async {
     if (kIsWeb || !Platform.isAndroid) return;
-    final android = _plugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
-    await android?.requestNotificationsPermission();
-    await android?.requestExactAlarmsPermission();
+    try {
+      final android = _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      await android?.requestNotificationsPermission();
+    } catch (e) {
+      debugPrint('REMINDER_NOTIF_PERMISSION: $e');
+    }
   }
 
-  /// ID stabil untuk satu jadwal: sama untuk hari yang sama lintas minggu.
-  static int idFor(StudentSchedule schedule) =>
-      Object.hash(schedule.dayOfWeek, schedule.startTime, schedule.courseName) &
-      0x3fffffff;
+  /// Izin exact alarm (Android 12+). Dipanggil hanya saat user menyalakan
+  /// alarm, karena plugin membuka halaman Settings untuk grant permission.
+  Future<void> requestExactAlarmPermission() async {
+    if (kIsWeb || !Platform.isAndroid) return;
+    try {
+      final android = _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      await android?.requestExactAlarmsPermission();
+    } catch (e) {
+      debugPrint('REMINDER_EXACT_PERMISSION: $e');
+    }
+  }
 
-  /// Kapan alarm harus berbunyi untuk kemunculan jadwal berikutnya.
-  ///
-  /// [now] bisa disuntik untuk keperluan test. Null jika jadwal tidak valid
-  /// atau waktunya sudah lewat hari ini.
+  /// ID deterministik (FNV-1a 32-bit) dari hari + jam + nama matkul.
+  /// Tidak bergantung pada implementasi [Object.hash] tiap versi Dart dan
+  /// tidak pernah bernilai 0.
+  static int idFor(StudentSchedule schedule) {
+    final key =
+        '${schedule.dayOfWeek}|${schedule.startTime}|'
+        '${schedule.courseName.trim().toLowerCase()}';
+    var hash = 2166136261;
+    for (final unit in key.codeUnits) {
+      hash ^= unit;
+      hash = (hash * 16777619) & 0xffffffff;
+    }
+    final id = hash & 0x3fffffff;
+    return id == 0 ? 1 : id;
+  }
+
+  /// Kapan alarm berbunyi untuk kemunculan jadwal berikutnya.
+  /// [now] bisa disuntik untuk test. Null jika jam invalid / sudah terlewat.
   static DateTime? nextReminderTime(
     StudentSchedule schedule, {
     DateTime? now,
@@ -77,11 +122,7 @@ class ScheduleReminderService {
     final current = now ?? DateTime.now();
 
     for (var offset = 0; offset <= 7; offset++) {
-      final day = DateTime(
-        current.year,
-        current.month,
-        current.day + offset,
-      );
+      final day = DateTime(current.year, current.month, current.day + offset);
       if (day.weekday != schedule.dayOfWeek) continue;
       final classStart = DateTime(
         day.year,
@@ -106,25 +147,22 @@ class ScheduleReminderService {
     return (hour, minute);
   }
 
-  /// Sinkronkan semua alarm: yang aktif dijadwalkan, yang mati dibatalkan.
+  /// Jadwalkan ulang semua alarm aktif. Alarm lama yang tidak lagi aktif
+  /// dibatalkan memakai daftar ID yang tersimpan.
   Future<void> sync(
     List<StudentSchedule> schedules,
-    Map<int, bool> enabledByIndex,
+    Set<int> enabledIds,
   ) async {
     await init();
     final exact = await _canScheduleExactly();
-    for (var i = 0; i < schedules.length; i++) {
-      final schedule = schedules[i];
+    final scheduled = <int>{};
+
+    for (final schedule in schedules) {
       final id = idFor(schedule);
-      if (enabledByIndex[i] != true) {
-        await _plugin.cancel(id: id);
-        continue;
-      }
+      if (!enabledIds.contains(id)) continue;
       final at = nextReminderTime(schedule);
-      if (at == null) {
-        await _plugin.cancel(id: id);
-        continue;
-      }
+      if (at == null) continue;
+
       final body = '$leadMinutes menit lagi: ${schedule.courseName} '
           'di ${schedule.room}';
       await _plugin.zonedSchedule(
@@ -138,14 +176,26 @@ class ScheduleReminderService {
             : AndroidScheduleMode.inexactAllowWhileIdle,
         payload: schedule.courseName,
       );
+      scheduled.add(id);
     }
+
+    final previous = await _loadScheduledIds();
+    for (final stale in previous.difference(scheduled)) {
+      await _plugin.cancel(id: stale);
+    }
+    await _saveScheduledIds(scheduled);
   }
 
   Future<bool> _canScheduleExactly() async {
     if (kIsWeb || !Platform.isAndroid) return true;
-    final android = _plugin.resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>();
-    return await android?.canScheduleExactNotifications() ?? false;
+    try {
+      final android = _plugin.resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+      return await android?.canScheduleExactNotifications() ?? false;
+    } catch (e) {
+      debugPrint('REMINDER_CAN_EXACT: $e');
+      return false;
+    }
   }
 
   /// Langsung bunyikan alarm (tombol uji di banner).
@@ -168,6 +218,7 @@ class ScheduleReminderService {
       importance: Importance.max,
       priority: Priority.high,
       category: AndroidNotificationCategory.alarm,
+      audioAttributesUsage: AudioAttributesUsage.alarm,
       playSound: true,
       enableVibration: true,
     ),
@@ -179,7 +230,7 @@ class ScheduleReminderService {
     ),
   );
 
-  // ── Persistensi toggle ─────────────────────────────────────────────────
+  // ── Persistensi ────────────────────────────────────────────────────────
 
   Future<Map<String, bool>> loadEnabledStates() async {
     final prefs = await SharedPreferences.getInstance();
@@ -191,7 +242,8 @@ class ScheduleReminderService {
         for (final entry in decoded.entries)
           if (entry.value is bool) entry.key: entry.value as bool,
       };
-    } catch (_) {
+    } catch (e) {
+      debugPrint('REMINDER_PREFS_READ: $e');
       return const <String, bool>{};
     }
   }
@@ -199,8 +251,30 @@ class ScheduleReminderService {
   Future<void> saveEnabledState(int id, bool enabled) async {
     final states = await loadEnabledStates();
     states[id.toString()] = enabled;
+    await _writeJson(_prefKey, states);
+  }
+
+  Future<Set<int>> _loadScheduledIds() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_prefKey, jsonEncode(states));
+    final raw = prefs.getString(_scheduledIdsKey);
+    if (raw == null || raw.isEmpty) return const <int>{};
+    try {
+      return (jsonDecode(raw) as List<dynamic>)
+          .whereType<num>()
+          .map((value) => value.toInt())
+          .toSet();
+    } catch (e) {
+      debugPrint('REMINDER_SCHEDULED_READ: $e');
+      return const <int>{};
+    }
+  }
+
+  Future<void> _saveScheduledIds(Set<int> ids) =>
+      _writeJson(_scheduledIdsKey, ids.toList());
+
+  Future<void> _writeJson(String key, Object value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(key, jsonEncode(value));
   }
 }
 

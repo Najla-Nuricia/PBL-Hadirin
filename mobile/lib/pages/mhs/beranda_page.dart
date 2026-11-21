@@ -20,7 +20,7 @@ class BerandaPage extends StatefulWidget {
 class _BerandaPageState extends State<BerandaPage> {
   int _selectedDay = DateTime.now().weekday;
 
-  final Map<int, bool> _alarmToggles = {};
+  final Map<int, bool> _alarmStates = {};
 
   bool _showReminder = true;
 
@@ -110,8 +110,9 @@ class _BerandaPageState extends State<BerandaPage> {
         _reminder = results[3] as ClassReminder?;
         _isLoading = false;
         _loadError = null;
-        for (var i = 0; i < loadedSchedules.length; i++) {
-          _alarmToggles.putIfAbsent(i, () => loadedSchedules[i].hasAlarm);
+        for (final schedule in loadedSchedules) {
+          final id = ScheduleReminderService.idFor(schedule);
+          _alarmStates.putIfAbsent(id, () => schedule.hasAlarm);
         }
       });
       try {
@@ -131,24 +132,30 @@ class _BerandaPageState extends State<BerandaPage> {
   /// Terapkan preferensi alarm yang tersimpan, lalu jadwalkan ulang.
   Future<void> _restoreAlarmStates() async {
     final states = await scheduleReminderService.loadEnabledStates();
-    for (var i = 0; i < _schedules.length; i++) {
-      final key = ScheduleReminderService.idFor(_schedules[i]).toString();
+    for (final schedule in _schedules) {
+      final key = ScheduleReminderService.idFor(schedule).toString();
       final saved = states[key];
-      if (saved != null) _alarmToggles[i] = saved;
+      if (saved != null) {
+        _alarmStates[ScheduleReminderService.idFor(schedule)] = saved;
+      }
     }
     if (!mounted) return;
-    await scheduleReminderService.sync(_schedules, _alarmToggles);
+    await scheduleReminderService.sync(_schedules, _enabledAlarmIds());
   }
 
-  Future<void> _onAlarmToggle(int index, bool value) async {
-    setState(() => _alarmToggles[index] = value);
+  Set<int> _enabledAlarmIds() =>
+      _alarmStates.entries.where((entry) => entry.value).map((e) => e.key).toSet();
+
+  Future<void> _onAlarmToggle(int scheduleId, bool value) async {
+    setState(() => _alarmStates[scheduleId] = value);
     try {
-      await scheduleReminderService.saveEnabledState(
-        ScheduleReminderService.idFor(_schedules[index]),
-        value,
-      );
-      await scheduleReminderService.sync(_schedules, _alarmToggles);
-    } catch (_) {
+      await scheduleReminderService.saveEnabledState(scheduleId, value);
+      if (value) {
+        await scheduleReminderService.requestExactAlarmPermission();
+      }
+      await scheduleReminderService.sync(_schedules, _enabledAlarmIds());
+    } catch (e) {
+      debugPrint('ALARM_SYNC_ERROR: $e');
       _showAlarmError();
     }
   }
@@ -158,7 +165,8 @@ class _BerandaPageState extends State<BerandaPage> {
     final schedule = _schedules.isEmpty ? dummySchedules.first : _schedules.first;
     try {
       await scheduleReminderService.showTestReminder(schedule);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('ALARM_TEST_ERROR: $e');
       _showAlarmError();
       return;
     }
@@ -263,7 +271,7 @@ class _BerandaPageState extends State<BerandaPage> {
                         schedules: _schedules,
                         onDaySelected: (day) =>
                             setState(() => _selectedDay = day),
-                        alarmToggles: _alarmToggles,
+                        alarmToggles: _alarmStates,
                         onAlarmToggle: _onAlarmToggle,
                       ),
                     ], // end else
@@ -664,7 +672,7 @@ class _ScheduleSection extends StatelessWidget {
   final int selectedDay;
   final ValueChanged<int> onDaySelected;
   final Map<int, bool> alarmToggles;
-  final void Function(int index, bool val) onAlarmToggle;
+  final void Function(int scheduleId, bool val) onAlarmToggle;
   final List<StudentSchedule>? schedules;
 
   static const _dayLabels = ['SEN', 'SEL', 'RAB', 'KAM', 'JUM', 'SAB', 'MIN'];
@@ -769,12 +777,17 @@ class _ScheduleSection extends StatelessWidget {
               ),
             )
           else
-            for (var i = 0; i < filteredSchedules.length; i++)
+            for (final schedule in filteredSchedules)
               _ScheduleItem(
-                schedule: filteredSchedules[i],
-                hasAlarm: alarmToggles[i] ?? false,
-                onAlarmToggle: (val) => onAlarmToggle(i, val),
-                isLast: i == filteredSchedules.length - 1,
+                schedule: schedule,
+                hasAlarm:
+                    alarmToggles[ScheduleReminderService.idFor(schedule)] ??
+                    false,
+                isLast: schedule == filteredSchedules.last,
+                onAlarmToggle: (val) => onAlarmToggle(
+                  ScheduleReminderService.idFor(schedule),
+                  val,
+                ),
               ),
         ],
       ),

@@ -29,7 +29,7 @@ void main() {
       expect(result, DateTime(2026, 12, 2, 7, 30));
     });
 
-    test('null untuk format jam invalid', () {
+    test('null untuk jam di luar rentang', () {
       const invalid = StudentSchedule(
         courseName: 'Pemrograman Web',
         startTime: '25:99',
@@ -45,6 +45,43 @@ void main() {
         ),
         isNull,
       );
+    });
+  });
+
+  group('idFor', () {
+    test('stabil untuk jadwal yang sama', () {
+      expect(
+        ScheduleReminderService.idFor(schedule),
+        ScheduleReminderService.idFor(schedule),
+      );
+    });
+
+    test('berbeda untuk jam atau matkul berbeda', () {
+      final otherTime = StudentSchedule(
+        courseName: schedule.courseName,
+        startTime: '09:00',
+        endTime: schedule.endTime,
+        room: schedule.room,
+        lecturerName: schedule.lecturerName,
+        dayOfWeek: schedule.dayOfWeek,
+      );
+      final otherCourse = StudentSchedule(
+        courseName: 'Basis Data',
+        startTime: schedule.startTime,
+        endTime: schedule.endTime,
+        room: schedule.room,
+        lecturerName: schedule.lecturerName,
+        dayOfWeek: schedule.dayOfWeek,
+      );
+      expect(
+        ScheduleReminderService.idFor(schedule),
+        isNot(ScheduleReminderService.idFor(otherTime)),
+      );
+      expect(
+        ScheduleReminderService.idFor(schedule),
+        isNot(ScheduleReminderService.idFor(otherCourse)),
+      );
+      expect(ScheduleReminderService.idFor(schedule), greaterThan(0));
     });
   });
 }
