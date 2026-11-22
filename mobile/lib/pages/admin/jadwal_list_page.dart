@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../data/admin/admin_auth_repository.dart';
+import '../../data/admin/admin_jadwal_service.dart';
 import '../../data/admin/jadwal.dart';
 import '../../data/admin/tahun_ajaran.dart';
 import '../../routing/admin_route_paths.dart';
@@ -13,7 +15,10 @@ typedef _JadwalFilter = ({
 });
 
 class JadwalListPage extends StatefulWidget {
-  const JadwalListPage({super.key});
+  const JadwalListPage({super.key, this.service});
+
+  /// Service opsional untuk pengujian; default memakai backend Hadirin.
+  final AdminJadwalService? service;
 
   @override
   State<JadwalListPage> createState() => _JadwalListPageState();
@@ -26,6 +31,60 @@ class _JadwalListPageState extends State<JadwalListPage> {
   late int _tingkat = _appliedFilter.kelas.tingkat;
   late KelasKuliah _kelas = _appliedFilter.kelas;
   bool _isFilterExpanded = true;
+
+  List<JadwalKuliah> _remoteJadwal = const [];
+  bool _isRemoteLoading = false;
+  String? _remoteError;
+
+  AdminJadwalService get _service => widget.service ?? adminJadwalService;
+  bool get _usesRemote => adminAuthRepository.hasRemoteSession;
+
+  @override
+  void initState() {
+    super.initState();
+    _isRemoteLoading = _usesRemote;
+    if (_usesRemote) {
+      _fetchRemoteJadwal();
+    }
+  }
+
+  Future<void> _fetchRemoteJadwal() async {
+    try {
+      final items = await _service.listJadwal(
+        tahunAjaran: _appliedFilter.tahunAjaran,
+        semester: _appliedFilter.semester,
+        tingkat: _appliedFilter.kelas.tingkat,
+        kelas: _appliedFilter.kelas.nama,
+      );
+      if (!mounted) return;
+      setState(() {
+        _remoteJadwal = items;
+        _isRemoteLoading = false;
+        _remoteError = null;
+      });
+    } on AdminRemoteApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isRemoteLoading = false;
+        _remoteError = e.message;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isRemoteLoading = false;
+        _remoteError = 'Gagal memuat jadwal admin.';
+      });
+    }
+  }
+
+  Future<void> _refreshRemoteJadwal() async {
+    if (!_usesRemote) return;
+    setState(() {
+      _isRemoteLoading = true;
+      _remoteError = null;
+    });
+    await _fetchRemoteJadwal();
+  }
 
   static _JadwalFilter _defaultFilter() {
     final tahunAjaranList = tahunAjaranRepository.getAll();
@@ -57,6 +116,9 @@ class _JadwalListPageState extends State<JadwalListPage> {
         kelas: _kelas,
       );
     });
+    if (_usesRemote) {
+      _refreshRemoteJadwal();
+    }
   }
 
   void _changeTingkat(int? tingkat) {
@@ -85,47 +147,19 @@ class _JadwalListPageState extends State<JadwalListPage> {
           children: [
             _buildAppBar(colorScheme),
             Expanded(
-              child: ListenableBuilder(
-                listenable: jadwalRepository,
-                builder: (context, _) {
-                  final jadwalList = jadwalRepository.filter(
-                    tahunAjaran: _appliedFilter.tahunAjaran,
-                    semester: _appliedFilter.semester,
-                    kelasNama: _appliedFilter.kelas.nama,
-                  );
-
-                  return ListView(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
-                    children: [
-                      _buildFilterCard(colorScheme),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Kelas ${_appliedFilter.kelas.nama} · Semester '
-                        '${_appliedFilter.semester.label} '
-                        '${_appliedFilter.tahunAjaran}',
-                        style: TextStyle(
-                          color: colorScheme.onSurfaceVariant,
-                          fontSize: 12,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      if (jadwalList.isEmpty)
-                        _buildEmptyState(colorScheme)
-                      else
-                        for (final hari in HariKuliah.values)
-                          if (jadwalList.any((item) => item.hari == hari)) ...[
-                            _HariSection(
-                              hari: hari,
-                              jadwalList: jadwalList
-                                  .where((item) => item.hari == hari)
-                                  .toList(),
-                            ),
-                            const SizedBox(height: 10),
-                          ],
-                    ],
-                  );
-                },
-              ),
+              child: _usesRemote
+                  ? _buildRemoteBody(colorScheme)
+                  : ListenableBuilder(
+                      listenable: jadwalRepository,
+                      builder: (context, _) {
+                        final jadwalList = jadwalRepository.filter(
+                          tahunAjaran: _appliedFilter.tahunAjaran,
+                          semester: _appliedFilter.semester,
+                          kelasNama: _appliedFilter.kelas.nama,
+                        );
+                        return _buildScheduleList(colorScheme, jadwalList);
+                      },
+                    ),
             ),
           ],
         ),
@@ -156,6 +190,95 @@ class _JadwalListPageState extends State<JadwalListPage> {
               fontSize: 16,
               fontWeight: FontWeight.w700,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRemoteBody(ColorScheme colorScheme) {
+    return RefreshIndicator(
+      onRefresh: _refreshRemoteJadwal,
+      child: _buildScheduleList(
+        colorScheme,
+        _remoteJadwal,
+        isLoading: _isRemoteLoading,
+        errorMessage: _remoteError,
+      ),
+    );
+  }
+
+  Widget _buildScheduleList(
+    ColorScheme colorScheme,
+    List<JadwalKuliah> jadwalList, {
+    bool isLoading = false,
+    String? errorMessage,
+  }) {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
+      children: [
+        _buildFilterCard(colorScheme),
+        const SizedBox(height: 16),
+        if (isLoading)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 32),
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else if (errorMessage != null)
+          _buildErrorState(colorScheme, errorMessage)
+        else ...[
+          Text(
+            'Kelas ${_appliedFilter.kelas.nama} · Semester '
+            '${_appliedFilter.semester.label} '
+            '${_appliedFilter.tahunAjaran}',
+            style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12),
+          ),
+          const SizedBox(height: 8),
+          if (jadwalList.isEmpty)
+            _buildEmptyState(colorScheme)
+          else
+            for (final hari in HariKuliah.values)
+              if (jadwalList.any((item) => item.hari == hari)) ...[
+                _HariSection(
+                  hari: hari,
+                  jadwalList: jadwalList
+                      .where((item) => item.hari == hari)
+                      .toList(),
+                ),
+                const SizedBox(height: 10),
+              ],
+        ],
+      ],
+    );
+  }
+
+  Widget _buildErrorState(ColorScheme colorScheme, String message) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 32),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            Icons.cloud_off_outlined,
+            size: 40,
+            color: colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13),
+          ),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: _refreshRemoteJadwal,
+            icon: const Icon(Icons.refresh, size: 18),
+            label: const Text('Coba Lagi'),
           ),
         ],
       ),

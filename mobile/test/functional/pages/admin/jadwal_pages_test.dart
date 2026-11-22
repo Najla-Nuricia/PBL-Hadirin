@@ -1,7 +1,14 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:mobile/data/admin/admin_auth_repository.dart';
+import 'package:mobile/data/admin/admin_jadwal_service.dart';
 import 'package:mobile/data/admin/jadwal.dart';
+import 'package:mobile/pages/admin/jadwal_list_page.dart';
 import 'package:mobile/routing/admin_router.dart';
 import 'package:mobile/theme/app_theme.dart';
 
@@ -136,6 +143,67 @@ void main() {
       await tapVisible(tester, find.text('Tampilkan Jadwal'));
 
       expect(find.text('Belum ada jadwal untuk filter ini.'), findsOneWidget);
+    });
+
+    testWidgets('loads schedules from the admin backend for a remote session', (
+      tester,
+    ) async {
+      adminAuthRepository.currentAccessToken = 'jwt-admin';
+      addTearDown(adminAuthRepository.logout);
+
+      final service = AdminJadwalService(
+        tokenProvider: () => 'jwt-admin',
+        httpClient: MockClient((request) async {
+          expect(request.url.path, '/admin/jadwal');
+          expect(request.url.queryParameters['tahun_ajaran'], '2026/2027');
+          expect(request.url.queryParameters['semester'], 'ganjil');
+          expect(request.url.queryParameters['tingkat'], '3');
+          expect(request.url.queryParameters['kelas'], 'TI-3A');
+          return http.Response(
+            jsonEncode({
+              'data': [
+                {
+                  'id': 'jadwal-remote',
+                  'tahun_ajaran_id': 'ta-1',
+                  'tahun_ajaran': '2026/2027',
+                  'semester': 'ganjil',
+                  'hari': 'senin',
+                  'sesi_mulai': 2,
+                  'sesi_selesai': 3,
+                  'jam_mulai': '07:50',
+                  'jam_selesai': '09:30',
+                  'mata_kuliah_kode': 'TI501',
+                  'matkul_nama': 'Pemrograman Web Lanjut',
+                  'sks': 3,
+                  'dosen_nip': '198501012010121001',
+                  'dosen_nama': 'Budi Santoso, S.T., M.T.',
+                  'program_studi_kode': 'D4-TI',
+                  'prodi_nama': 'D4 Teknik Informatika',
+                  'kelas_id': 'kelas-1',
+                  'kelas_nama': 'TI-3A',
+                  'kelas_tingkat': 3,
+                  'ruangan_kode': 'J301',
+                  'ruangan_nama': 'Ruang J301',
+                },
+              ],
+              'total': 1,
+              'filters': {},
+            }),
+            200,
+            headers: {'Content-Type': 'application/json'},
+          );
+        }),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(home: JadwalListPage(service: service)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Pemrograman Web Lanjut'), findsOneWidget);
+      expect(find.text('07:50 – 09:30'), findsOneWidget);
+      expect(find.text('Ruang J301'), findsOneWidget);
+      expect(find.text('Budi Santoso, S.T., M.T.'), findsOneWidget);
     });
   });
 
