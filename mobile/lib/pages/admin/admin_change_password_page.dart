@@ -22,6 +22,7 @@ class _AdminChangePasswordPageState extends State<AdminChangePasswordPage> {
   bool _currentVisible = false;
   bool _newVisible = false;
   bool _confirmVisible = false;
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
@@ -31,19 +32,34 @@ class _AdminChangePasswordPageState extends State<AdminChangePasswordPage> {
     super.dispose();
   }
 
-  void _submit() {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _submit() async {
+    if (_isSubmitting || !_formKey.currentState!.validate()) return;
 
     FocusScope.of(context).unfocus();
-    final changed = adminAuthRepository.changePassword(
-      currentPassword: _currentController.text,
-      newPassword: _newController.text,
-    );
+    setState(() => _isSubmitting = true);
+    var changed = false;
+    String? errorMessage;
+    try {
+      changed = await adminAuthRepository.changePassword(
+        currentPassword: _currentController.text,
+        newPassword: _newController.text,
+        confirmPassword: _confirmController.text,
+      );
+    } on AdminRemoteApiException catch (e) {
+      errorMessage = e.message;
+    } catch (_) {
+      errorMessage = 'Gagal menghubungi server untuk mengubah kata sandi.';
+    }
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
 
     _showMessage(
-      changed ? 'Kata sandi berhasil diubah.' : 'Kata sandi saat ini salah.',
+      errorMessage ??
+          (changed
+              ? 'Kata sandi berhasil diubah.'
+              : 'Kata sandi saat ini salah.'),
     );
-    if (changed && mounted) {
+    if (changed) {
       _currentController.clear();
       _newController.clear();
       _confirmController.clear();
@@ -162,30 +178,33 @@ class _AdminChangePasswordPageState extends State<AdminChangePasswordPage> {
                         width: double.infinity,
                         height: 42,
                         child: FilledButton(
-                          onPressed: _submit,
+                          onPressed: _isSubmitting ? null : _submit,
                           style: FilledButton.styleFrom(
                             backgroundColor: colorScheme.primary,
                             foregroundColor: colorScheme.onPrimary,
+                            disabledBackgroundColor: colorScheme.primary
+                                .withValues(alpha: 0.4),
+                            disabledForegroundColor: colorScheme.onPrimary,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          child: const Text(
-                            'Simpan',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        'Perubahan berlaku untuk sesi ini. Backend Hadirin '
-                        'belum menyediakan endpoint ubah kata sandi admin.',
-                        style: TextStyle(
-                          color: colorScheme.onSurfaceVariant,
-                          fontSize: 11,
+                          child: _isSubmitting
+                              ? SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: colorScheme.onPrimary,
+                                  ),
+                                )
+                              : const Text(
+                                  'Simpan',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                         ),
                       ),
                     ],
@@ -250,7 +269,9 @@ class _AdminChangePasswordPageState extends State<AdminChangePasswordPage> {
             ),
             suffixIcon: IconButton(
               onPressed: () => onVisibilityChanged(!isVisible),
-              tooltip: isVisible ? 'Sembunyikan password' : 'Tampilkan password',
+              tooltip: isVisible
+                  ? 'Sembunyikan password'
+                  : 'Tampilkan password',
               icon: Icon(
                 isVisible
                     ? Icons.visibility_off_outlined
