@@ -1,11 +1,14 @@
 import 'package:go_router/go_router.dart';
 
+import '../data/mhs/dummy_student_auth_repository.dart';
 import '../data/mhs/student_account.dart';
-import '../data/mhs/student_profile_preview.dart';
+import '../pages/admin/admin_change_password_page.dart';
 import '../pages/admin/admin_navigation_shell.dart';
+import '../pages/admin/admin_profile_page.dart';
 import '../pages/admin/auth/admin_login_page.dart';
 import '../pages/admin/data_academic_page.dart';
 import '../pages/admin/jadwal_list_page.dart';
+import '../pages/admin/mata_kuliah_list_page.dart';
 import '../pages/admin/tahun_ajaran_list_page.dart';
 import '../pages/admin/tambah_jadwal_page.dart';
 import '../pages/admin/tambah_kelas_page.dart';
@@ -28,8 +31,8 @@ import '../pages/mhs/auth/student_login_page.dart';
 import '../pages/mhs/auth/student_register_page.dart';
 import '../pages/mhs/beranda_page.dart';
 import '../pages/mhs/change_password_page.dart';
-import '../pages/mhs/page_placeholder.dart';
-import '../pages/mhs/profile_page.dart';
+import '../pages/mhs/profil_page.dart';
+import '../pages/mhs/riwayat_page.dart';
 import '../pages/mhs/student_navigation_shell.dart';
 import '../pages/onboarding_page.dart';
 import '../pages/mhs/surat_page.dart';
@@ -127,6 +130,14 @@ GoRouter createStudentRouter({bool showOnboarding = false}) => GoRouter(
       builder: (context, state) => const AdminLoginPage(),
     ),
     GoRoute(
+      path: AdminRoutePaths.tambahJadwal,
+      builder: (context, state) => const TambahJadwalPage(),
+    ),
+    GoRoute(
+      path: AdminRoutePaths.changePassword,
+      builder: (context, state) => const AdminChangePasswordPage(),
+    ),
+    GoRoute(
       path: AdminRoutePaths.tahunAjaran,
       builder: (context, state) => const TahunAjaranListPage(),
       routes: [
@@ -143,6 +154,10 @@ GoRouter createStudentRouter({bool showOnboarding = false}) => GoRouter(
     GoRoute(
       path: AdminRoutePaths.tambahRuangan,
       builder: (context, state) => const TambahRuanganPage(),
+    ),
+    GoRoute(
+      path: AdminRoutePaths.mataKuliah,
+      builder: (context, state) => const MataKuliahListPage(),
     ),
     GoRoute(
       path: AdminRoutePaths.tambahMataKuliah,
@@ -167,16 +182,16 @@ GoRouter createStudentRouter({bool showOnboarding = false}) => GoRouter(
         StatefulShellBranch(
           routes: [
             GoRoute(
-              path: AdminRoutePaths.tambahJadwal,
-              builder: (context, state) => const TambahJadwalPage(),
+              path: AdminRoutePaths.jadwal,
+              builder: (context, state) => const JadwalListPage(),
             ),
           ],
         ),
         StatefulShellBranch(
           routes: [
             GoRoute(
-              path: AdminRoutePaths.jadwal,
-              builder: (context, state) => const JadwalListPage(),
+              path: AdminRoutePaths.akun,
+              builder: (context, state) => const AdminProfilePage(),
             ),
           ],
         ),
@@ -221,8 +236,7 @@ GoRouter createStudentRouter({bool showOnboarding = false}) => GoRouter(
           routes: [
             GoRoute(
               path: StudentRoutePaths.riwayat,
-              builder: (context, state) =>
-                  const StudentPagePlaceholder(title: 'Riwayat'),
+              builder: (context, state) => const RiwayatPage(),
             ),
           ],
         ),
@@ -246,11 +260,8 @@ GoRouter createStudentRouter({bool showOnboarding = false}) => GoRouter(
           routes: [
             GoRoute(
               path: StudentRoutePaths.profil,
-              builder: (context, state) => ProfilePage(
-                profile: studentProfilePreview,
-                onChangePassword: () =>
-                    context.push(StudentRoutePaths.changePassword),
-              ),
+              builder: (context, state) =>
+                  ProfilPage(account: studentAuthRepository.currentAccount ?? DummyStudentAuthRepository.demoAccount),
             ),
           ],
         ),
@@ -258,7 +269,8 @@ GoRouter createStudentRouter({bool showOnboarding = false}) => GoRouter(
     ),
     GoRoute(
       path: StudentRoutePaths.changePassword,
-      builder: (context, state) => const ChangePasswordPage(),
+      builder: (context, state) =>
+          ChangePasswordPage(nim: (studentAuthRepository.currentAccount ?? DummyStudentAuthRepository.demoAccount).nim),
     ),
   ],
 );

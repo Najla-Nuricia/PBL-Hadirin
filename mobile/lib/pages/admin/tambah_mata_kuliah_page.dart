@@ -1,20 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../data/admin/admin_auth_repository.dart';
+import '../../data/admin/admin_master_data_service.dart';
+import '../../data/admin/jadwal.dart';
 import '../../routing/admin_route_paths.dart';
 import 'widgets/labeled_fields.dart';
 
-const _programStudi = [
-  'D4 Teknik Informatika',
-  'D4 Sistem Informasi Bisnis',
-  'D2 Pengembangan Perangkat Lunak Situs',
-];
-const _statusOptions = ['Aktif', 'Non-Aktif'];
 const _sksOptions = ['1', '2', '3', '4'];
 const _semesterOptions = ['1', '2', '3', '4', '5', '6', '7', '8'];
 
 class TambahMataKuliahPage extends StatefulWidget {
-  const TambahMataKuliahPage({super.key});
+  const TambahMataKuliahPage({this.initialItem, super.key});
+
+  final MataKuliah? initialItem;
 
   @override
   State<TambahMataKuliahPage> createState() => _TambahMataKuliahPageState();
@@ -24,10 +23,22 @@ class _TambahMataKuliahPageState extends State<TambahMataKuliahPage> {
   final _formKey = GlobalKey<FormState>();
   final _kodeController = TextEditingController();
   final _namaController = TextEditingController();
+
   String _sks = '3';
-  String _prodi = _programStudi.first;
   String _semester = '3';
-  String _status = _statusOptions.first;
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final item = widget.initialItem;
+    if (item != null) {
+      _kodeController.text = item.kode;
+      _namaController.text = item.nama;
+      _sks = item.sks.toString();
+      _semester = item.semester.toString();
+    }
+  }
 
   @override
   void dispose() {
@@ -36,26 +47,55 @@ class _TambahMataKuliahPageState extends State<TambahMataKuliahPage> {
     super.dispose();
   }
 
-  void _back() {
+  Future<void> _save() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isSubmitting = true);
+    try {
+      if (widget.initialItem == null) {
+        await adminMasterDataService.createMataKuliah(
+          kode: _kodeController.text,
+          nama: _namaController.text,
+          semester: int.parse(_semester),
+          sks: int.parse(_sks),
+        );
+      } else {
+        await adminMasterDataService.updateMataKuliah(
+          originalKode: widget.initialItem!.kode,
+          kode: _kodeController.text,
+          nama: _namaController.text,
+          semester: int.parse(_semester),
+          sks: int.parse(_sks),
+        );
+      }
+    } on AdminRemoteApiException catch (error) {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        _showError(error.message);
+      }
+      return;
+    }
+
+    if (!mounted) return;
     if (context.canPop()) {
-      context.pop();
+      context.pop(true);
     } else {
-      context.go(AdminRoutePaths.dataAkademik);
+      context.go(AdminRoutePaths.mataKuliah);
     }
   }
 
-  void _save() {
-    if (!_formKey.currentState!.validate()) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Mata kuliah berhasil ditambahkan')),
-    );
-    _back();
+  void _showError(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
   Widget build(BuildContext context) {
     return AdminFormScaffold(
-      title: 'Tambah Mata Kuliah',
+      title: widget.initialItem == null
+          ? 'Tambah Mata Kuliah'
+          : 'Edit Mata Kuliah',
       form: Form(
         key: _formKey,
         child: Column(
@@ -86,31 +126,16 @@ class _TambahMataKuliahPageState extends State<TambahMataKuliahPage> {
             ),
             const SizedBox(height: 16),
             LabeledDropdown(
-              label: 'Program Studi',
+              label: 'Semester',
               required: true,
-              value: _prodi,
-              items: _programStudi,
-              onChanged: (value) => setState(() => _prodi = value),
-            ),
-            const SizedBox(height: 16),
-            LabeledDropdown(
-              label: 'Semester Saran',
               value: _semester,
               items: _semesterOptions,
               onChanged: (value) => setState(() => _semester = value),
             ),
-            const SizedBox(height: 16),
-            LabeledDropdown(
-              label: 'Status',
-              required: true,
-              value: _status,
-              items: _statusOptions,
-              onChanged: (value) => setState(() => _status = value),
-            ),
           ],
         ),
       ),
-      onSave: _save,
+      onSave: _isSubmitting ? null : _save,
     );
   }
 
@@ -130,7 +155,7 @@ class AdminFormScaffold extends StatelessWidget {
 
   final String title;
   final Widget form;
-  final VoidCallback onSave;
+  final VoidCallback? onSave;
 
   @override
   Widget build(BuildContext context) {
@@ -144,8 +169,9 @@ class AdminFormScaffold extends StatelessWidget {
         leading: IconButton(
           onPressed: () => context.canPop()
               ? context.pop()
-              : context.go(AdminRoutePaths.dataAkademik),
+              : context.go(AdminRoutePaths.mataKuliah),
           icon: Icon(Icons.arrow_back_ios_new_rounded, color: cs.primary),
+          tooltip: 'Kembali',
         ),
         title: Text(
           title,
@@ -180,7 +206,9 @@ class AdminFormScaffold extends StatelessWidget {
                 height: 48,
                 child: FilledButton(
                   onPressed: onSave,
-                  child: const Text('Simpan'),
+                  child: Text(
+                    title.startsWith('Edit') ? 'Simpan Perubahan' : 'Simpan',
+                  ),
                 ),
               ),
             ),

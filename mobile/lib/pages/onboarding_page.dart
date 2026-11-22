@@ -230,18 +230,12 @@ class _OnboardingButton extends StatelessWidget {
 
 class _OnboardingCircles extends StatelessWidget {
   const _OnboardingCircles({
-    this.size = 220,
     this.color = const Color(0xFF0870F8),
     this.alignment = Alignment.topLeft,
-    this.strokeWidth = 22,
-    this.filled = false,
   });
 
-  final double size;
   final Color color;
   final Alignment alignment;
-  final double strokeWidth;
-  final bool filled;
 
   @override
   Widget build(BuildContext context) {
@@ -249,11 +243,11 @@ class _OnboardingCircles extends StatelessWidget {
       alignment: alignment,
       child: IgnorePointer(
         child: CustomPaint(
-          size: Size.square(size),
+          size: const Size.square(220),
           painter: _CirclePatternPainter(
             color,
-            strokeWidth: strokeWidth,
-            filled: filled,
+            strokeWidth: 22,
+            filled: false,
           ),
         ),
       ),

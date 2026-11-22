@@ -4,6 +4,15 @@ import 'tahun_ajaran.dart';
 
 enum SemesterPeriode { ganjil, genap }
 
+enum MataKuliahStatus { aktif, nonAktif }
+
+extension MataKuliahStatusLabel on MataKuliahStatus {
+  String get label => switch (this) {
+    MataKuliahStatus.aktif => 'Aktif',
+    MataKuliahStatus.nonAktif => 'Non-Aktif',
+  };
+}
+
 extension SemesterPeriodeLabel on SemesterPeriode {
   String get label => switch (this) {
     SemesterPeriode.ganjil => defaultSemesterInfo.namaGanjil,
@@ -30,19 +39,44 @@ class MataKuliah {
     required this.nama,
     required this.semester,
     required this.sks,
+    this.id = '',
+    this.programStudiKode = 'D4-TI',
+    this.status = MataKuliahStatus.aktif,
   });
 
+  final String id;
   final String kode;
   final String nama;
 
   /// Semester kurikulum (1–8); ganjil/genap dan tingkat diturunkan dari sini.
   final int semester;
   final int sks;
+  final String programStudiKode;
+  final MataKuliahStatus status;
 
   SemesterPeriode get periode =>
       semester.isOdd ? SemesterPeriode.ganjil : SemesterPeriode.genap;
 
   int get tingkat => (semester + 1) ~/ 2;
+
+  MataKuliah copyWith({
+    String? kode,
+    String? nama,
+    int? semester,
+    int? sks,
+    String? programStudiKode,
+    MataKuliahStatus? status,
+  }) {
+    return MataKuliah(
+      id: id,
+      kode: kode ?? this.kode,
+      nama: nama ?? this.nama,
+      semester: semester ?? this.semester,
+      sks: sks ?? this.sks,
+      programStudiKode: programStudiKode ?? this.programStudiKode,
+      status: status ?? this.status,
+    );
+  }
 }
 
 class Dosen {
@@ -106,6 +140,94 @@ class JadwalKuliah {
     required this.sesiMulai,
     required this.sesiSelesai,
   });
+
+  factory JadwalKuliah.fromAdminApiJson(Map<String, dynamic> json) {
+    final semester = _parseSemester(json['semester']);
+    final tingkat = _asInt(json['kelas_tingkat']);
+    final kurikulumSemester = tingkat > 0
+        ? (semester == SemesterPeriode.ganjil ? tingkat * 2 - 1 : tingkat * 2)
+        : (semester == SemesterPeriode.ganjil ? 1 : 2);
+    final sesiMulaiNomor = _asInt(json['sesi_mulai']);
+    final sesiSelesaiNomor = _asInt(json['sesi_selesai']);
+    final fallbackMulai = _fallbackSesi(sesiMulaiNomor);
+    final fallbackSelesai = _fallbackSesi(sesiSelesaiNomor);
+    final jamMulai = _asString(json['jam_mulai']);
+    final jamSelesai = _asString(json['jam_selesai']);
+    final programStudiKode = _asString(json['program_studi_kode']);
+    final ruanganKode = _asString(json['ruangan_kode']);
+    final ruanganNama = _asString(json['ruangan_nama']);
+
+    return JadwalKuliah(
+      id: _asString(json['id']),
+      tahunAjaran: _asString(json['tahun_ajaran']),
+      mataKuliah: MataKuliah(
+        kode: _asString(json['mata_kuliah_kode']),
+        nama: _asString(json['matkul_nama']),
+        semester: kurikulumSemester,
+        sks: _asInt(json['sks']),
+        programStudiKode: programStudiKode,
+      ),
+      dosen: Dosen(
+        nip: _asString(json['dosen_nip']),
+        nama: _asString(json['dosen_nama']),
+      ),
+      programStudi: ProgramStudi(
+        kode: programStudiKode,
+        nama: _asString(json['prodi_nama']),
+      ),
+      kelas: KelasKuliah(
+        nama: _asString(json['kelas_nama']),
+        tingkat: tingkat,
+        programStudiKode: programStudiKode,
+      ),
+      ruangan: Ruangan(
+        kode: ruanganKode,
+        nama: ruanganNama.isEmpty ? ruanganKode : ruanganNama,
+      ),
+      hari: _parseHari(json['hari']),
+      sesiMulai: SesiKuliah(
+        nomor: sesiMulaiNomor,
+        jamMulai: jamMulai.isEmpty ? fallbackMulai.jamMulai : jamMulai,
+        jamSelesai: fallbackMulai.jamSelesai,
+      ),
+      sesiSelesai: SesiKuliah(
+        nomor: sesiSelesaiNomor,
+        jamMulai: fallbackSelesai.jamMulai,
+        jamSelesai: jamSelesai.isEmpty
+            ? fallbackSelesai.jamSelesai
+            : jamSelesai,
+      ),
+    );
+  }
+
+  static String _asString(Object? value) => value?.toString().trim() ?? '';
+
+  static int _asInt(Object? value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(_asString(value)) ?? 0;
+  }
+
+  static SemesterPeriode _parseSemester(Object? value) =>
+      _asString(value).toLowerCase() == 'genap'
+      ? SemesterPeriode.genap
+      : SemesterPeriode.ganjil;
+
+  static HariKuliah _parseHari(Object? value) {
+    final normalized = _asString(value).toLowerCase();
+    for (final hari in HariKuliah.values) {
+      if (hari.name == normalized) return hari;
+    }
+    return HariKuliah.senin;
+  }
+
+  static SesiKuliah _fallbackSesi(int nomor) {
+    final index = nomor - 1;
+    if (index >= 0 && index < JadwalMasterData.sesi.length) {
+      return JadwalMasterData.sesi[index];
+    }
+    return SesiKuliah(nomor: nomor, jamMulai: '', jamSelesai: '');
+  }
 
   final String id;
 

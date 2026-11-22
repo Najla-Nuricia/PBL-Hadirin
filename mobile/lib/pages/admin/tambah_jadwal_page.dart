@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../data/admin/admin_auth_repository.dart';
+import '../../data/admin/admin_jadwal_service.dart';
 import '../../data/admin/jadwal.dart';
+import '../../data/admin/mata_kuliah.dart';
 import '../../data/admin/tahun_ajaran.dart';
 import '../../routing/admin_route_paths.dart';
 import 'widgets/jadwal_form_widgets.dart';
 
 class TambahJadwalPage extends StatefulWidget {
-  const TambahJadwalPage({super.key});
+  const TambahJadwalPage({super.key, this.service});
+
+  /// Service opsional untuk pengujian; default memakai backend Hadirin.
+  final AdminJadwalService? service;
 
   @override
   State<TambahJadwalPage> createState() => _TambahJadwalPageState();
@@ -34,6 +40,9 @@ class _TambahJadwalPageState extends State<TambahJadwalPage> {
   bool _isSubmitting = false;
   AutovalidateMode _autovalidateMode = AutovalidateMode.disabled;
 
+  AdminJadwalService get _service => widget.service ?? adminJadwalService;
+  bool get _usesRemote => adminAuthRepository.hasRemoteSession;
+
   static String _defaultTahunAjaran() {
     final all = tahunAjaranRepository.getAll();
     final aktif = all.where((item) => item.status == TahunAjaranStatus.aktif);
@@ -52,7 +61,38 @@ class _TambahJadwalPageState extends State<TambahJadwalPage> {
     FocusScope.of(context).unfocus();
     setState(() => _isSubmitting = true);
 
-    // Simulate network latency
+    if (_usesRemote) {
+      try {
+        final created = await _service.createJadwal(
+          tahunAjaran: _tahunAjaran,
+          kelas: _kelas!.nama,
+          mataKuliahKode: _mataKuliah!.kode,
+          dosenNip: _dosen!.nip,
+          ruanganKode: _ruangan!.kode,
+          hari: _hari!,
+          sesiMulai: _sesiMulai!.nomor,
+          sesiSelesai: _sesiSelesai!.nomor,
+          semester: _mataKuliah!.periode,
+        );
+        if (!mounted) return;
+        _finishSubmit();
+        _showMessage(
+          'Jadwal ${created.mataKuliah.nama} untuk ${created.kelas.nama} '
+          'berhasil disimpan.',
+        );
+      } on AdminRemoteApiException catch (error) {
+        if (!mounted) return;
+        setState(() => _isSubmitting = false);
+        _showMessage(error.message);
+      } catch (_) {
+        if (!mounted) return;
+        setState(() => _isSubmitting = false);
+        _showMessage('Gagal menghubungi server untuk menyimpan jadwal.');
+      }
+      return;
+    }
+
+    // Simulate network latency for the offline/demo repository.
     await Future<void>.delayed(const Duration(milliseconds: 600));
     if (!mounted) return;
 
@@ -77,6 +117,14 @@ class _TambahJadwalPageState extends State<TambahJadwalPage> {
       return;
     }
 
+    _finishSubmit();
+    _showMessage(
+      'Jadwal ${jadwal.mataKuliah.nama} untuk ${jadwal.kelas.nama} '
+      'berhasil disimpan.',
+    );
+  }
+
+  void _finishSubmit() {
     setState(() {
       _isSubmitting = false;
       _mataKuliah = null;
@@ -89,10 +137,6 @@ class _TambahJadwalPageState extends State<TambahJadwalPage> {
       _autovalidateMode = AutovalidateMode.disabled;
       _formGeneration++;
     });
-    _showMessage(
-      'Jadwal ${jadwal.mataKuliah.nama} untuk ${jadwal.kelas.nama} '
-      'berhasil disimpan.',
-    );
   }
 
   void _showMessage(String message) {
@@ -258,7 +302,7 @@ class _TambahJadwalPageState extends State<TambahJadwalPage> {
         const JadwalFieldLabel(label: 'Mata Kuliah', required: true),
         JadwalSearchPickerField<MataKuliah>(
           value: _mataKuliah,
-          options: JadwalMasterData.mataKuliah,
+          options: mataKuliahRepository.getActive(),
           itemLabel: (item) => item.nama,
           itemSubtitle: (item) =>
               '${item.kode} · Semester ${item.semester} · ${item.sks} SKS',

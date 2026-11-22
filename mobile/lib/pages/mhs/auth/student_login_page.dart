@@ -35,23 +35,34 @@ class _StudentLoginPageState extends State<StudentLoginPage> {
 
     FocusScope.of(context).unfocus();
     setState(() => _isSubmitting = true);
-    final account = await studentAuthRepository.login(
-      nim: _nimController.text.trim(),
-      password: _passwordController.text,
-    );
-    if (!mounted) return;
-    setState(() => _isSubmitting = false);
+    try {
+      final account = await studentAuthRepository.login(
+        nim: _nimController.text.trim(),
+        password: _passwordController.text,
+      );
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
 
-    if (account == null) {
+      if (account == null) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(content: Text('NIM atau password salah.')),
+          );
+        return;
+      }
+
+      context.go(StudentRoutePaths.beranda);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      final msg = e is RemoteApiException
+          ? e.message
+          : 'Gagal masuk. Periksa koneksi server.';
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(content: Text('NIM atau password salah.')),
-        );
-      return;
+        ..showSnackBar(SnackBar(content: Text(msg)));
     }
-
-    context.go(StudentRoutePaths.beranda);
   }
 
   void _showForgotPasswordUnavailable() {

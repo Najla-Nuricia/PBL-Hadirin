@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../data/admin/admin_auth_repository.dart';
+import '../../data/admin/admin_master_data_service.dart';
 import '../../data/admin/tahun_ajaran.dart';
 import '../../routing/admin_route_paths.dart';
 import 'tambah_tahun_ajaran_page.dart';
@@ -14,13 +16,16 @@ class TahunAjaranListPage extends StatefulWidget {
 
 class _TahunAjaranListPageState extends State<TahunAjaranListPage> {
   final _searchController = TextEditingController();
+  List<TahunAjaran> _items = [];
   List<TahunAjaran> _displayed = [];
+  bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _displayed = tahunAjaranRepository.getAll();
     _searchController.addListener(_onSearch);
+    _load();
   }
 
   @override
@@ -31,15 +36,38 @@ class _TahunAjaranListPageState extends State<TahunAjaranListPage> {
   }
 
   void _onSearch() {
+    final query = _searchController.text.trim().toLowerCase();
     setState(() {
-      _displayed = tahunAjaranRepository.search(_searchController.text);
+      _displayed = query.isEmpty
+          ? List.unmodifiable(_items)
+          : _items
+                .where((item) => item.tahun.toLowerCase().contains(query))
+                .toList(growable: false);
     });
   }
 
-  void _refresh() {
-    setState(() {
-      _displayed = tahunAjaranRepository.search(_searchController.text);
-    });
+  Future<void> _load() async {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
+    try {
+      final items = await adminMasterDataService.listTahunAjaran();
+      if (!mounted) return;
+      setState(() {
+        _items = items;
+        _displayed = items;
+        _isLoading = false;
+      });
+    } on AdminRemoteApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = error.message;
+      });
+    }
   }
 
   void _back() {
@@ -52,11 +80,54 @@ class _TahunAjaranListPageState extends State<TahunAjaranListPage> {
 
   Future<void> _openTambah() async {
     final added = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const TambahTahunAjaranPage()),
+    );
+    if (added == true) await _load();
+  }
+
+  Future<void> _openEdit(TahunAjaran item) async {
+    final updated = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
-        builder: (_) => const TambahTahunAjaranPage(),
+        builder: (_) => TambahTahunAjaranPage(initialItem: item),
       ),
     );
-    if (added == true) _refresh();
+    if (updated == true) await _load();
+  }
+
+  Future<void> _delete(TahunAjaran item) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        final colorScheme = Theme.of(context).colorScheme;
+        return AlertDialog(
+          title: const Text('Hapus tahun ajaran?'),
+          content: Text(
+            'Data ${item.tahun} akan dihapus dan tidak dapat dikembalikan.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Batal'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: colorScheme.error,
+                foregroundColor: colorScheme.onError,
+              ),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Hapus'),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await adminMasterDataService.deleteTahunAjaran(item.id);
+      if (mounted) await _load();
+    } on AdminRemoteApiException catch (error) {
+      if (mounted) _showError(error.message);
+    }
   }
 
   @override
@@ -73,18 +144,22 @@ class _TahunAjaranListPageState extends State<TahunAjaranListPage> {
             _buildSearchBar(colorScheme),
             const SizedBox(height: 8),
             Expanded(
-              child: _displayed.isEmpty
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _errorMessage != null
+                  ? _buildError(colorScheme)
+                  : _displayed.isEmpty
                   ? _buildEmpty(colorScheme)
                   : ListView.separated(
                       padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
                       itemCount: _displayed.length,
                       separatorBuilder: (_, i) => const SizedBox(height: 8),
                       itemBuilder: (context, index) {
+                        final item = _displayed[index];
                         return _TahunAjaranCard(
-                          item: _displayed[index],
-                          onTap: () {
-                            // TODO: buka halaman detail / edit
-                          },
+                          item: item,
+                          onEdit: () => _openEdit(item),
+                          onDelete: () => _delete(item),
                         );
                       },
                     ),
@@ -159,8 +234,11 @@ class _TahunAjaranListPageState extends State<TahunAjaranListPage> {
           ),
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
-                  icon: Icon(Icons.close,
-                      color: colorScheme.onSurfaceVariant, size: 18),
+                  icon: Icon(
+                    Icons.close,
+                    color: colorScheme.onSurfaceVariant,
+                    size: 18,
+                  ),
                   onPressed: () {
                     _searchController.clear();
                   },
@@ -192,19 +270,47 @@ class _TahunAjaranListPageState extends State<TahunAjaranListPage> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.calendar_today_outlined,
-              size: 48, color: colorScheme.onSurfaceVariant),
+          Icon(
+            Icons.calendar_today_outlined,
+            size: 48,
+            color: colorScheme.onSurfaceVariant,
+          ),
           const SizedBox(height: 12),
           Text(
             'Tidak ada tahun ajaran ditemukan.',
-            style: TextStyle(
-              color: colorScheme.onSurfaceVariant,
-              fontSize: 14,
-            ),
+            style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildError(ColorScheme colorScheme) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.cloud_off_outlined, size: 48, color: colorScheme.error),
+            const SizedBox(height: 12),
+            Text(
+              _errorMessage!,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton(onPressed: _load, child: const Text('Coba lagi')),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 }
 
@@ -212,10 +318,15 @@ class _TahunAjaranListPageState extends State<TahunAjaranListPage> {
 // Card item tahun ajaran
 // ─────────────────────────────────────────────────────────
 class _TahunAjaranCard extends StatelessWidget {
-  const _TahunAjaranCard({required this.item, required this.onTap});
+  const _TahunAjaranCard({
+    required this.item,
+    required this.onEdit,
+    required this.onDelete,
+  });
 
   final TahunAjaran item;
-  final VoidCallback onTap;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -225,71 +336,81 @@ class _TahunAjaranCard extends StatelessWidget {
     return Material(
       color: colorScheme.surface,
       borderRadius: BorderRadius.circular(12),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: colorScheme.outlineVariant),
-          ),
-          child: Row(
-            children: [
-              // Ikon kalender
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  Icons.calendar_month_outlined,
-                  color: colorScheme.primary,
-                  size: 20,
-                ),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: colorScheme.outlineVariant),
+        ),
+        child: Row(
+          children: [
+            // Ikon kalender
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(10),
               ),
-              const SizedBox(width: 12),
-              // Info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
+              child: Icon(
+                Icons.calendar_month_outlined,
+                color: colorScheme.primary,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
                           item.tahun,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: colorScheme.onSurface,
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
                           ),
                         ),
-                        if (isAktif) ...[
-                          const SizedBox(width: 8),
-                          _AktifBadge(colorScheme: colorScheme),
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      item.semesterLabel,
-                      style: TextStyle(
-                        color: colorScheme.onSurfaceVariant,
-                        fontSize: 12,
                       ),
+                      if (isAktif) ...[
+                        const SizedBox(width: 8),
+                        _AktifBadge(colorScheme: colorScheme),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    item.semesterLabel,
+                    style: TextStyle(
+                      color: colorScheme.onSurfaceVariant,
+                      fontSize: 12,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-              Icon(
-                Icons.chevron_right,
-                color: colorScheme.onSurfaceVariant,
-                size: 20,
-              ),
-            ],
-          ),
+            ),
+            IconButton(
+              onPressed: onEdit,
+              tooltip: 'Edit tahun ajaran',
+              constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+              padding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
+              icon: Icon(Icons.edit_outlined, color: colorScheme.primary),
+            ),
+            IconButton(
+              onPressed: onDelete,
+              tooltip: 'Hapus tahun ajaran',
+              constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+              padding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
+              icon: Icon(Icons.delete_outline, color: colorScheme.error),
+            ),
+          ],
         ),
       ),
     );

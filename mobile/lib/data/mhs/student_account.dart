@@ -5,6 +5,7 @@ class StudentAccount {
     required this.className,
     required this.password,
     this.facePhotoPaths = const [],
+    this.token,
   });
 
   final String nim;
@@ -12,6 +13,7 @@ class StudentAccount {
   final String className;
   final String password;
   final List<String> facePhotoPaths;
+  final String? token;
 }
 
 class StudentRegistrationDraft {

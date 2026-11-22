@@ -1,13 +1,25 @@
 import '../../models/dosen/attendance_session.dart';
 import '../../models/dosen/attendance_status.dart';
+import '../../models/dosen/attendance_summary.dart';
 import '../../models/dosen/student_attendance.dart';
 
 /// Data sementara. Ganti dengan repository/API saat backend siap.
 abstract final class LecturerDummyData {
   static const _kelas = 'TI-3A';
 
+  /// Saat backend belum punya sesi/absen: tampilkan kartu ringkas saja,
+  /// tanpa daftar mahasiswa palsu.
+  static final emptySession = AttendanceSession(
+    className: _kelas,
+    date: DateTime(2024, 5, 15),
+    students: [],
+    summary: AttendanceSummary(total: 10),
+    isDemo: true,
+  );
+
   static final session = AttendanceSession(
     className: _kelas,
+    isDemo: true,
     date: DateTime(2024, 5, 15),
     students: const [
       StudentAttendance(nim: '2211001', name: 'Adi Saputra', className: _kelas, status: AttendanceStatus.hadir, checkInTime: '07:58'),

@@ -20,7 +20,7 @@ class AttendanceListPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
-    final session = ref.watch(attendanceSessionProvider);
+    final sessionAsync = ref.watch(attendanceSessionProvider);
     final students = ref.watch(filteredStudentsProvider);
 
     return Scaffold(
@@ -33,65 +33,102 @@ class AttendanceListPage extends ConsumerWidget {
               : context.go(LecturerRoutePaths.beranda),
         ),
       ),
-      body: ContentConstraint(
-        child: CustomScrollView(
-          slivers: [
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(
-                LecturerStyle.pagePadding,
-                LecturerStyle.pagePadding,
-                LecturerStyle.pagePadding,
-                0,
-              ),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate([
-                  AttendanceSummaryCard(session: session),
-                  const SizedBox(height: 12),
-                  const AttendanceFilterChips(),
-                  const SizedBox(height: 12),
-                ]),
-              ),
+      body: sessionAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, _) => Center(
+          child: Padding(
+            padding: const EdgeInsets.all(LecturerStyle.pagePadding),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.cloud_off_outlined, size: 40, color: scheme.error),
+                const SizedBox(height: 12),
+                Text(
+                  '$error',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: scheme.onSurfaceVariant),
+                ),
+                const SizedBox(height: 12),
+                FilledButton.tonal(
+                  onPressed: () => ref.invalidate(attendanceSessionProvider),
+                  child: const Text('Coba lagi'),
+                ),
+              ],
             ),
-            if (students.isEmpty)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.all(32),
-                  child: Center(
-                    child: Text(
-                      'Tidak ada mahasiswa dengan status ini.',
-                      style: TextStyle(color: scheme.onSurfaceVariant),
+          ),
+        ),
+        data: (session) => ContentConstraint(
+          child: CustomScrollView(
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(
+                  LecturerStyle.pagePadding,
+                  LecturerStyle.pagePadding,
+                  LecturerStyle.pagePadding,
+                  0,
+                ),
+                sliver: SliverList(
+                  delegate: SliverChildListDelegate([
+                    if (session.isDemo)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: InfoBanner(
+                          message: session.students.isEmpty
+                              ? 'Belum ada mahasiswa yang absen.'
+                              : 'Belum ada data sesi presensi. Menampilkan data contoh.',
+                        ),
+                      ),
+                    AttendanceSummaryCard(session: session),
+                    const SizedBox(height: 12),
+                    const AttendanceFilterChips(),
+                    const SizedBox(height: 12),
+                  ]),
+                ),
+              ),
+              if (students.isEmpty)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32),
+                    child: Center(
+                      child: Text(
+                        session.isDemo && session.students.isEmpty
+                            ? 'Belum ada mahasiswa yang absen.'
+                            : 'Tidak ada mahasiswa dengan status ini.',
+                        style: TextStyle(color: scheme.onSurfaceVariant),
+                      ),
+                    ),
+                  ),
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: LecturerStyle.pagePadding,
+                  ),
+                  sliver: SliverList.separated(
+                    itemCount: students.length,
+                    separatorBuilder: (_, _) =>
+                        const SizedBox(height: LecturerStyle.listGap),
+                    itemBuilder: (context, i) {
+                      final s = students[i];
+                      return StudentAttendanceTile(
+                        student: s,
+                        onTap: () =>
+                            context.push(LecturerRoutePaths.studentDetail(s.id)),
+                      );
+                    },
+                  ),
+                ),
+              if (students.isNotEmpty)
+                const SliverPadding(
+                  padding: EdgeInsets.all(LecturerStyle.pagePadding),
+                  sliver: SliverToBoxAdapter(
+                    child: InfoBanner(
+                      message: 'Ketuk nama mahasiswa untuk melihat detail.',
                     ),
                   ),
                 ),
-              )
-            else
-              SliverPadding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: LecturerStyle.pagePadding,
-                ),
-                sliver: SliverList.separated(
-                  itemCount: students.length,
-                  separatorBuilder: (_, __) =>
-                      const SizedBox(height: LecturerStyle.listGap),
-                  itemBuilder: (context, i) {
-                    final s = students[i];
-                    return StudentAttendanceTile(
-                      student: s,
-                      onTap: () =>
-                          context.push(LecturerRoutePaths.studentDetail(s.id)),
-                    );
-                  },
-                ),
-              ),
-            const SliverPadding(
-              padding: EdgeInsets.all(LecturerStyle.pagePadding),
-              sliver: SliverToBoxAdapter(
-                child: InfoBanner(
-                  message: 'Ketuk nama mahasiswa untuk melihat detail.',
-                ),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

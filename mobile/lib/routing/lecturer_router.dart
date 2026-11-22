@@ -1,7 +1,6 @@
 // lib/routing/lecturer_router.dart
 import 'package:go_router/go_router.dart';
 
-import '../data/dosen/lecturer_profile_preview.dart';
 import '../pages/dosen/attendance_list_page.dart';
 import '../pages/dosen/cek_presensi_page.dart';
 import '../pages/dosen/auth/lecturer_login_page.dart';
@@ -82,8 +81,7 @@ GoRouter createLecturerRouter({bool showOnboarding = false}) => GoRouter(
           routes: [
             GoRoute(
               path: LecturerRoutePaths.profil,
-              builder: (context, state) =>
-                  LecturerProfilePage(profile: lecturerProfilePreview),
+              builder: (context, state) => const LecturerProfilePage(),
               routes: [
                 GoRoute(
                   path: 'ubah-kata-sandi',

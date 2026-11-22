@@ -1,0 +1,93 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/routing/lecturer_route_paths.dart';
+import 'package:mobile/routing/lecturer_router.dart';
+import 'package:mobile/theme/app_theme.dart';
+
+void main() {
+  testWidgets('lecturer profile and navigation are available', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final router = createLecturerRouter();
+    addTearDown(router.dispose);
+    router.go(LecturerRoutePaths.profil);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp.router(routerConfig: router, theme: AppTheme.light),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Informasi Akun'), findsOneWidget);
+    expect(find.text('Dr. Andi Pratama, S.T., M.Kom.'), findsOneWidget);
+    expect(find.text('NIP/NIDN'), findsOneWidget);
+    expect(find.text('Kehadiran'), findsOneWidget);
+    expect(find.text('Profil'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('lecturer-change-password')));
+    await tester.pumpAndSettle();
+    expect(find.text('Kata Sandi Baru'), findsOneWidget);
+    expect(find.text('Konfirmasi Kata Sandi Baru'), findsOneWidget);
+    expect(find.text('Masukkan ulang kata sandi'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Kembali'));
+    await tester.pumpAndSettle();
+    expect(
+      router.routeInformationProvider.value.uri.path,
+      LecturerRoutePaths.profil,
+    );
+
+    await tester.tap(find.text('Kehadiran'));
+    await tester.pumpAndSettle();
+    expect(
+      router.routeInformationProvider.value.uri.path,
+      LecturerRoutePaths.kehadiran,
+    );
+  });
+
+  testWidgets('tapping Keluar asks for confirmation before logging out', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final router = createLecturerRouter();
+    addTearDown(router.dispose);
+    router.go(LecturerRoutePaths.profil);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        child: MaterialApp.router(routerConfig: router, theme: AppTheme.light),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('lecturer-logout')));
+    await tester.pumpAndSettle();
+    expect(find.text('Keluar dari akun?'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('lecturer-logout-cancel')));
+    await tester.pumpAndSettle();
+    expect(find.text('Keluar dari akun?'), findsNothing);
+    expect(
+      router.routeInformationProvider.value.uri.path,
+      LecturerRoutePaths.profil,
+    );
+
+    await tester.tap(find.byKey(const ValueKey('lecturer-logout')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('lecturer-logout-confirm')));
+    await tester.pumpAndSettle();
+    expect(
+      router.routeInformationProvider.value.uri.path,
+      LecturerRoutePaths.login,
+    );
+  });
+}

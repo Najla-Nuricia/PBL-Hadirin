@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../data/admin/admin_auth_repository.dart';
 import '../../../routing/admin_route_paths.dart';
 
+/// Kompatibilitas dengan kode/QA lama yang memakai kredensial demo.
 abstract final class AdminDemoCredentials {
-  static const username = 'admin';
-  static const password = '123';
+  static String get username => AdminAuthRepository.demoUsername;
+  static String get password => AdminAuthRepository.demoPassword;
 }
 
 class AdminLoginPage extends StatefulWidget {
@@ -20,6 +22,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isPasswordVisible = false;
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
@@ -28,20 +31,36 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
     super.dispose();
   }
 
-  void _submit() {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _submit() async {
+    if (_isSubmitting || !_formKey.currentState!.validate()) return;
 
-    if (_usernameController.text.trim() == AdminDemoCredentials.username &&
-        _passwordController.text == AdminDemoCredentials.password) {
-      context.go(AdminRoutePaths.dataAkademik);
-      return;
+    setState(() => _isSubmitting = true);
+    try {
+      final account = await adminAuthRepository.login(
+        username: _usernameController.text.trim(),
+        password: _passwordController.text,
+      );
+      if (!mounted) return;
+      if (account != null) {
+        context.go(AdminRoutePaths.dataAkademik);
+        return;
+      }
+      _showError('Username atau password admin salah.');
+    } on AdminRemoteApiException catch (e) {
+      if (!mounted) return;
+      _showError(e.message);
+    } catch (_) {
+      if (!mounted) return;
+      _showError('Login admin gagal. Coba lagi.');
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
     }
+  }
 
+  void _showError(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
-      ..showSnackBar(
-        const SnackBar(content: Text('Username atau password salah.')),
-      );
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -137,13 +156,19 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
                           borderRadius: BorderRadius.circular(11),
                         ),
                       ),
-                      child: const Text(
-                        'Masuk',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                      child: _isSubmitting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text(
+                            'Masuk',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                     ),
                   ),
                 ],

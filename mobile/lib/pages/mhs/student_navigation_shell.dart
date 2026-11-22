@@ -86,6 +86,7 @@ class _StudentBottomNavigationBar extends StatelessWidget {
                       child: index == 2
                           ? _CenterNavbarLabel(
                               label: _studentNavbarItems[index].label,
+                              onTap: () => onTap(index),
                             )
                           : _NavbarItem(
                               icon: _studentNavbarItems[index].icon,
@@ -160,27 +161,35 @@ class _NavbarItem extends StatelessWidget {
 }
 
 class _CenterNavbarLabel extends StatelessWidget {
-  const _CenterNavbarLabel({required this.label});
+  const _CenterNavbarLabel({
+    required this.label,
+    required this.onTap,
+  });
 
   final String label;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        const SizedBox(height: NavbarStyle.normalIconSize),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            color: colorScheme.onSurfaceVariant,
-            fontSize: NavbarStyle.textSize,
-            fontWeight: FontWeight.w500,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const SizedBox(height: NavbarStyle.normalIconSize),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: colorScheme.onSurfaceVariant,
+              fontSize: NavbarStyle.textSize,
+              fontWeight: FontWeight.w500,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

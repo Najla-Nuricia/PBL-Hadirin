@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/mhs/dummy_student_auth_repository.dart';
+import '../../data/mhs/schedule_reminder_service.dart';
+import '../../data/mhs/student_account.dart';
 import '../../data/mhs/student_attendance.dart';
+import '../../data/mhs/student_data_service.dart';
 import '../../data/mhs/student_schedule.dart';
+import '../../models/mhs/student_profile.dart';
 import '../../routing/student_route_paths.dart';
 
 class BerandaPage extends StatefulWidget {
@@ -14,16 +18,178 @@ class BerandaPage extends StatefulWidget {
 }
 
 class _BerandaPageState extends State<BerandaPage> {
-  // Hari yang dipilih di jadwal (default hari ini, disesuaikan dgn demo = Rabu=3)
-  int _selectedDay = 3;
+  int _selectedDay = DateTime.now().weekday;
 
-  // Alarm toggle per schedule index
-  final Map<int, bool> _alarmToggles = {0: true};
+  final Map<int, bool> _alarmStates = {};
 
   bool _showReminder = true;
 
-  // Demo: gunakan data demo account
-  final _account = DummyStudentAuthRepository.demoAccount;
+  StudentAccount get _account =>
+      studentAuthRepository.currentAccount ??
+      DummyStudentAuthRepository.demoAccount;
+
+  String get _displayName {
+    if (_profile != null && _profile!.fullName.isNotEmpty) {
+      return _profile!.fullName;
+    }
+    final current = studentAuthRepository.currentAccount;
+    if (current != null) return current.fullName;
+    return _account.fullName;
+  }
+
+  String get _displaySubtitle {
+    final nim = (_profile?.studentId.isNotEmpty == true)
+        ? _profile!.studentId
+        : (studentAuthRepository.currentAccount?.nim ?? _account.nim);
+    final cls = (_profile?.className.isNotEmpty == true)
+        ? _profile!.className
+        : (studentAuthRepository.currentAccount?.className ?? _account.className);
+    return cls.isNotEmpty ? '$nim · $cls' : nim;
+  }
+
+  StudentProfile? _profile;
+  StudentAttendanceSummary _summary = const StudentAttendanceSummary(
+    hadir: 0,
+    izin: 0,
+    sakit: 0,
+    alfa: 0,
+  );
+  List<StudentSchedule> _schedules = const [];
+  ClassReminder? _reminder;
+  bool _isLoading = false;
+  String? _loadError;
+
+  @override
+  void initState() {
+    super.initState();
+    studentAuthRepository.addListener(_handleAccountChanged);
+    _loadData();
+  }
+
+  @override
+  void dispose() {
+    studentAuthRepository.removeListener(_handleAccountChanged);
+    super.dispose();
+  }
+
+  void _handleAccountChanged() {
+    final current = studentAuthRepository.currentAccount;
+    if (!mounted) return;
+    setState(() {
+      if (_profile != null && current != null && current.nim == _profile!.studentId) {
+        _profile = StudentProfile(
+          fullName: current.fullName,
+          studentId: _profile!.studentId,
+          email: _profile!.email,
+          phoneNumber: _profile!.phoneNumber,
+          role: _profile!.role,
+          className: _profile!.className,
+        );
+      }
+    });
+  }
+
+  Future<void> _loadData() async {
+    setState(() {
+      _isLoading = true;
+      _loadError = null;
+    });
+    try {
+      final results = await Future.wait([
+        studentDataService.loadProfile(),
+        studentDataService.loadAttendanceSummary(),
+        studentDataService.loadSchedules(),
+        studentDataService.loadClassReminder(),
+      ]);
+      if (!mounted) return;
+      final loadedSchedules = results[2] as List<StudentSchedule>;
+      setState(() {
+        _profile = results[0] as StudentProfile;
+        _summary = results[1] as StudentAttendanceSummary;
+        _schedules = loadedSchedules;
+        _reminder = results[3] as ClassReminder?;
+        _isLoading = false;
+        _loadError = null;
+        for (final schedule in loadedSchedules) {
+          final id = ScheduleReminderService.idFor(schedule);
+          _alarmStates.putIfAbsent(id, () => schedule.hasAlarm);
+        }
+      });
+      try {
+        await _restoreAlarmStates();
+      } catch (_) {
+        // Notifikasi tidak tersedia (mis. emulator/test): UI tetap tampil.
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _loadError = e.toString().replaceFirst('Exception: ', '');
+      });
+    }
+  }
+
+  /// Terapkan preferensi alarm yang tersimpan, lalu jadwalkan ulang.
+  Future<void> _restoreAlarmStates() async {
+    final states = await scheduleReminderService.loadEnabledStates();
+    for (final schedule in _schedules) {
+      final key = ScheduleReminderService.idFor(schedule).toString();
+      final saved = states[key];
+      if (saved != null) {
+        _alarmStates[ScheduleReminderService.idFor(schedule)] = saved;
+      }
+    }
+    if (!mounted) return;
+    await scheduleReminderService.sync(_schedules, _enabledAlarmIds());
+  }
+
+  Set<int> _enabledAlarmIds() =>
+      _alarmStates.entries.where((entry) => entry.value).map((e) => e.key).toSet();
+
+  Future<void> _onAlarmToggle(int scheduleId, bool value) async {
+    setState(() => _alarmStates[scheduleId] = value);
+    try {
+      await scheduleReminderService.saveEnabledState(scheduleId, value);
+      if (value) {
+        await scheduleReminderService.requestExactAlarmPermission();
+      }
+      await scheduleReminderService.sync(_schedules, _enabledAlarmIds());
+    } catch (e) {
+      debugPrint('ALARM_SYNC_ERROR: $e');
+      _showAlarmError();
+    }
+  }
+
+  /// Tombol uji: bunyikan notifikasi + tampilkan banner tanpa tunggu 30 menit.
+  Future<void> _fireTestReminder() async {
+    final schedule = _schedules.isEmpty ? dummySchedules.first : _schedules.first;
+    try {
+      await scheduleReminderService.showTestReminder(schedule);
+    } catch (e) {
+      debugPrint('ALARM_TEST_ERROR: $e');
+      _showAlarmError();
+      return;
+    }
+    if (!mounted) return;
+    setState(() {
+      _reminder = ClassReminder(
+        message: '${ScheduleReminderService.leadMinutes} menit lagi!',
+        courseName: schedule.courseName,
+        time: schedule.startTime,
+        room: schedule.room,
+      );
+      _showReminder = true;
+    });
+  }
+
+  void _showAlarmError() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Alarm tidak dapat diatur pada perangkat ini.'),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -36,29 +202,81 @@ class _BerandaPageState extends State<BerandaPage> {
           children: [
             _buildHeader(colorScheme),
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (_showReminder)
-                      _ReminderBanner(
-                        reminder: dummyClassReminder,
-                        onDismiss: () => setState(() => _showReminder = false),
-                      ),
-                    const SizedBox(height: 12),
-                    _QuickActions(onAbsensiTap: () => context.go(StudentRoutePaths.absensi)),
-                    const SizedBox(height: 16),
-                    _AttendanceSummaryCard(summary: dummyAttendanceSummary),
-                    const SizedBox(height: 16),
-                    _ScheduleSection(
-                      selectedDay: _selectedDay,
-                      onDaySelected: (day) => setState(() => _selectedDay = day),
-                      alarmToggles: _alarmToggles,
-                      onAlarmToggle: (index, val) =>
-                          setState(() => _alarmToggles[index] = val),
+              child: RefreshIndicator(
+                onRefresh: _loadData,
+                child: SingleChildScrollView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (_isLoading)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 32),
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      else if (_loadError != null)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          child: Card(
+                            color: Theme.of(context).colorScheme.errorContainer,
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Column(
+                                children: [
+                                  Icon(Icons.warning_amber_rounded,
+                                      color: Theme.of(context).colorScheme.onErrorContainer),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Gagal memuat data: $_loadError',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                        color: Theme.of(context).colorScheme.onErrorContainer),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  TextButton(
+                                    onPressed: _loadData,
+                                    child: const Text('Coba Lagi'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        )
+                      else ...[ 
+                      if (_showReminder && _reminder != null)
+                        Semantics(
+                          label: 'Pengingat kelas',
+                          child: _ReminderBanner(
+                            reminder: _reminder!,
+                            onDismiss: () =>
+                                setState(() => _showReminder = false),
+                            onTest: _fireTestReminder,
+                          ),
+                        ),
+                      if (_showReminder && _reminder != null)
+                        const SizedBox(height: 12),
+                    _QuickActions(
+                      onAbsensiTap: () => context.go(StudentRoutePaths.absensi),
+                      onSuratTap: () => context.go(StudentRoutePaths.surat),
                     ),
-                  ],
+                    const SizedBox(height: 16),
+                    _AttendanceSummaryCard(
+                      summary: _summary,
+                      onViewAll: () => context.go(StudentRoutePaths.riwayat),
+                    ),
+                    const SizedBox(height: 16),
+                      _ScheduleSection(
+                        selectedDay: _selectedDay,
+                        schedules: _schedules,
+                        onDaySelected: (day) =>
+                            setState(() => _selectedDay = day),
+                        alarmToggles: _alarmStates,
+                        onAlarmToggle: _onAlarmToggle,
+                      ),
+                    ], // end else
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -94,7 +312,7 @@ class _BerandaPageState extends State<BerandaPage> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  _account.fullName,
+                  _displayName,
                   style: TextStyle(
                     color: colorScheme.onSurface,
                     fontSize: 20,
@@ -103,7 +321,7 @@ class _BerandaPageState extends State<BerandaPage> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  '${_account.nim} · ${_account.className}',
+                  _displaySubtitle,
                   style: TextStyle(
                     color: colorScheme.onSurfaceVariant,
                     fontSize: 12,
@@ -132,10 +350,15 @@ class _BerandaPageState extends State<BerandaPage> {
 // Reminder Banner
 // ─────────────────────────────────────────────────────────
 class _ReminderBanner extends StatelessWidget {
-  const _ReminderBanner({required this.reminder, required this.onDismiss});
+  const _ReminderBanner({
+    required this.reminder,
+    required this.onDismiss,
+    required this.onTest,
+  });
 
   final ClassReminder reminder;
   final VoidCallback onDismiss;
+  final VoidCallback onTest;
 
   @override
   Widget build(BuildContext context) {
@@ -149,8 +372,11 @@ class _ReminderBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Icon(Icons.notifications_active_outlined,
-              color: colorScheme.onTertiaryContainer, size: 20),
+          Icon(
+            Icons.notifications_active_outlined,
+            color: colorScheme.onTertiaryContainer,
+            size: 20,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -176,10 +402,25 @@ class _ReminderBanner extends StatelessWidget {
               ],
             ),
           ),
+          IconButton(
+            tooltip: 'Uji alarm',
+            onPressed: onTest,
+            icon: Icon(
+              Icons.alarm_outlined,
+              color: colorScheme.onTertiaryContainer,
+              size: 18,
+            ),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
+            visualDensity: VisualDensity.compact,
+          ),
           GestureDetector(
             onTap: onDismiss,
-            child: Icon(Icons.close,
-                color: colorScheme.onTertiaryContainer, size: 18),
+            child: Icon(
+              Icons.close,
+              color: colorScheme.onTertiaryContainer,
+              size: 18,
+            ),
           ),
         ],
       ),
@@ -191,8 +432,10 @@ class _ReminderBanner extends StatelessWidget {
 // Quick Actions (Absensi & Surat)
 // ─────────────────────────────────────────────────────────
 class _QuickActions extends StatelessWidget {
-  const _QuickActions({required this.onAbsensiTap});
+  const _QuickActions({required this.onAbsensiTap, required this.onSuratTap});
+
   final VoidCallback onAbsensiTap;
+  final VoidCallback onSuratTap;
 
   @override
   Widget build(BuildContext context) {
@@ -219,7 +462,7 @@ class _QuickActions extends StatelessWidget {
             backgroundColor: colorScheme.surface,
             foregroundColor: colorScheme.onSurface,
             iconColor: colorScheme.primary,
-            onTap: () {},
+            onTap: onSuratTap,
           ),
         ),
       ],
@@ -294,9 +537,13 @@ class _ActionCard extends StatelessWidget {
 // Rekap Kehadiran Card
 // ─────────────────────────────────────────────────────────
 class _AttendanceSummaryCard extends StatelessWidget {
-  const _AttendanceSummaryCard({required this.summary});
+  const _AttendanceSummaryCard({
+    required this.summary,
+    required this.onViewAll,
+  });
 
   final StudentAttendanceSummary summary;
+  final VoidCallback onViewAll;
 
   @override
   Widget build(BuildContext context) {
@@ -325,7 +572,7 @@ class _AttendanceSummaryCard extends StatelessWidget {
                 ),
               ),
               TextButton(
-                onPressed: () {},
+                onPressed: onViewAll,
                 style: TextButton.styleFrom(
                   padding: EdgeInsets.zero,
                   minimumSize: const Size(0, 24),
@@ -402,10 +649,7 @@ class _AttendanceStat extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(color: color, fontSize: 11),
-            ),
+            Text(label, style: TextStyle(color: color, fontSize: 11)),
           ],
         ),
       ),
@@ -422,21 +666,29 @@ class _ScheduleSection extends StatelessWidget {
     required this.onDaySelected,
     required this.alarmToggles,
     required this.onAlarmToggle,
+    this.schedules,
   });
 
   final int selectedDay;
   final ValueChanged<int> onDaySelected;
   final Map<int, bool> alarmToggles;
-  final void Function(int index, bool val) onAlarmToggle;
+  final void Function(int scheduleId, bool val) onAlarmToggle;
+  final List<StudentSchedule>? schedules;
 
   static const _dayLabels = ['SEN', 'SEL', 'RAB', 'KAM', 'JUM', 'SAB', 'MIN'];
-  // hari ini tanggal 14 (Rabu), demo start dari 12 (Senin)
-  static const _dayDates = [12, 13, 14, 15, 16, 17, 18];
+
+  List<int> _currentWeekDayNumbers() {
+    final now = DateTime.now();
+    final monday = now.subtract(Duration(days: now.weekday - DateTime.monday));
+    return List.generate(7, (i) => monday.add(Duration(days: i)).day);
+  }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final filteredSchedules = dummySchedules
+    final dayDates = _currentWeekDayNumbers();
+    final sourceSchedules = schedules ?? dummySchedules;
+    final filteredSchedules = sourceSchedules
         .where((s) => s.dayOfWeek == selectedDay)
         .toList();
 
@@ -492,7 +744,7 @@ class _ScheduleSection extends StatelessWidget {
                             ),
                             const SizedBox(height: 2),
                             Text(
-                              '${_dayDates[i]}',
+                              '${dayDates[i]}',
                               style: TextStyle(
                                 color: selectedDay == (i + 1)
                                     ? colorScheme.onPrimary
@@ -525,12 +777,17 @@ class _ScheduleSection extends StatelessWidget {
               ),
             )
           else
-            for (var i = 0; i < filteredSchedules.length; i++)
+            for (final schedule in filteredSchedules)
               _ScheduleItem(
-                schedule: filteredSchedules[i],
-                hasAlarm: alarmToggles[i] ?? false,
-                onAlarmToggle: (val) => onAlarmToggle(i, val),
-                isLast: i == filteredSchedules.length - 1,
+                schedule: schedule,
+                hasAlarm:
+                    alarmToggles[ScheduleReminderService.idFor(schedule)] ??
+                    false,
+                isLast: schedule == filteredSchedules.last,
+                onAlarmToggle: (val) => onAlarmToggle(
+                  ScheduleReminderService.idFor(schedule),
+                  val,
+                ),
               ),
         ],
       ),
@@ -589,8 +846,11 @@ class _ScheduleItem extends StatelessWidget {
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.access_time,
-                                size: 12, color: colorScheme.onSurfaceVariant),
+                            Icon(
+                              Icons.access_time,
+                              size: 12,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               '${schedule.startTime} – ${schedule.endTime}',
@@ -604,8 +864,11 @@ class _ScheduleItem extends StatelessWidget {
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.location_on_outlined,
-                                size: 12, color: colorScheme.onSurfaceVariant),
+                            Icon(
+                              Icons.location_on_outlined,
+                              size: 12,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               schedule.room,
@@ -658,8 +921,11 @@ class _AlarmInfoBanner extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
       child: Row(
         children: [
-          Icon(Icons.info_outline,
-              size: 14, color: colorScheme.onSurfaceVariant),
+          Icon(
+            Icons.info_outline,
+            size: 14,
+            color: colorScheme.onSurfaceVariant,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(

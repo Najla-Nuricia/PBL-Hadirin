@@ -5,6 +5,7 @@ class StudentProfile {
     required this.email,
     required this.phoneNumber,
     required this.role,
+    this.className = '',
   });
 
   final String fullName;
@@ -12,4 +13,5 @@ class StudentProfile {
   final String email;
   final String phoneNumber;
   final String role;
+  final String className;
 }

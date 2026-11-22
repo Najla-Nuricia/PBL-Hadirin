@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 /// Status tahun ajaran.
 enum TahunAjaranStatus { aktif, nonAktif }
 
@@ -82,7 +84,7 @@ class TahunAjaran {
 }
 
 /// In-memory repository untuk Tahun Ajaran (dummy, sampai backend siap).
-class TahunAjaranRepository {
+class TahunAjaranRepository extends ChangeNotifier {
   TahunAjaranRepository() : _items = List.of(_seedData);
 
   static final _seedData = [
@@ -134,6 +136,15 @@ class TahunAjaranRepository {
     return _items.where((t) => t.tahun.toLowerCase().contains(q)).toList();
   }
 
+  bool exists(String tahun, {String? excludingId}) {
+    final normalized = tahun.trim().toLowerCase();
+    return _items.any(
+      (item) =>
+          item.id != excludingId &&
+          item.tahun.trim().toLowerCase() == normalized,
+    );
+  }
+
   void add(TahunAjaran item) {
     // Jika status aktif, nonaktifkan yang lain
     if (item.status == TahunAjaranStatus.aktif) {
@@ -142,6 +153,25 @@ class TahunAjaranRepository {
       }
     }
     _items.insert(0, item);
+    notifyListeners();
+  }
+
+  void update(TahunAjaran item) {
+    final index = _items.indexWhere((existing) => existing.id == item.id);
+    if (index == -1) return;
+
+    if (item.status == TahunAjaranStatus.aktif) {
+      for (var i = 0; i < _items.length; i++) {
+        _items[i] = _items[i].copyWith(status: TahunAjaranStatus.nonAktif);
+      }
+    }
+    _items[index] = item;
+    notifyListeners();
+  }
+
+  void delete(String id) {
+    _items.removeWhere((item) => item.id == id);
+    notifyListeners();
   }
 
   String generateId() => DateTime.now().millisecondsSinceEpoch.toString();
