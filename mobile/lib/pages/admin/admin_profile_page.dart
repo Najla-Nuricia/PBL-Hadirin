@@ -32,13 +32,26 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
   }
 
   Future<void> _changeEmail() async {
-    final email = await showDialog<String>(
+    final result = await showDialog<({String email, String currentPassword})>(
       context: context,
       builder: (_) => _AdminEmailDialog(currentEmail: _account?.email ?? ''),
     );
-    if (!mounted || email == null) return;
-    adminAuthRepository.updateEmail(email);
-    _showMessage('Email berhasil diperbarui.');
+    if (!mounted || result == null) return;
+
+    try {
+      await adminAuthRepository.updateEmail(
+        result.email,
+        currentPassword: result.currentPassword,
+      );
+      if (!mounted) return;
+      _showMessage('Email berhasil diperbarui.');
+    } on AdminRemoteApiException catch (e) {
+      if (!mounted) return;
+      _showMessage(e.message);
+    } catch (_) {
+      if (!mounted) return;
+      _showMessage('Gagal menghubungi server untuk mengubah email.');
+    }
   }
 
   Future<void> _confirmLogout() async {
@@ -60,7 +73,8 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final account = _account ??
+    final account =
+        _account ??
         const AdminAccount(
           username: 'admin',
           name: 'Administrator',
@@ -402,6 +416,8 @@ class _AdminEmailDialog extends StatefulWidget {
 class _AdminEmailDialogState extends State<_AdminEmailDialog> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _controller;
+  final _passwordController = TextEditingController();
+  bool _isPasswordVisible = false;
 
   @override
   void initState() {
@@ -412,6 +428,7 @@ class _AdminEmailDialogState extends State<_AdminEmailDialog> {
   @override
   void dispose() {
     _controller.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -421,20 +438,50 @@ class _AdminEmailDialogState extends State<_AdminEmailDialog> {
       title: const Text('Ubah Email'),
       content: Form(
         key: _formKey,
-        child: TextFormField(
-          key: const ValueKey('admin-email-field'),
-          controller: _controller,
-          autofocus: true,
-          keyboardType: TextInputType.emailAddress,
-          decoration: const InputDecoration(labelText: 'Email baru'),
-          validator: (value) {
-            final email = (value ?? '').trim();
-            if (email.isEmpty) return 'Email wajib diisi.';
-            if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
-              return 'Format email tidak valid.';
-            }
-            return null;
-          },
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              key: const ValueKey('admin-email-field'),
+              controller: _controller,
+              autofocus: true,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(labelText: 'Email baru'),
+              validator: (value) {
+                final email = (value ?? '').trim();
+                if (email.isEmpty) return 'Email wajib diisi.';
+                if (!RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
+                  return 'Format email tidak valid.';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              key: const ValueKey('admin-email-password-field'),
+              controller: _passwordController,
+              obscureText: !_isPasswordVisible,
+              decoration: InputDecoration(
+                labelText: 'Kata sandi saat ini',
+                suffixIcon: IconButton(
+                  onPressed: () =>
+                      setState(() => _isPasswordVisible = !_isPasswordVisible),
+                  tooltip: _isPasswordVisible
+                      ? 'Sembunyikan kata sandi'
+                      : 'Tampilkan kata sandi',
+                  icon: Icon(
+                    _isPasswordVisible
+                        ? Icons.visibility_off_outlined
+                        : Icons.visibility_outlined,
+                    size: 19,
+                  ),
+                ),
+              ),
+              validator: (value) => (value ?? '').isEmpty
+                  ? 'Kata sandi saat ini wajib diisi.'
+                  : null,
+            ),
+          ],
         ),
       ),
       actions: [
@@ -445,7 +492,10 @@ class _AdminEmailDialogState extends State<_AdminEmailDialog> {
         FilledButton(
           onPressed: () {
             if (!_formKey.currentState!.validate()) return;
-            Navigator.of(context).pop(_controller.text.trim());
+            Navigator.of(context).pop((
+              email: _controller.text.trim(),
+              currentPassword: _passwordController.text,
+            ));
           },
           child: const Text('Simpan'),
         ),
@@ -463,7 +513,9 @@ class _AdminLogoutDialog extends StatelessWidget {
     return AlertDialog(
       icon: Icon(Icons.logout_rounded, color: colorScheme.error),
       title: const Text('Keluar dari akun?'),
-      content: const Text('Sesi admin akan berakhir dan Anda perlu masuk lagi.'),
+      content: const Text(
+        'Sesi admin akan berakhir dan Anda perlu masuk lagi.',
+      ),
       actions: [
         TextButton(
           key: const ValueKey('admin-logout-cancel'),

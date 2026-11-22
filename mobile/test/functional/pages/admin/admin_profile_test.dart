@@ -36,6 +36,10 @@ void main() {
       find.byKey(const ValueKey('admin-email-field')),
       'admin.baru@hadirin.polinema.ac.id',
     );
+    await tester.enterText(
+      find.byKey(const ValueKey('admin-email-password-field')),
+      'admin123',
+    );
     await tester.tap(find.text('Simpan'));
     await tester.pumpAndSettle();
 

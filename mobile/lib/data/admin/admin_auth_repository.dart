@@ -98,8 +98,8 @@ class AdminAuthRepository extends ChangeNotifier {
         if (!_isFlutterMockHttpResponse(response)) {
           if (response.statusCode == 200) {
             final data = jsonDecode(response.body) as Map<String, dynamic>;
-            final token = (data['access_token'] as String?) ??
-                (data['token'] as String?);
+            final token =
+                (data['access_token'] as String?) ?? (data['token'] as String?);
             final account = AdminAccount(
               username: (data['username'] as String?) ?? identifier,
               name: (data['name'] as String?) ?? 'Administrator',
@@ -129,11 +129,17 @@ class AdminAuthRepository extends ChangeNotifier {
               // Test widget lama memakai kredensial demo.
               return await _loginDemo(identifier, password);
             }
-            throw AdminRemoteApiException(detail, statusCode: response.statusCode);
+            throw AdminRemoteApiException(
+              detail,
+              statusCode: response.statusCode,
+            );
           }
 
           throw AdminRemoteApiException(
-            _extractDetail(response, 'Login admin gagal (${response.statusCode}).'),
+            _extractDetail(
+              response,
+              'Login admin gagal (${response.statusCode}).',
+            ),
             statusCode: response.statusCode,
           );
         }
@@ -206,36 +212,132 @@ class AdminAuthRepository extends ChangeNotifier {
     return null;
   }
 
-  /// Update email admin pada profil aktif.
+  /// Ubah email admin lewat `PUT /auth/admin/change-email`.
   ///
-  /// Backend Hadirin belum menyediakan endpoint ubah email admin, jadi
-  /// perubahan disimpan di sesi aplikasi sampai endpoint tersedia.
-  void updateEmail(String email) {
-    final account = _currentAccount;
-    if (account == null) return;
-    _currentAccount = AdminAccount(
-      username: account.username,
-      name: account.name,
-      role: account.role,
-      email: email.trim(),
-      token: account.token,
-      expiresIn: account.expiresIn,
-    );
-    notifyListeners();
+  /// Backend memverifikasi [currentPassword] sebelum mengganti email di
+  /// Supabase Auth dan tabel `admin`. Sesi demo (tanpa remote token) tetap
+  /// memperbarui profil lokal agar QA offline dapat berjalan.
+  Future<bool> updateEmail(String email, {String? currentPassword}) async {
+    final normalized = email.trim().toLowerCase();
+
+    if (hasRemoteSession) {
+      final token = currentAccessToken;
+      try {
+        final uri = Uri.parse('${ApiConfig.baseUrl}/auth/admin/change-email');
+        final response = await _client
+            .put(
+              uri,
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer $token',
+              },
+              body: jsonEncode({
+                'new_email': normalized,
+                'current_password': currentPassword ?? '',
+              }),
+            )
+            .timeout(_requestTimeout);
+
+        if (!_isFlutterMockHttpResponse(response)) {
+          if (response.statusCode == 200) {
+            _applyEmail(normalized);
+            return true;
+          }
+          throw AdminRemoteApiException(
+            _extractDetail(response, 'Gagal memperbarui email admin.'),
+            statusCode: response.statusCode,
+          );
+        }
+      } on AdminRemoteApiException {
+        rethrow;
+      } catch (_) {
+        throw AdminRemoteApiException(
+          'Gagal terhubung ke server backend di ${ApiConfig.baseUrl}. '
+          'Pastikan server backend sedang aktif.',
+        );
+      }
+    }
+
+    if (currentPassword != null &&
+        _currentPassword != null &&
+        currentPassword != _currentPassword) {
+      throw const AdminRemoteApiException('Kata sandi saat ini tidak sesuai.');
+    }
+    _applyEmail(normalized);
+    return true;
   }
 
-  /// Ganti kata sandi admin. Mengembalikan false jika kata sandi saat ini
-  /// salah, true jika berhasil diperbarui pada sesi aplikasi.
-  bool changePassword({
+  /// Ganti kata sandi admin lewat `PUT /auth/admin/change-password`.
+  ///
+  /// Returns true saat backend menerima perubahan. Sesi demo tetap memakai
+  /// validasi lokal agar QA offline dan test widget lama tetap berjalan.
+  Future<bool> changePassword({
     required String currentPassword,
     required String newPassword,
-  }) {
+    String? confirmPassword,
+  }) async {
+    if (hasRemoteSession) {
+      final token = currentAccessToken;
+      try {
+        final uri = Uri.parse(
+          '${ApiConfig.baseUrl}/auth/admin/change-password',
+        );
+        final response = await _client
+            .put(
+              uri,
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer $token',
+              },
+              body: jsonEncode({
+                'current_password': currentPassword,
+                'new_password': newPassword,
+                'confirm_password': confirmPassword ?? newPassword,
+              }),
+            )
+            .timeout(_requestTimeout);
+
+        if (!_isFlutterMockHttpResponse(response)) {
+          if (response.statusCode == 200) {
+            _currentPassword = newPassword;
+            notifyListeners();
+            return true;
+          }
+          throw AdminRemoteApiException(
+            _extractDetail(response, 'Gagal memperbarui kata sandi admin.'),
+            statusCode: response.statusCode,
+          );
+        }
+      } on AdminRemoteApiException {
+        rethrow;
+      } catch (_) {
+        throw AdminRemoteApiException(
+          'Gagal terhubung ke server backend di ${ApiConfig.baseUrl}. '
+          'Pastikan server backend sedang aktif.',
+        );
+      }
+    }
+
     if (_currentPassword == null || _currentPassword != currentPassword) {
       return false;
     }
     _currentPassword = newPassword;
     notifyListeners();
     return true;
+  }
+
+  void _applyEmail(String email) {
+    final account = _currentAccount;
+    if (account == null) return;
+    _currentAccount = AdminAccount(
+      username: account.username,
+      name: account.name,
+      role: account.role,
+      email: email,
+      token: account.token,
+      expiresIn: account.expiresIn,
+    );
+    notifyListeners();
   }
 
   void _clearSession() {

@@ -1,7 +1,15 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
+import 'package:mobile/data/admin/admin_auth_repository.dart';
+import 'package:mobile/data/admin/admin_jadwal_service.dart';
 import 'package:mobile/data/admin/jadwal.dart';
+import 'package:mobile/pages/admin/jadwal_list_page.dart';
+import 'package:mobile/pages/admin/tambah_jadwal_page.dart';
 import 'package:mobile/routing/admin_router.dart';
 import 'package:mobile/theme/app_theme.dart';
 
@@ -137,6 +145,67 @@ void main() {
 
       expect(find.text('Belum ada jadwal untuk filter ini.'), findsOneWidget);
     });
+
+    testWidgets('loads schedules from the admin backend for a remote session', (
+      tester,
+    ) async {
+      adminAuthRepository.currentAccessToken = 'jwt-admin';
+      addTearDown(adminAuthRepository.logout);
+
+      final service = AdminJadwalService(
+        tokenProvider: () => 'jwt-admin',
+        httpClient: MockClient((request) async {
+          expect(request.url.path, '/admin/jadwal');
+          expect(request.url.queryParameters['tahun_ajaran'], '2026/2027');
+          expect(request.url.queryParameters['semester'], 'ganjil');
+          expect(request.url.queryParameters['tingkat'], '3');
+          expect(request.url.queryParameters['kelas'], 'TI-3A');
+          return http.Response(
+            jsonEncode({
+              'data': [
+                {
+                  'id': 'jadwal-remote',
+                  'tahun_ajaran_id': 'ta-1',
+                  'tahun_ajaran': '2026/2027',
+                  'semester': 'ganjil',
+                  'hari': 'senin',
+                  'sesi_mulai': 2,
+                  'sesi_selesai': 3,
+                  'jam_mulai': '07:50',
+                  'jam_selesai': '09:30',
+                  'mata_kuliah_kode': 'TI501',
+                  'matkul_nama': 'Pemrograman Web Lanjut',
+                  'sks': 3,
+                  'dosen_nip': '198501012010121001',
+                  'dosen_nama': 'Budi Santoso, S.T., M.T.',
+                  'program_studi_kode': 'D4-TI',
+                  'prodi_nama': 'D4 Teknik Informatika',
+                  'kelas_id': 'kelas-1',
+                  'kelas_nama': 'TI-3A',
+                  'kelas_tingkat': 3,
+                  'ruangan_kode': 'J301',
+                  'ruangan_nama': 'Ruang J301',
+                },
+              ],
+              'total': 1,
+              'filters': {},
+            }),
+            200,
+            headers: {'Content-Type': 'application/json'},
+          );
+        }),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(home: JadwalListPage(service: service)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Pemrograman Web Lanjut'), findsOneWidget);
+      expect(find.text('07:50 – 09:30'), findsOneWidget);
+      expect(find.text('Ruang J301'), findsOneWidget);
+      expect(find.text('Budi Santoso, S.T., M.T.'), findsOneWidget);
+    });
   });
 
   group('Tambah Jadwal Baru', () {
@@ -225,6 +294,110 @@ void main() {
 
       expect(find.textContaining('Jadwal bentrok'), findsOneWidget);
       expect(jadwalRepository.getAll(), hasLength(initialCount + 1));
+    });
+
+    testWidgets('creates a schedule through the admin backend', (tester) async {
+      adminAuthRepository.currentAccessToken = 'jwt-admin';
+      addTearDown(adminAuthRepository.logout);
+
+      final service = AdminJadwalService(
+        tokenProvider: () => 'jwt-admin',
+        httpClient: MockClient((request) async {
+          expect(request.method, 'POST');
+          expect(request.url.path, '/admin/jadwal');
+          expect(request.headers['Authorization'], 'Bearer jwt-admin');
+          expect(jsonDecode(request.body), {
+            'tahun_ajaran': '2026/2027',
+            'kelas': 'TI-1B',
+            'mata_kuliah_kode': 'TI201',
+            'dosen_nip': '199002202015041003',
+            'ruangan_kode': 'J302',
+            'hari': 'sabtu',
+            'sesi_mulai': 1,
+            'sesi_selesai': 2,
+            'semester': 'genap',
+          });
+          return http.Response(
+            jsonEncode({
+              'message': 'Jadwal berhasil dibuat.',
+              'data': {
+                'id': 'jadwal-baru',
+                'tahun_ajaran_id': 'ta-1',
+                'tahun_ajaran': '2026/2027',
+                'semester': 'genap',
+                'hari': 'sabtu',
+                'sesi_mulai': 1,
+                'sesi_selesai': 2,
+                'jam_mulai': '07:00',
+                'jam_selesai': '08:40',
+                'mata_kuliah_kode': 'TI201',
+                'matkul_nama': 'Struktur Data',
+                'sks': 3,
+                'dosen_nip': '199002202015041003',
+                'dosen_nama': 'Rizky Pratama, S.Kom., M.T.',
+                'program_studi_kode': 'D4-TI',
+                'prodi_nama': 'D4 Teknik Informatika',
+                'kelas_id': 'kelas-2',
+                'kelas_nama': 'TI-1B',
+                'kelas_tingkat': 1,
+                'ruangan_kode': 'J302',
+                'ruangan_nama': 'Ruang J302',
+              },
+            }),
+            201,
+            headers: {'Content-Type': 'application/json'},
+          );
+        }),
+      );
+
+      await tester.pumpWidget(
+        MaterialApp(home: TambahJadwalPage(service: service)),
+      );
+      await tester.pumpAndSettle();
+
+      await pickFromSheet(
+        tester,
+        fieldHint: 'Cari & Pilih Mata Kuliah...',
+        option: 'Struktur Data',
+      );
+      await pickFromSheet(
+        tester,
+        fieldHint: 'Cari Nama/NIP Dosen...',
+        option: 'Rizky Pratama, S.Kom., M.T.',
+      );
+      await pickFromSheet(
+        tester,
+        fieldHint: 'Cari Kelas (TI-2A)...',
+        option: 'TI-1B',
+      );
+      await pickFromSheet(
+        tester,
+        fieldHint: 'Cari Ruang (LPR)...',
+        option: 'Ruang J302',
+      );
+      await pickFromDropdown(
+        tester,
+        field: find.text('Pilih Hari...'),
+        option: 'Sabtu',
+      );
+      await pickFromDropdown(
+        tester,
+        field: find.text('Sesi').first,
+        option: 'Sesi 1 (07:00–07:50)',
+      );
+      await pickFromDropdown(
+        tester,
+        field: find.text('Sesi').last,
+        option: 'Sesi 2 (07:50–08:40)',
+      );
+
+      await tester.tap(find.text('Simpan Jadwal'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('Jadwal Struktur Data untuk TI-1B berhasil disimpan.'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('rejects a class whose level does not match the course', (
