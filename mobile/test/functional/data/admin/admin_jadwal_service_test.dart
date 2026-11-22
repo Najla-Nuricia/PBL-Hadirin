@@ -94,6 +94,88 @@ void main() {
     },
   );
 
+  test(
+    'createJadwal mengirim POST /admin/jadwal dengan payload backend',
+    () async {
+      final service = AdminJadwalService(
+        tokenProvider: () => 'jwt-admin',
+        httpClient: MockClient((request) async {
+          expect(request.method, 'POST');
+          expect(request.url.path, '/admin/jadwal');
+          expect(request.headers['Authorization'], 'Bearer jwt-admin');
+          expect(jsonDecode(request.body), {
+            'tahun_ajaran': '2026/2027',
+            'kelas': 'TI-3A',
+            'mata_kuliah_kode': 'TI501',
+            'dosen_nip': '198501012010121001',
+            'ruangan_kode': 'J301',
+            'hari': 'senin',
+            'sesi_mulai': 2,
+            'sesi_selesai': 3,
+            'semester': 'ganjil',
+          });
+          return jsonResponse({
+            'message': 'Jadwal berhasil dibuat.',
+            'data': jadwalJson(),
+          }, 201);
+        }),
+      );
+
+      final created = await service.createJadwal(
+        tahunAjaran: '2026/2027',
+        kelas: 'TI-3A',
+        mataKuliahKode: 'TI501',
+        dosenNip: '198501012010121001',
+        ruanganKode: 'J301',
+        hari: HariKuliah.senin,
+        sesiMulai: 2,
+        sesiSelesai: 3,
+        semester: SemesterPeriode.ganjil,
+      );
+
+      expect(created.id, 'jadwal-1');
+      expect(created.mataKuliah.nama, 'Pemrograman Web Lanjut');
+      expect(created.kelas.nama, 'TI-3A');
+      expect(created.rentangWaktu, '07:50 – 09:30');
+    },
+  );
+
+  test('createJadwal meneruskan detail konflik backend', () async {
+    final service = AdminJadwalService(
+      tokenProvider: () => 'jwt-admin',
+      httpClient: MockClient((_) async {
+        return jsonResponse({
+          'detail':
+              'Kelas TI-3A sudah memiliki jadwal pada hari senin sesi 2-3.',
+          'code': 'conflict',
+        }, 409);
+      }),
+    );
+
+    expect(
+      () => service.createJadwal(
+        tahunAjaran: '2026/2027',
+        kelas: 'TI-3A',
+        mataKuliahKode: 'TI501',
+        dosenNip: '198501012010121001',
+        ruanganKode: 'J301',
+        hari: HariKuliah.senin,
+        sesiMulai: 2,
+        sesiSelesai: 3,
+        semester: SemesterPeriode.ganjil,
+      ),
+      throwsA(
+        isA<AdminRemoteApiException>()
+            .having((e) => e.statusCode, 'statusCode', 409)
+            .having(
+              (e) => e.message,
+              'message',
+              'Kelas TI-3A sudah memiliki jadwal pada hari senin sesi 2-3.',
+            ),
+      ),
+    );
+  });
+
   test('listJadwal tanpa token menolak permintaan', () async {
     final service = AdminJadwalService(
       tokenProvider: () => null,

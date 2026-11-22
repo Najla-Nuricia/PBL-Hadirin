@@ -29,14 +29,7 @@ class AdminJadwalService {
     required int tingkat,
     required String kelas,
   }) async {
-    final token = _tokenProvider();
-    if (token == null || token.isEmpty) {
-      throw const AdminRemoteApiException(
-        'Sesi admin tidak ditemukan. Silakan masuk ulang.',
-        statusCode: 401,
-      );
-    }
-
+    final token = _requireToken();
     final uri = Uri.parse('${ApiConfig.baseUrl}/admin/jadwal').replace(
       queryParameters: {
         'tahun_ajaran': tahunAjaran,
@@ -59,26 +52,97 @@ class AdminJadwalService {
             .toList(growable: false);
       }
 
-      if (response.statusCode == 401 || response.statusCode == 403) {
-        throw AdminRemoteApiException(
-          'Sesi login berakhir. Silakan masuk ulang.',
-          statusCode: response.statusCode,
-        );
-      }
-
-      throw AdminRemoteApiException(
-        _extractDetail(response, 'Gagal memuat jadwal admin.'),
-        statusCode: response.statusCode,
-      );
+      throw _errorFrom(response, 'Gagal memuat jadwal admin.');
     } on AdminRemoteApiException {
       rethrow;
     } catch (_) {
-      throw AdminRemoteApiException(
-        'Gagal terhubung ke server backend di ${ApiConfig.baseUrl}. '
-        'Pastikan server backend sedang aktif.',
-      );
+      throw _connectionError();
     }
   }
+
+  Future<JadwalKuliah> createJadwal({
+    required String tahunAjaran,
+    required String kelas,
+    required String mataKuliahKode,
+    required String dosenNip,
+    required String ruanganKode,
+    required HariKuliah hari,
+    required int sesiMulai,
+    required int sesiSelesai,
+    required SemesterPeriode semester,
+  }) async {
+    final token = _requireToken();
+    final uri = Uri.parse('${ApiConfig.baseUrl}/admin/jadwal');
+
+    try {
+      final response = await _client
+          .post(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+            body: jsonEncode({
+              'tahun_ajaran': tahunAjaran,
+              'kelas': kelas,
+              'mata_kuliah_kode': mataKuliahKode,
+              'dosen_nip': dosenNip,
+              'ruangan_kode': ruanganKode,
+              'hari': hari.name,
+              'sesi_mulai': sesiMulai,
+              'sesi_selesai': sesiSelesai,
+              'semester': semester.name,
+            }),
+          )
+          .timeout(_timeout);
+
+      if (response.statusCode == 201) {
+        final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+        final data = decoded['data'];
+        if (data is Map<String, dynamic>) {
+          return JadwalKuliah.fromAdminApiJson(data);
+        }
+        throw const AdminRemoteApiException(
+          'Respons backend tidak berisi data jadwal.',
+        );
+      }
+
+      throw _errorFrom(response, 'Gagal menyimpan jadwal admin.');
+    } on AdminRemoteApiException {
+      rethrow;
+    } catch (_) {
+      throw _connectionError();
+    }
+  }
+
+  String _requireToken() {
+    final token = _tokenProvider();
+    if (token == null || token.isEmpty) {
+      throw const AdminRemoteApiException(
+        'Sesi admin tidak ditemukan. Silakan masuk ulang.',
+        statusCode: 401,
+      );
+    }
+    return token;
+  }
+
+  AdminRemoteApiException _errorFrom(http.Response response, String fallback) {
+    if (response.statusCode == 401 || response.statusCode == 403) {
+      return AdminRemoteApiException(
+        'Sesi login berakhir. Silakan masuk ulang.',
+        statusCode: response.statusCode,
+      );
+    }
+    return AdminRemoteApiException(
+      _extractDetail(response, fallback),
+      statusCode: response.statusCode,
+    );
+  }
+
+  AdminRemoteApiException _connectionError() => AdminRemoteApiException(
+    'Gagal terhubung ke server backend di ${ApiConfig.baseUrl}. '
+    'Pastikan server backend sedang aktif.',
+  );
 
   String _extractDetail(http.Response response, String fallback) {
     try {
