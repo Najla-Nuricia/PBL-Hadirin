@@ -168,6 +168,91 @@ class AdminMasterDataService {
     );
   }
 
+  /// Pilihan dosen pengampu untuk form jadwal.
+  Future<List<Dosen>> listDosen({String? search}) async {
+    final response = await _send(
+      () => _client.get(
+        _uri('/admin/dosen', _searchQuery(search)),
+        headers: _authHeaders(),
+      ),
+    );
+    return _listData(response)
+        .map(
+          (json) =>
+              Dosen(nip: _string(json['nip']), nama: _string(json['nama'])),
+        )
+        .toList(growable: false);
+  }
+
+  /// Pilihan program studi untuk form jadwal.
+  Future<List<ProgramStudi>> listProgramStudi() async {
+    final response = await _send(
+      () => _client.get(_uri('/admin/program-studi'), headers: _authHeaders()),
+    );
+    return _listData(response)
+        .map(
+          (json) => ProgramStudi(
+            kode: _string(json['kode']),
+            nama: _string(json['nama']),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  /// Pilihan ruangan untuk form jadwal.
+  Future<List<Ruangan>> listRuangan() async {
+    final response = await _send(
+      () => _client.get(_uri('/admin/ruangan'), headers: _authHeaders()),
+    );
+    return _listData(response)
+        .map(
+          (json) =>
+              Ruangan(kode: _string(json['kode']), nama: _string(json['nama'])),
+        )
+        .toList(growable: false);
+  }
+
+  /// Pilihan sesi kuliah untuk form jadwal.
+  Future<List<SesiKuliah>> listSesiKuliah() async {
+    final response = await _send(
+      () => _client.get(_uri('/admin/sesi-kuliah'), headers: _authHeaders()),
+    );
+    return _listData(response)
+        .map(
+          (json) => SesiKuliah(
+            nomor: _integer(json['nomor']),
+            jamMulai: _string(json['jam_mulai']),
+            jamSelesai: _string(json['jam_selesai']),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  /// Pilihan kelas untuk form jadwal, dibatasi pada tahun ajaran aktif.
+  Future<List<KelasKuliah>> listKelas({String? tahunAjaran}) async {
+    final query = <String, String>{};
+    if (tahunAjaran != null && tahunAjaran.trim().isNotEmpty) {
+      query['tahun_ajaran'] = tahunAjaran.trim();
+    }
+    final response = await _send(
+      () => _client.get(_uri('/kelas', query), headers: _authHeaders()),
+    );
+    return _listData(response)
+        .map(
+          (json) => KelasKuliah(
+            nama: _string(json['nama']),
+            tingkat: _integer(json['tingkat']),
+            programStudiKode: _string(json['program_studi_kode']),
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  Map<String, String> _searchQuery(String? search) =>
+      search != null && search.trim().isNotEmpty
+      ? {'search': search.trim()}
+      : const <String, String>{};
+
   Uri _uri(String path, [Map<String, String>? query]) =>
       Uri.parse('${ApiConfig.baseUrl}$path').replace(queryParameters: query);
 
