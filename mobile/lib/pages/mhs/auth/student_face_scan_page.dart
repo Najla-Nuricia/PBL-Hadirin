@@ -265,6 +265,10 @@ class _StudentFaceScanPageState extends State<StudentFaceScanPage>
           ),
         );
       context.go(StudentRoutePaths.login);
+    } on NimNotWhitelistedException {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      _showMessage('NIM belum terdaftar dalam whitelist admin.');
     } on NimAlreadyRegisteredException {
       if (!mounted) return;
       messenger

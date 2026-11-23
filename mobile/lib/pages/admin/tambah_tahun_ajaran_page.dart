@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../data/admin/admin_auth_repository.dart';
+import '../../data/admin/admin_master_data_service.dart';
 import '../../data/admin/tahun_ajaran.dart';
 import '../../routing/admin_route_paths.dart';
 
@@ -97,35 +99,36 @@ class _TambahTahunAjaranPageState extends State<TambahTahunAjaranPage> {
       _showError('Tanggal selesai harus setelah tanggal mulai.');
       return;
     }
-    if (tahunAjaranRepository.exists(
-      _tahunController.text,
-      excludingId: widget.initialItem?.id,
-    )) {
-      _showError('Tahun ajaran tersebut sudah terdaftar.');
+    setState(() => _isSubmitting = true);
+    try {
+      if (widget.initialItem == null) {
+        await adminMasterDataService.createTahunAjaran(
+          tahun: _tahunController.text,
+          status: _status,
+          semesterGanjil: _semesterGanjil,
+          semesterGenap: _semesterGenap,
+          tanggalMulai: _tanggalMulai,
+          tanggalSelesai: _tanggalSelesai,
+        );
+      } else {
+        await adminMasterDataService.updateTahunAjaran(
+          id: widget.initialItem!.id,
+          tahun: _tahunController.text,
+          status: _status,
+          semesterGanjil: _semesterGanjil,
+          semesterGenap: _semesterGenap,
+          tanggalMulai: _tanggalMulai,
+          tanggalSelesai: _tanggalSelesai,
+        );
+      }
+    } on AdminRemoteApiException catch (error) {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        _showError(error.message);
+      }
       return;
     }
-
-    setState(() => _isSubmitting = true);
-
-    // Simulate network latency
-    await Future<void>.delayed(const Duration(milliseconds: 600));
     if (!mounted) return;
-
-    final item = TahunAjaran(
-      id: widget.initialItem?.id ?? tahunAjaranRepository.generateId(),
-      tahun: _tahunController.text.trim(),
-      status: _status,
-      semesterGanjil: _semesterGanjil,
-      semesterGenap: _semesterGenap,
-      tanggalMulai: _tanggalMulai,
-      tanggalSelesai: _tanggalSelesai,
-    );
-
-    if (widget.initialItem == null) {
-      tahunAjaranRepository.add(item);
-    } else {
-      tahunAjaranRepository.update(item);
-    }
     setState(() => _isSubmitting = false);
 
     if (!mounted) return;
@@ -352,10 +355,10 @@ class _TambahTahunAjaranPageState extends State<TambahTahunAjaranPage> {
                                   color: colorScheme.onPrimary,
                                 ),
                               )
-                                  : Text(
-                                      widget.initialItem == null
-                                          ? 'Simpan tahun ajaran'
-                                          : 'Simpan perubahan',
+                            : Text(
+                                widget.initialItem == null
+                                    ? 'Simpan tahun ajaran'
+                                    : 'Simpan perubahan',
                                 style: TextStyle(
                                   fontWeight: FontWeight.w600,
                                   fontSize: 14,
