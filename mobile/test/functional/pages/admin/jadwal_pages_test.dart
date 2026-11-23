@@ -6,7 +6,9 @@ import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:mobile/data/admin/admin_auth_repository.dart';
+import 'package:mobile/data/admin/admin_jadwal_options_service.dart';
 import 'package:mobile/data/admin/admin_jadwal_service.dart';
+import 'package:mobile/data/admin/admin_master_data_service.dart';
 import 'package:mobile/data/admin/jadwal.dart';
 import 'package:mobile/pages/admin/jadwal_list_page.dart';
 import 'package:mobile/pages/admin/tambah_jadwal_page.dart';
@@ -300,58 +302,116 @@ void main() {
       adminAuthRepository.currentAccessToken = 'jwt-admin';
       addTearDown(adminAuthRepository.logout);
 
-      final service = AdminJadwalService(
-        tokenProvider: () => 'jwt-admin',
-        httpClient: MockClient((request) async {
-          expect(request.method, 'POST');
-          expect(request.url.path, '/admin/jadwal');
-          expect(request.headers['Authorization'], 'Bearer jwt-admin');
-          expect(jsonDecode(request.body), {
-            'tahun_ajaran': '2026/2027',
-            'kelas': 'TI-1B',
-            'mata_kuliah_kode': 'TI201',
-            'dosen_nip': '199002202015041003',
-            'ruangan_kode': 'J302',
-            'hari': 'sabtu',
-            'sesi_mulai': 1,
-            'sesi_selesai': 2,
-            'semester': 'genap',
-          });
-          return http.Response(
-            jsonEncode({
-              'message': 'Jadwal berhasil dibuat.',
-              'data': {
-                'id': 'jadwal-baru',
-                'tahun_ajaran_id': 'ta-1',
-                'tahun_ajaran': '2026/2027',
-                'semester': 'genap',
-                'hari': 'sabtu',
-                'sesi_mulai': 1,
-                'sesi_selesai': 2,
-                'jam_mulai': '07:00',
-                'jam_selesai': '08:40',
-                'mata_kuliah_kode': 'TI201',
-                'matkul_nama': 'Struktur Data',
-                'sks': 3,
-                'dosen_nip': '199002202015041003',
-                'dosen_nama': 'Rizky Pratama, S.Kom., M.T.',
-                'program_studi_kode': 'D4-TI',
-                'prodi_nama': 'D4 Teknik Informatika',
-                'kelas_id': 'kelas-2',
-                'kelas_nama': 'TI-1B',
-                'kelas_tingkat': 1,
-                'ruangan_kode': 'J302',
-                'ruangan_nama': 'Ruang J302',
-              },
-            }),
-            201,
+      http.Response optionsResponse(List<Map<String, dynamic>> data) =>
+          http.Response(
+            jsonEncode({'data': data, 'total': data.length}),
+            200,
             headers: {'Content-Type': 'application/json'},
           );
-        }),
+
+      final httpClient = MockClient((request) async {
+        return switch (request.url.path) {
+          '/admin/jadwal' => () {
+            expect(request.method, 'POST');
+            expect(request.headers['Authorization'], 'Bearer jwt-admin');
+            expect(jsonDecode(request.body), {
+              'tahun_ajaran': '2026/2027',
+              'kelas': 'TI-1B',
+              'mata_kuliah_kode': 'TI201',
+              'dosen_nip': '199002202015041003',
+              'ruangan_kode': 'J302',
+              'hari': 'sabtu',
+              'sesi_mulai': 1,
+              'sesi_selesai': 2,
+              'semester': 'genap',
+            });
+            return http.Response(
+              jsonEncode({
+                'message': 'Jadwal berhasil dibuat.',
+                'data': {
+                  'id': 'jadwal-baru',
+                  'tahun_ajaran_id': 'ta-1',
+                  'tahun_ajaran': '2026/2027',
+                  'semester': 'genap',
+                  'hari': 'sabtu',
+                  'sesi_mulai': 1,
+                  'sesi_selesai': 2,
+                  'jam_mulai': '07:00',
+                  'jam_selesai': '08:40',
+                  'mata_kuliah_kode': 'TI201',
+                  'matkul_nama': 'Struktur Data',
+                  'sks': 3,
+                  'dosen_nip': '199002202015041003',
+                  'dosen_nama': 'Rizky Pratama, S.Kom., M.T.',
+                  'program_studi_kode': 'D4-TI',
+                  'prodi_nama': 'D4 Teknik Informatika',
+                  'kelas_id': 'kelas-2',
+                  'kelas_nama': 'TI-1B',
+                  'kelas_tingkat': 1,
+                  'ruangan_kode': 'J302',
+                  'ruangan_nama': 'Ruang J302',
+                },
+              }),
+              201,
+              headers: {'Content-Type': 'application/json'},
+            );
+          }(),
+          '/admin/tahun-ajaran' => optionsResponse([
+            {
+              'id': 'ta-1',
+              'tahun': '2026/2027',
+              'status': 'aktif',
+              'semester_ganjil': true,
+              'semester_genap': true,
+            },
+          ]),
+          '/admin/mata-kuliah' => optionsResponse([
+            {'kode': 'TI201', 'nama': 'Struktur Data', 'semester': 2, 'sks': 3},
+          ]),
+          '/admin/dosen' => optionsResponse([
+            {
+              'nip': '199002202015041003',
+              'nama': 'Rizky Pratama, S.Kom., M.T.',
+              'email': 'rizky@polinema.ac.id',
+            },
+          ]),
+          '/admin/program-studi' => optionsResponse([
+            {'kode': 'D4-TI', 'nama': 'D4 Teknik Informatika'},
+          ]),
+          '/admin/ruangan' => optionsResponse([
+            {'kode': 'J302', 'nama': 'Ruang J302'},
+          ]),
+          '/admin/sesi-kuliah' => optionsResponse([
+            {'nomor': 1, 'jam_mulai': '07:00', 'jam_selesai': '07:50'},
+            {'nomor': 2, 'jam_mulai': '07:50', 'jam_selesai': '08:40'},
+          ]),
+          '/kelas' => optionsResponse([
+            {
+              'id': 'kelas-2',
+              'nama': 'TI-1B',
+              'tingkat': 1,
+              'program_studi_kode': 'D4-TI',
+              'tahun_ajaran_id': 'ta-1',
+            },
+          ]),
+          _ => fail('Endpoint tak terduga: ${request.url.path}'),
+        };
+      });
+      final service = AdminJadwalService(
+        tokenProvider: () => 'jwt-admin',
+        httpClient: httpClient,
+      );
+      final optionsService = AdminJadwalOptionsService(
+        masterData: AdminMasterDataService(httpClient: httpClient),
       );
 
       await tester.pumpWidget(
-        MaterialApp(home: TambahJadwalPage(service: service)),
+        MaterialApp(
+          home: TambahJadwalPage(
+            service: service,
+            optionsService: optionsService,
+          ),
+        ),
       );
       await tester.pumpAndSettle();
 
