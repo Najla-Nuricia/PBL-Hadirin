@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/admin/tahun_ajaran.dart';
 import '../../routing/admin_route_paths.dart';
+import '../../widgets/widgets.dart';
 import 'tambah_tahun_ajaran_page.dart';
+import 'widgets/admin_list.dart';
+import 'widgets/admin_scaffold.dart';
 
 class TahunAjaranListPage extends StatefulWidget {
   const TahunAjaranListPage({super.key});
@@ -69,29 +73,25 @@ class _TahunAjaranListPageState extends State<TahunAjaranListPage> {
   Future<void> _delete(TahunAjaran item) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) {
-        final colorScheme = Theme.of(context).colorScheme;
-        return AlertDialog(
-          title: const Text('Hapus tahun ajaran?'),
-          content: Text(
-            'Data ${item.tahun} akan dihapus dan tidak dapat dikembalikan.',
+      builder: (context) => AlertDialog(
+        title: const Text('Hapus tahun ajaran?'),
+        content: Text(
+          'Data ${item.tahun} akan dihapus dan tidak dapat dikembalikan.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal'),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Batal'),
+          TextButton(
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
             ),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: colorScheme.error,
-                foregroundColor: colorScheme.onError,
-              ),
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Hapus'),
-            ),
-          ],
-        );
-      },
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
     );
     if (confirmed != true || !mounted) return;
     tahunAjaranRepository.delete(item.id);
@@ -102,291 +102,63 @@ class _TahunAjaranListPageState extends State<TahunAjaranListPage> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      backgroundColor: colorScheme.surface,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _buildHeader(colorScheme),
-            _buildSearchBar(colorScheme),
-            const SizedBox(height: 8),
-            Expanded(
-              child: _displayed.isEmpty
-                  ? _buildEmpty(colorScheme)
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-                      itemCount: _displayed.length,
-                      separatorBuilder: (_, i) => const SizedBox(height: 8),
-                      itemBuilder: (context, index) {
-                        final item = _displayed[index];
-                        return _TahunAjaranCard(
-                          item: item,
-                          onEdit: () => _openEdit(item),
-                          onDelete: () => _delete(item),
-                        );
-                      },
-                    ),
-            ),
-          ],
+    return AdminPageScaffold(
+      title: 'Tahun Ajaran',
+      onBack: _back,
+      bottomBar: AdminBottomBar(
+        child: AppGradientButton(
+          onPressed: _openTambah,
+          icon: PhosphorIconsRegular.plus,
+          label: 'Tambah',
         ),
       ),
-    );
-  }
-
-  Widget _buildHeader(ColorScheme colorScheme) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 12, 16, 12),
-      child: Row(
-        children: [
-          IconButton(
-            onPressed: _back,
-            icon: Icon(
-              Icons.arrow_back_ios_new_rounded,
-              size: 20,
-              color: colorScheme.primary,
-            ),
-            tooltip: 'Kembali',
-          ),
-          const SizedBox(width: 4),
-          Expanded(
-            child: Text(
-              'Tahun Ajaran',
-              style: TextStyle(
-                color: colorScheme.onSurface,
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-          FilledButton.icon(
-            onPressed: _openTambah,
-            icon: const Icon(Icons.add, size: 18),
-            label: const Text(
-              'Tambah',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
-            style: FilledButton.styleFrom(
-              backgroundColor: colorScheme.primary,
-              foregroundColor: colorScheme.onPrimary,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSearchBar(ColorScheme colorScheme) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: TextField(
-        controller: _searchController,
-        decoration: InputDecoration(
+      children: [
+        const SizedBox(height: AppSpacing.sm),
+        AdminSearchField(
+          controller: _searchController,
           hintText: 'Cari tahun ajaran...',
-          hintStyle: TextStyle(
-            color: colorScheme.onSurfaceVariant,
-            fontSize: 13,
-          ),
-          prefixIcon: Icon(
-            Icons.search,
-            color: colorScheme.onSurfaceVariant,
-            size: 20,
-          ),
-          suffixIcon: _searchController.text.isNotEmpty
-              ? IconButton(
-                  icon: Icon(
-                    Icons.close,
-                    color: colorScheme.onSurfaceVariant,
-                    size: 18,
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        if (_displayed.isEmpty)
+          AppEmptyState(
+            icon: PhosphorIconsRegular.calendarBlank,
+            title: 'Tidak ada tahun ajaran ditemukan.',
+            message: _searchController.text.trim().isEmpty
+                ? 'Tahun ajaran yang ditambahkan akan muncul di sini.'
+                : 'Coba kata kunci lain.',
+          )
+        else
+          AdminListCard(
+            children: [
+              for (final item in _displayed)
+                AdminListRow(
+                  icon: PhosphorIconsRegular.calendarBlank,
+                  title: item.tahun,
+                  subtitle: item.semesterLabel,
+                  badge: AdminStatusBadge(
+                    label: item.status.label,
+                    active: item.status == TahunAjaranStatus.aktif,
                   ),
-                  onPressed: () {
-                    _searchController.clear();
-                  },
-                )
-              : null,
-          filled: true,
-          fillColor: colorScheme.surfaceContainerHighest,
-          contentPadding: const EdgeInsets.symmetric(vertical: 12),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: colorScheme.outlineVariant),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: colorScheme.primary),
-          ),
-        ),
-        style: TextStyle(color: colorScheme.onSurface, fontSize: 13),
-      ),
-    );
-  }
-
-  Widget _buildEmpty(ColorScheme colorScheme) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.calendar_today_outlined,
-            size: 48,
-            color: colorScheme.onSurfaceVariant,
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Tidak ada tahun ajaran ditemukan.',
-            style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────
-// Card item tahun ajaran
-// ─────────────────────────────────────────────────────────
-class _TahunAjaranCard extends StatelessWidget {
-  const _TahunAjaranCard({
-    required this.item,
-    required this.onEdit,
-    required this.onDelete,
-  });
-
-  final TahunAjaran item;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final isAktif = item.status == TahunAjaranStatus.aktif;
-
-    return Material(
-      color: colorScheme.surface,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: colorScheme.outlineVariant),
-        ),
-        child: Row(
-          children: [
-            // Ikon kalender
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                Icons.calendar_month_outlined,
-                color: colorScheme.primary,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 12),
-            // Info
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Flexible(
-                        child: Text(
-                          item.tahun,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            color: colorScheme.onSurface,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+                      IconButton(
+                        onPressed: () => _openEdit(item),
+                        tooltip: 'Edit tahun ajaran',
+                        icon: const Icon(PhosphorIconsRegular.pencilSimple),
                       ),
-                      if (isAktif) ...[
-                        const SizedBox(width: 8),
-                        _AktifBadge(colorScheme: colorScheme),
-                      ],
+                      IconButton(
+                        onPressed: () => _delete(item),
+                        tooltip: 'Hapus tahun ajaran',
+                        color: colorScheme.error,
+                        icon: const Icon(PhosphorIconsRegular.trash),
+                      ),
                     ],
                   ),
-                  const SizedBox(height: 3),
-                  Text(
-                    item.semesterLabel,
-                    style: TextStyle(
-                      color: colorScheme.onSurfaceVariant,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            IconButton(
-              onPressed: onEdit,
-              tooltip: 'Edit tahun ajaran',
-              constraints: const BoxConstraints.tightFor(width: 32, height: 32),
-              padding: EdgeInsets.zero,
-              visualDensity: VisualDensity.compact,
-              icon: Icon(Icons.edit_outlined, color: colorScheme.primary),
-            ),
-            IconButton(
-              onPressed: onDelete,
-              tooltip: 'Hapus tahun ajaran',
-              constraints: const BoxConstraints.tightFor(width: 32, height: 32),
-              padding: EdgeInsets.zero,
-              visualDensity: VisualDensity.compact,
-              icon: Icon(Icons.delete_outline, color: colorScheme.error),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _AktifBadge extends StatelessWidget {
-  const _AktifBadge({required this.colorScheme});
-  final ColorScheme colorScheme;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: colorScheme.secondaryContainer,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 6,
-            height: 6,
-            decoration: BoxDecoration(
-              color: colorScheme.secondary,
-              shape: BoxShape.circle,
-            ),
+                ),
+            ],
           ),
-          const SizedBox(width: 4),
-          Text(
-            'Aktif',
-            style: TextStyle(
-              color: colorScheme.onSecondaryContainer,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
+      ],
     );
   }
 }

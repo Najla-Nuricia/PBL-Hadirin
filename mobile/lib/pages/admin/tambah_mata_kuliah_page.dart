@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../../data/admin/jadwal.dart';
 import '../../data/admin/mata_kuliah.dart';
 import '../../routing/admin_route_paths.dart';
+import '../../widgets/widgets.dart';
+import 'widgets/admin_scaffold.dart';
 import 'widgets/labeled_fields.dart';
 
 const _programStudi = {
@@ -32,6 +34,9 @@ class _TambahMataKuliahPageState extends State<TambahMataKuliahPage> {
   String _prodi = _programStudi.keys.first;
   String _semester = '3';
   MataKuliahStatus _status = MataKuliahStatus.aktif;
+
+  /// Alasan data ditolak saat disimpan; tampil di atas tombol simpan.
+  String? _error;
 
   @override
   void initState() {
@@ -64,7 +69,7 @@ class _TambahMataKuliahPageState extends State<TambahMataKuliahPage> {
       kode,
       excludingId: widget.initialItem?.id,
     )) {
-      _showError('Kode mata kuliah tersebut sudah terdaftar.');
+      setState(() => _error = 'Kode mata kuliah tersebut sudah terdaftar.');
       return;
     }
 
@@ -91,10 +96,8 @@ class _TambahMataKuliahPageState extends State<TambahMataKuliahPage> {
     }
   }
 
-  void _showError(String message) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
+  void _clearError() {
+    if (_error != null) setState(() => _error = null);
   }
 
   @override
@@ -103,10 +106,17 @@ class _TambahMataKuliahPageState extends State<TambahMataKuliahPage> {
       title: widget.initialItem == null
           ? 'Tambah Mata Kuliah'
           : 'Edit Mata Kuliah',
+      onSave: _save,
+      notice: _error == null
+          ? null
+          : AppBanner(tone: StatusTone.danger, message: _error!),
       form: Form(
         key: _formKey,
+        onChanged: _clearError,
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            const SizedBox(height: AppSpacing.md),
             LabeledTextField(
               label: 'Kode Mata Kuliah',
               required: true,
@@ -115,7 +125,7 @@ class _TambahMataKuliahPageState extends State<TambahMataKuliahPage> {
               helper: 'Contoh: TI101',
               validator: _required('Kode mata kuliah'),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
             LabeledTextField(
               label: 'Nama Mata Kuliah',
               required: true,
@@ -123,7 +133,7 @@ class _TambahMataKuliahPageState extends State<TambahMataKuliahPage> {
               hint: 'Basis Data',
               validator: _required('Nama mata kuliah'),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
             LabeledDropdown(
               label: 'SKS',
               required: true,
@@ -131,7 +141,7 @@ class _TambahMataKuliahPageState extends State<TambahMataKuliahPage> {
               items: _sksOptions,
               onChanged: (value) => setState(() => _sks = value),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
             LabeledDropdown(
               label: 'Program Studi',
               required: true,
@@ -140,7 +150,7 @@ class _TambahMataKuliahPageState extends State<TambahMataKuliahPage> {
               itemLabels: _programStudi,
               onChanged: (value) => setState(() => _prodi = value),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
             LabeledDropdown(
               label: 'Semester',
               required: true,
@@ -148,7 +158,7 @@ class _TambahMataKuliahPageState extends State<TambahMataKuliahPage> {
               items: _semesterOptions,
               onChanged: (value) => setState(() => _semester = value),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
             LabeledDropdown(
               label: 'Status',
               required: true,
@@ -163,86 +173,11 @@ class _TambahMataKuliahPageState extends State<TambahMataKuliahPage> {
           ],
         ),
       ),
-      onSave: _save,
     );
   }
 
   FormFieldValidator<String> _required(String label) {
     return (value) =>
         (value ?? '').trim().isEmpty ? '$label wajib diisi' : null;
-  }
-}
-
-class AdminFormScaffold extends StatelessWidget {
-  const AdminFormScaffold({
-    super.key,
-    required this.title,
-    required this.form,
-    required this.onSave,
-  });
-
-  final String title;
-  final Widget form;
-  final VoidCallback onSave;
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Scaffold(
-      backgroundColor: cs.surface,
-      appBar: AppBar(
-        backgroundColor: cs.surface,
-        surfaceTintColor: Colors.transparent,
-        centerTitle: true,
-        leading: IconButton(
-          onPressed: () => context.canPop()
-              ? context.pop()
-              : context.go(AdminRoutePaths.mataKuliah),
-          icon: Icon(Icons.arrow_back_ios_new_rounded, color: cs.primary),
-          tooltip: 'Kembali',
-        ),
-        title: Text(
-          title,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: cs.onSurface,
-          ),
-        ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Divider(height: 1, color: cs.outlineVariant),
-        ),
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-                child: form,
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: cs.surface,
-                border: Border(top: BorderSide(color: cs.outlineVariant)),
-              ),
-              child: SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: FilledButton(
-                  onPressed: onSave,
-                  child: Text(
-                    title.startsWith('Edit') ? 'Simpan Perubahan' : 'Simpan',
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }

@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/admin/tahun_ajaran.dart';
 import '../../routing/admin_route_paths.dart';
+import '../../widgets/widgets.dart';
+import 'widgets/admin_scaffold.dart';
+import 'widgets/jadwal_form_widgets.dart';
+import 'widgets/labeled_fields.dart';
 
 class TambahTahunAjaranPage extends StatefulWidget {
   const TambahTahunAjaranPage({this.initialItem, super.key});
@@ -23,6 +28,10 @@ class _TambahTahunAjaranPageState extends State<TambahTahunAjaranPage> {
   DateTime? _tanggalMulai;
   DateTime? _tanggalSelesai;
   bool _isSubmitting = false;
+  AutovalidateMode _autovalidateMode = AutovalidateMode.disabled;
+
+  /// Alasan data ditolak saat disimpan; tampil di atas tombol simpan.
+  String? _error;
 
   @override
   void initState() {
@@ -44,7 +53,6 @@ class _TambahTahunAjaranPageState extends State<TambahTahunAjaranPage> {
     super.dispose();
   }
 
-  // ── Date picker ──────────────────────────────────────────
   Future<void> _pickDate({required bool isStart}) async {
     final now = DateTime.now();
     final initial = isStart
@@ -57,13 +65,8 @@ class _TambahTahunAjaranPageState extends State<TambahTahunAjaranPage> {
       firstDate: DateTime(2020),
       lastDate: DateTime(2035),
       helpText: isStart ? 'Pilih tanggal mulai' : 'Pilih tanggal selesai',
-      builder: (context, child) => Theme(
-        data: Theme.of(context)
-            .copyWith(colorScheme: Theme.of(context).colorScheme),
-        child: child!,
-      ),
     );
-    if (picked == null) return;
+    if (picked == null || !mounted) return;
     setState(() {
       if (isStart) {
         _tanggalMulai = picked;
@@ -77,34 +80,49 @@ class _TambahTahunAjaranPageState extends State<TambahTahunAjaranPage> {
     });
   }
 
-  // ── Submit ────────────────────────────────────────────────
+  String? _validateTahun(String? value) {
+    final tahun = (value ?? '').trim();
+    if (tahun.isEmpty) return 'Tahun ajaran wajib diisi.';
+    final pattern = RegExp(r'^\d{4}/\d{4}$');
+    if (!pattern.hasMatch(tahun)) {
+      return 'Format: YYYY/YYYY, contoh 2026/2027';
+    }
+    return null;
+  }
+
+  String? _validateSemester() {
+    return !_semesterGanjil && !_semesterGenap
+        ? 'Pilih minimal satu semester.'
+        : null;
+  }
+
+  String? _validateTanggalSelesai() {
+    final selesai = _tanggalSelesai;
+    if (selesai == null) return 'Tanggal selesai wajib diisi.';
+    final mulai = _tanggalMulai;
+    if (mulai != null && selesai.isBefore(mulai)) {
+      return 'Tanggal selesai harus setelah tanggal mulai.';
+    }
+    return null;
+  }
+
   Future<void> _submit() async {
+    if (_isSubmitting) return;
+    setState(() {
+      _error = null;
+      _autovalidateMode = AutovalidateMode.onUserInteraction;
+    });
     if (!_formKey.currentState!.validate()) return;
 
-    if (!_semesterGanjil && !_semesterGenap) {
-      _showError('Pilih minimal satu semester.');
-      return;
-    }
-    if (_tanggalMulai == null) {
-      _showError('Tanggal mulai wajib diisi.');
-      return;
-    }
-    if (_tanggalSelesai == null) {
-      _showError('Tanggal selesai wajib diisi.');
-      return;
-    }
-    if (_tanggalSelesai!.isBefore(_tanggalMulai!)) {
-      _showError('Tanggal selesai harus setelah tanggal mulai.');
-      return;
-    }
     if (tahunAjaranRepository.exists(
       _tahunController.text,
       excludingId: widget.initialItem?.id,
     )) {
-      _showError('Tahun ajaran tersebut sudah terdaftar.');
+      setState(() => _error = 'Tahun ajaran tersebut sudah terdaftar.');
       return;
     }
 
+    FocusScope.of(context).unfocus();
     setState(() => _isSubmitting = true);
 
     // Simulate network latency
@@ -144,516 +162,101 @@ class _TambahTahunAjaranPageState extends State<TambahTahunAjaranPage> {
     }
   }
 
-  void _showError(String msg) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(msg)));
+  void _clearError() {
+    if (_error != null) setState(() => _error = null);
   }
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final isNew = widget.initialItem == null;
 
-    return Scaffold(
-      backgroundColor: colorScheme.surface,
-      appBar: AppBar(
-        backgroundColor: colorScheme.surface,
-        surfaceTintColor: Colors.transparent,
-        scrolledUnderElevation: 0,
-        centerTitle: true,
-        leading: IconButton(
-          onPressed: _back,
-          icon: Icon(
-            Icons.arrow_back_ios_new_rounded,
-            size: 20,
-            color: colorScheme.primary,
-          ),
-          tooltip: 'Kembali',
-        ),
-        title: Text(
-          widget.initialItem == null
-              ? 'Tambah Tahun Ajaran'
-              : 'Edit Tahun Ajaran',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: colorScheme.onSurface,
-          ),
-        ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Divider(
-            height: 1,
-            thickness: 1,
-            color: colorScheme.outlineVariant,
-          ),
-        ),
-      ),
-      body: SafeArea(
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // ── Section 01 ──────────────────────────
-                _SectionHeader(
-                  number: '01',
-                  title: 'Informasi periode',
-                  subtitle: 'Masukkan identitas dan semester yang tersedia.',
-                  colorScheme: colorScheme,
-                ),
-                const SizedBox(height: 20),
-                _FieldLabel(
-                  label: 'Tahun ajaran',
-                  required: true,
-                  colorScheme: colorScheme,
-                ),
-                const SizedBox(height: 6),
-                TextFormField(
-                  controller: _tahunController,
-                  decoration: _fieldDecoration(
-                    colorScheme,
-                    hintText: '2026/2027',
-                    helperText: 'Contoh: 2026/2027',
-                  ),
-                  style: TextStyle(color: colorScheme.onSurface, fontSize: 14),
-                  validator: (v) {
-                    final val = (v ?? '').trim();
-                    if (val.isEmpty) return 'Tahun ajaran wajib diisi.';
-                    final pattern = RegExp(r'^\d{4}/\d{4}$');
-                    if (!pattern.hasMatch(val)) {
-                      return 'Format: YYYY/YYYY, contoh 2026/2027';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                _FieldLabel(
-                  label: 'Status',
-                  required: true,
-                  colorScheme: colorScheme,
-                ),
-                const SizedBox(height: 6),
-                _StatusDropdown(
-                  value: _status,
-                  colorScheme: colorScheme,
-                  onChanged: (v) => setState(() => _status = v!),
-                ),
-                const SizedBox(height: 16),
-                _FieldLabel(
-                  label: 'Semester',
-                  required: true,
-                  colorScheme: colorScheme,
-                ),
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    Expanded(
-                      child: _SemesterToggleCard(
-                        label: defaultSemesterInfo.namaGanjil,
-                        period: defaultSemesterInfo.periodGanjil,
-                        selected: _semesterGanjil,
-                        colorScheme: colorScheme,
-                        onTap: () =>
-                            setState(() => _semesterGanjil = !_semesterGanjil),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _SemesterToggleCard(
-                        label: defaultSemesterInfo.namaGenap,
-                        period: defaultSemesterInfo.periodGenap,
-                        selected: _semesterGenap,
-                        colorScheme: colorScheme,
-                        onTap: () =>
-                            setState(() => _semesterGenap = !_semesterGenap),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 28),
-
-                // ── Section 02 ──────────────────────────
-                _SectionHeader(
-                  number: '02',
-                  title: 'Rentang tanggal',
-                  subtitle: 'Tentukan waktu mulai dan berakhirnya periode.',
-                  colorScheme: colorScheme,
-                ),
-                const SizedBox(height: 20),
-                _FieldLabel(
-                  label: 'Tanggal mulai',
-                  required: true,
-                  colorScheme: colorScheme,
-                ),
-                const SizedBox(height: 6),
-                _DatePickerField(
-                  date: _tanggalMulai,
-                  colorScheme: colorScheme,
-                  onTap: () => _pickDate(isStart: true),
-                ),
-                const SizedBox(height: 16),
-                _FieldLabel(
-                  label: 'Tanggal selesai',
-                  required: true,
-                  colorScheme: colorScheme,
-                ),
-                const SizedBox(height: 6),
-                _DatePickerField(
-                  date: _tanggalSelesai,
-                  colorScheme: colorScheme,
-                  onTap: () => _pickDate(isStart: false),
-                  firstSelectableDate: _tanggalMulai,
-                ),
-                const SizedBox(height: 32),
-
-                // ── Buttons ─────────────────────────────
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: _isSubmitting ? null : _back,
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          side: BorderSide(color: colorScheme.outlineVariant),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          foregroundColor: colorScheme.onSurface,
-                        ),
-                        child: const Text(
-                          'Batal',
-                          style: TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      flex: 2,
-                      child: FilledButton(
-                        onPressed: _isSubmitting ? null : _submit,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: colorScheme.primary,
-                          disabledBackgroundColor: colorScheme.primary
-                              .withValues(alpha: 0.38),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: _isSubmitting
-                            ? SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: colorScheme.onPrimary,
-                                ),
-                              )
-                                  : Text(
-                                      widget.initialItem == null
-                                          ? 'Simpan tahun ajaran'
-                                          : 'Simpan perubahan',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 14,
-                                ),
-                              ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  InputDecoration _fieldDecoration(
-    ColorScheme colorScheme, {
-    String? hintText,
-    String? helperText,
-  }) {
-    return InputDecoration(
-      hintText: hintText,
-      hintStyle: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13),
-      helperText: helperText,
-      helperStyle: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 11),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: colorScheme.outlineVariant),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: colorScheme.outlineVariant),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
-      ),
-      errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: colorScheme.error),
-      ),
-      focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: colorScheme.error, width: 1.5),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────
-// Section header (numbered)
-// ─────────────────────────────────────────────────────────
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({
-    required this.number,
-    required this.title,
-    required this.subtitle,
-    required this.colorScheme,
-  });
-
-  final String number;
-  final String title;
-  final String subtitle;
-  final ColorScheme colorScheme;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          width: 28,
-          height: 28,
-          decoration: BoxDecoration(
-            color: colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          alignment: Alignment.center,
-          child: Text(
-            number,
-            style: TextStyle(
-              color: colorScheme.primary,
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: TextStyle(
-                  color: colorScheme.onSurface,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: TextStyle(
-                  color: colorScheme.onSurfaceVariant,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────
-// Field label with asterisk for required
-// ─────────────────────────────────────────────────────────
-class _FieldLabel extends StatelessWidget {
-  const _FieldLabel({
-    required this.label,
-    this.required = false,
-    required this.colorScheme,
-  });
-
-  final String label;
-  final bool required;
-  final ColorScheme colorScheme;
-
-  @override
-  Widget build(BuildContext context) {
-    return RichText(
-      text: TextSpan(
-        children: [
-          TextSpan(
-            text: label,
-            style: TextStyle(
-              color: colorScheme.onSurface,
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          if (required)
-            TextSpan(
-              text: ' *',
-              style: TextStyle(
-                color: colorScheme.error,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────
-// Status dropdown
-// ─────────────────────────────────────────────────────────
-class _StatusDropdown extends StatelessWidget {
-  const _StatusDropdown({
-    required this.value,
-    required this.colorScheme,
-    required this.onChanged,
-  });
-
-  final TahunAjaranStatus value;
-  final ColorScheme colorScheme;
-  final ValueChanged<TahunAjaranStatus?> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return DropdownButtonFormField<TahunAjaranStatus>(
-      initialValue: value,
-      items: TahunAjaranStatus.values
-          .map(
-            (s) => DropdownMenuItem(
-              value: s,
-              child: Text(
-                s.label,
-                style: TextStyle(color: colorScheme.onSurface, fontSize: 14),
-              ),
-            ),
-          )
-          .toList(),
-      onChanged: onChanged,
-      icon: Icon(
-        Icons.keyboard_arrow_down,
-        color: colorScheme.onSurfaceVariant,
-      ),
-      decoration: InputDecoration(
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 14,
-          vertical: 13,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: colorScheme.outlineVariant),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: colorScheme.outlineVariant),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────
-// Semester toggle card
-// ─────────────────────────────────────────────────────────
-class _SemesterToggleCard extends StatelessWidget {
-  const _SemesterToggleCard({
-    required this.label,
-    required this.period,
-    required this.selected,
-    required this.colorScheme,
-    required this.onTap,
-  });
-
-  final String label;
-  final String period;
-  final bool selected;
-  final ColorScheme colorScheme;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        decoration: BoxDecoration(
-          color: selected ? colorScheme.primaryContainer : colorScheme.surface,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: selected ? colorScheme.primary : colorScheme.outlineVariant,
-            width: selected ? 1.5 : 1,
-          ),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return AdminFormScaffold(
+      title: isNew ? 'Tambah Tahun Ajaran' : 'Edit Tahun Ajaran',
+      onBack: _back,
+      onSave: _submit,
+      saveLabel: isNew ? 'Simpan tahun ajaran' : 'Simpan perubahan',
+      isSaving: _isSubmitting,
+      notice: _error == null
+          ? null
+          : AppBanner(tone: StatusTone.danger, message: _error!),
+      form: Form(
+        key: _formKey,
+        autovalidateMode: _autovalidateMode,
+        onChanged: _clearError,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              width: 18,
-              height: 18,
-              decoration: BoxDecoration(
-                color: selected ? colorScheme.primary : colorScheme.surface,
-                borderRadius: BorderRadius.circular(4),
-                border: Border.all(
-                  color: selected
-                      ? colorScheme.primary
-                      : colorScheme.outlineVariant,
-                ),
-              ),
-              child: selected
-                  ? Icon(Icons.check, size: 12, color: colorScheme.onPrimary)
-                  : null,
+            const AppSectionHeader(title: 'Informasi periode'),
+            const _SectionHint(
+              'Masukkan identitas dan semester yang tersedia.',
             ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: TextStyle(
-                      color: selected
-                          ? colorScheme.onPrimaryContainer
-                          : colorScheme.onSurface,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    period,
-                    style: TextStyle(
-                      color: selected
-                          ? colorScheme.onPrimaryContainer.withValues(
-                              alpha: 0.7,
-                            )
-                          : colorScheme.onSurfaceVariant,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
+            const SizedBox(height: AppSpacing.lg),
+            LabeledTextField(
+              label: 'Tahun ajaran',
+              required: true,
+              controller: _tahunController,
+              hint: '2026/2027',
+              helper: 'Contoh: 2026/2027',
+              validator: _validateTahun,
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            const AdminFieldLabel(label: 'Status', required: true),
+            JadwalDropdownField<TahunAjaranStatus>(
+              value: _status,
+              items: TahunAjaranStatus.values,
+              itemLabel: (status) => status.label,
+              onChanged: (status) {
+                if (status != null) setState(() => _status = status);
+              },
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            const AdminFieldLabel(label: 'Semester', required: true),
+            FormField<bool>(
+              validator: (_) => _validateSemester(),
+              builder: (field) => _SemesterChoices(
+                ganjil: _semesterGanjil,
+                genap: _semesterGenap,
+                errorText: field.errorText,
+                onGanjilChanged: (selected) {
+                  setState(() => _semesterGanjil = selected);
+                  field.didChange(_semesterGanjil || _semesterGenap);
+                },
+                onGenapChanged: (selected) {
+                  setState(() => _semesterGenap = selected);
+                  field.didChange(_semesterGanjil || _semesterGenap);
+                },
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            const AppSectionHeader(title: 'Rentang tanggal'),
+            const _SectionHint('Tentukan waktu mulai dan berakhirnya periode.'),
+            const SizedBox(height: AppSpacing.lg),
+            const AdminFieldLabel(label: 'Tanggal mulai', required: true),
+            FormField<DateTime>(
+              validator: (_) =>
+                  _tanggalMulai == null ? 'Tanggal mulai wajib diisi.' : null,
+              builder: (field) => _DatePickerField(
+                date: _tanggalMulai,
+                errorText: field.errorText,
+                semanticLabel: 'Pilih tanggal mulai',
+                onTap: () async {
+                  await _pickDate(isStart: true);
+                  if (field.mounted) field.didChange(_tanggalMulai);
+                },
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            const AdminFieldLabel(label: 'Tanggal selesai', required: true),
+            FormField<DateTime>(
+              validator: (_) => _validateTanggalSelesai(),
+              builder: (field) => _DatePickerField(
+                date: _tanggalSelesai,
+                errorText: field.errorText,
+                semanticLabel: 'Pilih tanggal selesai',
+                onTap: () async {
+                  await _pickDate(isStart: false);
+                  if (field.mounted) field.didChange(_tanggalSelesai);
+                },
               ),
             ),
           ],
@@ -663,21 +266,109 @@ class _SemesterToggleCard extends StatelessWidget {
   }
 }
 
-// ─────────────────────────────────────────────────────────
-// Date picker field
-// ─────────────────────────────────────────────────────────
+class _SectionHint extends StatelessWidget {
+  const _SectionHint(this.text);
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: Theme.of(context).textTheme.bodySmall
+          ?.copyWith(color: AppColors.inkMuted),
+    );
+  }
+}
+
+/// Pilihan semester ganjil dan genap; keduanya boleh dicentang.
+class _SemesterChoices extends StatelessWidget {
+  const _SemesterChoices({
+    required this.ganjil,
+    required this.genap,
+    required this.onGanjilChanged,
+    required this.onGenapChanged,
+    this.errorText,
+  });
+
+  final bool ganjil;
+  final bool genap;
+  final ValueChanged<bool> onGanjilChanged;
+  final ValueChanged<bool> onGenapChanged;
+  final String? errorText;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    Widget choice({
+      required String label,
+      required String period,
+      required bool selected,
+      required ValueChanged<bool> onChanged,
+    }) {
+      return CheckboxListTile(
+        value: selected,
+        onChanged: (value) => onChanged(value ?? false),
+        title: Text(label, style: theme.textTheme.titleSmall),
+        subtitle: Text(
+          period,
+          style: theme.textTheme.bodySmall?.copyWith(color: AppColors.inkFaint),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Card(
+          child: Column(
+            children: [
+              choice(
+                label: defaultSemesterInfo.namaGanjil,
+                period: defaultSemesterInfo.periodGanjil,
+                selected: ganjil,
+                onChanged: onGanjilChanged,
+              ),
+              const Divider(),
+              choice(
+                label: defaultSemesterInfo.namaGenap,
+                period: defaultSemesterInfo.periodGenap,
+                selected: genap,
+                onChanged: onGenapChanged,
+              ),
+            ],
+          ),
+        ),
+        if (errorText != null)
+          Padding(
+            // Sejajar dengan pesan galat di bawah kolom isian tema.
+            padding: const EdgeInsets.only(top: 6, left: 18),
+            child: Text(
+              errorText!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// Kolom tanggal yang membuka pemilih tanggal saat diketuk.
 class _DatePickerField extends StatelessWidget {
   const _DatePickerField({
     required this.date,
-    required this.colorScheme,
     required this.onTap,
-    this.firstSelectableDate,
+    required this.semanticLabel,
+    this.errorText,
   });
 
   final DateTime? date;
-  final ColorScheme colorScheme;
   final VoidCallback onTap;
-  final DateTime? firstSelectableDate;
+  final String semanticLabel;
+  final String? errorText;
 
   String get _formattedDate {
     if (date == null) return '';
@@ -688,41 +379,25 @@ class _DatePickerField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: InputDecorator(
-        decoration: InputDecoration(
-          suffixIcon: Icon(
-            Icons.calendar_today_outlined,
-            size: 18,
-            color: colorScheme.onSurfaceVariant,
+    return Semantics(
+      button: true,
+      label: semanticLabel,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppRadius.control,
+        child: InputDecorator(
+          isEmpty: date == null,
+          decoration: InputDecoration(
+            hintText: 'Pilih tanggal',
+            errorText: errorText,
+            suffixIcon: const Icon(PhosphorIconsRegular.calendarBlank, size: 20),
           ),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 14,
-            vertical: 13,
-          ),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(color: colorScheme.outlineVariant),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(color: colorScheme.outlineVariant),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
-          ),
-        ),
-        child: Text(
-          _formattedDate,
-          style: TextStyle(
-            color: date != null
-                ? colorScheme.onSurface
-                : colorScheme.onSurfaceVariant,
-            fontSize: 14,
-          ),
+          child: date == null
+              ? null
+              : Text(
+                  _formattedDate,
+                  style: Theme.of(context).textTheme.bodyLarge?.tabular,
+                ),
         ),
       ),
     );

@@ -1,93 +1,95 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../../theme/style/auth_style.dart';
+import '../../../../widgets/widgets.dart';
 
+/// Kepala layar auth di atas langit: logo atau tombol kembali, indikator
+/// langkah, judul, dan keterangan. Tepi awan di bawahnya menyambung ke
+/// formulir.
 class AuthHeader extends StatelessWidget {
   const AuthHeader({
     required this.title,
     required this.activeSteps,
-    this.totalSteps = 2,
+    this.totalSteps = 1,
     this.subtitle,
     this.onBack,
     super.key,
   });
 
   final String title;
+
+  /// Langkah yang sedang dijalani, dihitung dari 1.
   final int activeSteps;
+
+  /// Jumlah langkah alur ini. Indikator hanya tampil bila lebih dari satu.
   final int totalSteps;
   final String? subtitle;
   final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final hasBackButton = onBack != null;
+    final text = Theme.of(context).textTheme;
+    // Pemanggil yang hanya mengirim `activeSteps: 2` tetap mendapat dua segmen.
+    final steps = math.max(totalSteps, activeSteps);
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(
-        AuthStyle.headerHorizontalPadding,
-        hasBackButton ? 40 : 48,
-        AuthStyle.headerHorizontalPadding,
-        hasBackButton ? 16 : 32,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _StepIndicator(activeSteps: activeSteps, totalSteps: totalSteps),
-          SizedBox(height: hasBackButton ? 16 : 32),
-          Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal:
-                  AuthStyle.contentHorizontalPadding -
-                  AuthStyle.headerHorizontalPadding,
+      padding: const EdgeInsets.only(bottom: AppSpacing.lg),
+      child: SkyHeader(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Tingginya tetap dipesan walau tanpa tombol, supaya judul tidak
+            // bergeser saat berpindah dari login ke registrasi.
+            SizedBox(
+              height: AppSizes.touch,
+              child: onBack == null
+                  ? const Align(
+                      alignment: Alignment.centerLeft,
+                      child: WordmarkPill(),
+                    )
+                  : Align(
+                      alignment: Alignment.centerLeft,
+                      child: IconButton(
+                        onPressed: onBack,
+                        tooltip: 'Kembali',
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: AppColors.gownNavy,
+                        ),
+                        icon: const Icon(PhosphorIconsRegular.arrowLeft),
+                      ),
+                    ),
             ),
-            child: _buildTitleBlock(colorScheme),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTitleBlock(ColorScheme colorScheme) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        if (onBack != null)
-          TextButton.icon(
-            onPressed: onBack,
-            icon: const Icon(Icons.chevron_left, size: 20),
-            label: const Text('Kembali'),
-            style: TextButton.styleFrom(
-              foregroundColor: colorScheme.onSurfaceVariant,
-              padding: EdgeInsets.zero,
-              minimumSize: const Size(0, 32),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              textStyle: const TextStyle(
-                fontSize: AuthStyle.bodySize,
-                fontWeight: FontWeight.w400,
+            const SizedBox(height: AppSpacing.xl),
+            if (steps > 1) ...[
+              _StepIndicator(activeSteps: activeSteps, totalSteps: steps),
+              const SizedBox(height: AppSpacing.lg),
+            ],
+            Semantics(
+              header: true,
+              child: Text(
+                title,
+                style: text.headlineLarge?.copyWith(
+                  color: AppColors.gownNavy,
+                ),
               ),
             ),
-          ),
-        Text(
-          title,
-          style: TextStyle(
-            color: colorScheme.onSurface,
-            fontSize: AuthStyle.titleSize,
-            fontWeight: FontWeight.w700,
-            height: 32 / AuthStyle.titleSize,
-          ),
+            if (subtitle != null) ...[
+              const SizedBox(height: AppSpacing.xs),
+              Text(
+                subtitle!,
+                style: text.bodyLarge?.copyWith(
+                  color: AppColors.gownNavy,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ],
         ),
-        if (subtitle != null) ...[
-          const SizedBox(height: 8),
-          Text(
-            subtitle!,
-            style: TextStyle(
-              color: colorScheme.onSurfaceVariant,
-              fontSize: AuthStyle.bodySize,
-            ),
-          ),
-        ],
-      ],
+      ),
     );
   }
 }
@@ -100,30 +102,37 @@ class _StepIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Semantics(
-      label: 'Langkah $activeSteps dari $totalSteps',
-      child: Row(
-        children: [
-          for (var step = 0; step < totalSteps; step++) ...[
-            if (step > 0) const SizedBox(width: 4),
-            Expanded(
-              child: Container(
-                height: AuthStyle.stepIndicatorHeight,
-                decoration: BoxDecoration(
-                  color: step < activeSteps
-                      ? colorScheme.primary
-                      : colorScheme.outline,
-                  borderRadius: BorderRadius.circular(
-                    AuthStyle.stepIndicatorHeight,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Posisi langkah ditulis juga, tidak hanya dibedakan lewat warna.
+        Text(
+          'Langkah $activeSteps dari $totalSteps',
+          style: Theme.of(context).textTheme.labelMedium?.tabular.copyWith(
+            color: AppColors.gownNavy,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        ExcludeSemantics(
+          child: Row(
+            spacing: AppSpacing.xs,
+            children: [
+              for (var step = 0; step < totalSteps; step++)
+                Expanded(
+                  child: Container(
+                    height: AuthStyle.stepIndicatorHeight,
+                    decoration: BoxDecoration(
+                      color: step < activeSteps
+                          ? AppColors.gownNavy
+                          : Colors.white.withValues(alpha: 0.55),
+                      borderRadius: AppRadius.pill,
+                    ),
                   ),
                 ),
-              ),
-            ),
-          ],
-        ],
-      ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

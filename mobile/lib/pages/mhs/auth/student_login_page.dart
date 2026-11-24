@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../data/mhs/dummy_student_auth_repository.dart';
 import '../../../routing/student_route_paths.dart';
 import '../../../theme/style/auth_style.dart';
+import '../../../widgets/widgets.dart';
 import 'widgets/auth_buttons.dart';
 import 'widgets/auth_header.dart';
 import 'widgets/auth_scaffold.dart';
@@ -69,26 +70,26 @@ class _StudentLoginPageState extends State<StudentLoginPage> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        const SnackBar(content: Text('Fitur lupa password belum tersedia.')),
+        const SnackBar(content: Text('Fitur lupa kata sandi belum tersedia.')),
       );
   }
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return AuthScaffold(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const AuthHeader(title: 'Login Mahasiswa', activeSteps: 1),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
-                AuthStyle.contentHorizontalPadding,
-                0,
-                AuthStyle.contentHorizontalPadding,
-                24,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.only(bottom: AppSpacing.xxl),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const AuthHeader(
+              title: 'Login Mahasiswa',
+              subtitle: 'Masuk dengan NIM dan kata sandi.',
+              activeSteps: 1,
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AuthStyle.contentHorizontalPadding,
               ),
               child: AutofillGroup(
                 child: Form(
@@ -110,7 +111,7 @@ class _StudentLoginPageState extends State<StudentLoginPage> {
                             ? 'NIM wajib diisi.'
                             : null,
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: AuthStyle.fieldGap),
                       AuthTextField(
                         label: 'Password',
                         hintText: 'Masukkan password',
@@ -125,29 +126,21 @@ class _StudentLoginPageState extends State<StudentLoginPage> {
                             ? 'Password wajib diisi.'
                             : null,
                       ),
+                      const SizedBox(height: AppSpacing.xs),
                       Align(
-                        alignment: Alignment.centerLeft,
+                        alignment: Alignment.centerRight,
                         child: TextButton(
                           onPressed: _showForgotPasswordUnavailable,
-                          style: TextButton.styleFrom(
-                            foregroundColor: colorScheme.primary,
-                            padding: EdgeInsets.zero,
-                            minimumSize: const Size(0, 32),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            textStyle: const TextStyle(
-                              fontSize: AuthStyle.captionSize,
-                            ),
-                          ),
-                          child: const Text('Forgot password?'),
+                          child: const Text('Lupa kata sandi?'),
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AppSpacing.md),
                       AuthPrimaryButton(
                         label: 'Masuk',
                         onPressed: _submit,
                         isLoading: _isSubmitting,
                       ),
-                      const SizedBox(height: 9),
+                      const SizedBox(height: AppSpacing.md),
                       AuthSecondaryButton(
                         label: 'Daftar',
                         onPressed: _isSubmitting
@@ -159,8 +152,8 @@ class _StudentLoginPageState extends State<StudentLoginPage> {
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

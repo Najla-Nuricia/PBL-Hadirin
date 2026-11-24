@@ -94,8 +94,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(currentPath(), StudentRoutePaths.beranda);
-    expect(find.text(account.fullName), findsOneWidget);
-    expect(find.text('${account.nim} · ${account.className}'), findsOneWidget);
+    expect(find.text('Halo, Nama.'), findsOneWidget);
+    expect(find.text('${account.className} · ${account.nim}'), findsOneWidget);
   });
 
   testWidgets('register validates the form before the face scan', (

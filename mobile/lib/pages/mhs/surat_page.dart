@@ -1,20 +1,34 @@
-import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../data/mhs/student_data_service.dart';
+import '../../widgets/widgets.dart';
+import 'widgets/content_width.dart';
+import 'widgets/friendly_error.dart';
 
-class SuratPage extends StatefulWidget {
+class SuratPage extends StatelessWidget {
   const SuratPage({super.key});
 
   @override
-  State<SuratPage> createState() => _SuratPageState();
+  Widget build(BuildContext context) {
+    // Messenger sendiri supaya SnackBar muncul di atas tombol "Kirim Surat".
+    // Lewat Scaffold navigasi di luar halaman ini, SnackBar menutupi tombol.
+    return const ScaffoldMessenger(child: _SuratForm());
+  }
 }
 
-class _SuratPageState extends State<SuratPage> {
+class _SuratForm extends StatefulWidget {
+  const _SuratForm();
+
+  @override
+  State<_SuratForm> createState() => _SuratPageState();
+}
+
+class _SuratPageState extends State<_SuratForm> {
   static const _fallbackCourses = [
     'Pemrograman Web Lanjut',
     'Basis Data Lanjut',
@@ -43,12 +57,13 @@ class _SuratPageState extends State<SuratPage> {
   Future<void> _loadCourseOptions() async {
     try {
       final schedules = await studentDataService.loadSchedules();
-      final names = schedules
-          .map((item) => item.courseName.trim())
-          .where((name) => name.isNotEmpty)
-          .toSet()
-          .toList()
-        ..sort();
+      final names =
+          schedules
+              .map((item) => item.courseName.trim())
+              .where((name) => name.isNotEmpty)
+              .toSet()
+              .toList()
+            ..sort();
       if (!mounted || names.isEmpty) return;
       setState(() {
         _courses = names;
@@ -58,6 +73,22 @@ class _SuratPageState extends State<SuratPage> {
       });
     } catch (_) {
       // Fallback course list remains available if schedules fail to load.
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Tab yang disembunyikan tidak menjalankan animasi, jadi SnackBar yang
+    // masih tampil akan tertinggal sampai tab ini dibuka lagi.
+    if (!TickerMode.valuesOf(context).enabled) {
+      final messenger = ScaffoldMessenger.of(context);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        messenger
+          ..clearSnackBars()
+          ..removeCurrentSnackBar();
+      });
     }
   }
 
@@ -77,8 +108,10 @@ class _SuratPageState extends State<SuratPage> {
     setState(() => _isSubmitting = true);
     try {
       final jenis = _selectedType == 0 ? _selectedAbsenceType : 'kompensasi';
-      final tanggal =
-          (_selectedDate ?? DateTime.now()).toIso8601String().split('T').first;
+      final tanggal = (_selectedDate ?? DateTime.now())
+          .toIso8601String()
+          .split('T')
+          .first;
       final alasan = _notesController.text.trim().isNotEmpty
           ? _notesController.text.trim()
           : 'Pengajuan surat $jenis';
@@ -107,10 +140,13 @@ class _SuratPageState extends State<SuratPage> {
       }
     } catch (e) {
       if (mounted) {
-        final msg = e.toString().replaceFirst('Exception: ', '');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal mengirim surat: $msg')),
+        final msg = friendlyError(
+          e,
+          fallback: 'Periksa koneksi internet, lalu coba lagi.',
         );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Gagal mengirim surat: $msg')));
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
@@ -145,7 +181,11 @@ class _SuratPageState extends State<SuratPage> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Gagal memilih file: $e')),
+        SnackBar(
+          content: Text(
+            'Gagal memilih file: ${friendlyError(e, fallback: 'Coba pilih ulang filenya.')}',
+          ),
+        ),
       );
     }
   }
@@ -165,200 +205,139 @@ class _SuratPageState extends State<SuratPage> {
       ? 'Unggah surat keterangan (Izin/Sakit)'
       : 'Unggah surat kompensasi';
 
+  void _removeFile() {
+    setState(() {
+      _fileName = null;
+      _fileBytes = null;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
 
     return Scaffold(
-      backgroundColor: colorScheme.surfaceContainerHighest,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            _buildHeader(colorScheme),
-            _buildTypeSelector(colorScheme),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(12, 16, 12, 16),
-                child: _buildFormCard(colorScheme),
+      appBar: SkyAppBar(
+        leading: IconButton(
+          onPressed: () => context.go('/mhs/beranda'),
+          icon: const Icon(PhosphorIconsRegular.arrowLeft),
+          tooltip: 'Kembali',
+        ),
+        title: const Text('Upload Surat'),
+      ),
+      body: AuroraBackground(
+        child: SafeArea(
+          top: false,
+          bottom: false,
+          child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.page,
+              AppSpacing.md,
+              AppSpacing.page,
+              AppSpacing.xxl,
+            ),
+            child: ContentWidth(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _buildIntroCard(text),
+                  const SizedBox(height: AppSpacing.lg),
+                  _buildTypeSelector(),
+                  AnimatedSize(
+                    duration: AppMotion.fast,
+                    curve: AppMotion.curve,
+                    alignment: Alignment.topCenter,
+                    child: _selectedType == 0
+                        ? Padding(
+                            padding: const EdgeInsets.only(top: AppSpacing.lg),
+                            child: _buildField(
+                              text,
+                              'Jenis ketidakhadiran',
+                              _buildAbsenceTypeSelector(),
+                            ),
+                          )
+                        : const SizedBox(width: double.infinity),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  _buildField(text, 'Mata Kuliah', _buildCourseDropdown(text)),
+                  const SizedBox(height: AppSpacing.lg),
+                  _buildField(text, 'Tanggal', _buildDateField(text)),
+                  const SizedBox(height: AppSpacing.lg),
+                  _buildField(text, 'Catatan (opsional)', _buildNotesField()),
+                  const SizedBox(height: AppSpacing.lg),
+                  _buildField(text, 'Lampiran', _buildAttachment(text)),
+                ],
               ),
             ),
-          ],
+          ),
+        ),
+      ),
+      bottomNavigationBar: DecoratedBox(
+        decoration: const BoxDecoration(color: AppColors.canvas),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.page,
+              AppSpacing.md,
+              AppSpacing.page,
+              AppSpacing.lg,
+            ),
+            child: ContentWidth(
+              child: AppGradientButton(
+                onPressed: _isSubmitting ? null : _submitSurat,
+                label: 'Kirim Surat',
+                icon: PhosphorIconsRegular.paperPlaneTilt,
+                isBusy: _isSubmitting,
+              ),
+            ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildHeader(ColorScheme colorScheme) {
+  Widget _buildIntroCard(TextTheme text) {
     return Container(
-      height: 52,
-      color: colorScheme.surface,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        gradient: AppColors.heroGradient,
+        borderRadius: AppRadius.hero,
+        boxShadow: AppColors.shadowLifted,
+      ),
       child: Row(
         children: [
-          IconButton(
-            onPressed: () => context.go('/mhs/beranda'),
-            icon: const Icon(Icons.chevron_left),
-            color: colorScheme.onSurfaceVariant,
-            tooltip: 'Kembali',
-          ),
-          Text(
-            'Upload Surat',
-            style: TextStyle(
-              color: colorScheme.onSurface,
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+            ),
+            child: const Icon(
+              PhosphorIconsRegular.envelopeSimple,
+              size: 22,
+              color: Colors.white,
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTypeSelector(ColorScheme colorScheme) {
-    const labels = ['Izin/Sakit', 'Upload Surat Kompensasi'];
-
-    return Container(
-      height: 36,
-      margin: const EdgeInsets.fromLTRB(12, 14, 12, 0),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        border: Border.all(color: colorScheme.outlineVariant),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Row(
-        children: [
-          for (var index = 0; index < labels.length; index++)
-            Expanded(
-              child: InkWell(
-                onTap: () => setState(() => _selectedType = index),
-                child: Container(
-                  alignment: Alignment.center,
-                  color: _selectedType == index
-                      ? colorScheme.primary
-                      : colorScheme.surface,
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      labels[index],
-                      style: TextStyle(
-                        color: _selectedType == index
-                            ? colorScheme.onPrimary
-                            : colorScheme.onSurfaceVariant,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Ajukan surat dalam satu menit',
+                  style: text.titleSmall?.copyWith(color: Colors.white),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Lampirkan bukti agar dosen bisa langsung meninjau.',
+                  style: text.bodySmall?.copyWith(
+                    color: AppColors.onBrandMuted,
                   ),
                 ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAbsenceTypeSelector(ColorScheme colorScheme) {
-    return RadioGroup<String>(
-      groupValue: _selectedAbsenceType,
-      onChanged: (selected) {
-        if (selected != null) {
-          setState(() => _selectedAbsenceType = selected);
-        }
-      },
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.start,
-        children: [
-          _buildAbsenceRadio('sakit', 'Sakit', colorScheme),
-          const SizedBox(width: 20),
-          _buildAbsenceRadio('izin', 'Izin', colorScheme),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAbsenceRadio(
-    String value,
-    String label,
-    ColorScheme colorScheme,
-  ) {
-    return Semantics(
-      label: label,
-      selected: _selectedAbsenceType == value,
-      child: InkWell(
-        onTap: () => setState(() => _selectedAbsenceType = value),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Radio<String>(
-              value: value,
-              activeColor: colorScheme.primary,
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            Text(
-              label,
-              style: TextStyle(color: colorScheme.onSurface, fontSize: 12),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFormCard(ColorScheme colorScheme) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          _buildFilePicker(colorScheme),
-          if (_selectedType == 0) ...[
-            const SizedBox(height: 8),
-            _buildAbsenceTypeSelector(colorScheme),
-          ],
-          const SizedBox(height: 14),
-          _buildFieldLabel('Mata Kuliah', colorScheme),
-          const SizedBox(height: 6),
-          _buildCourseDropdown(colorScheme),
-          const SizedBox(height: 14),
-          _buildFieldLabel('Tanggal', colorScheme),
-          const SizedBox(height: 6),
-          _buildDateField(colorScheme),
-          const SizedBox(height: 14),
-          _buildFieldLabel('Catatan (Optional):', colorScheme),
-          const SizedBox(height: 6),
-          _buildNotesField(colorScheme),
-          const SizedBox(height: 18),
-          SizedBox(
-            height: 42,
-            child: FilledButton(
-              onPressed: _isSubmitting ? null : _submitSurat,
-              style: FilledButton.styleFrom(
-                backgroundColor: colorScheme.primary,
-                disabledBackgroundColor: colorScheme.primary.withValues(
-                  alpha: 0.38,
-                ),
-                foregroundColor: colorScheme.onPrimary,
-                disabledForegroundColor: colorScheme.onPrimary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-              child: _isSubmitting
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Text(
-                      'Kirim Surat',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-                    ),
+              ],
             ),
           ),
         ],
@@ -366,202 +345,185 @@ class _SuratPageState extends State<SuratPage> {
     );
   }
 
-  Widget _buildFilePicker(ColorScheme colorScheme) {
-    return CustomPaint(
-      foregroundPainter: _DashedRoundedBorderPainter(
-        color: colorScheme.outlineVariant,
-      ),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 22),
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
-          borderRadius: BorderRadius.circular(14),
+  Widget _buildField(TextTheme text, String label, Widget field) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(label, style: text.titleSmall),
+        const SizedBox(height: 6),
+        field,
+      ],
+    );
+  }
+
+  Widget _buildTypeSelector() {
+    return SegmentedButton<int>(
+      segments: const [
+        ButtonSegment(
+          value: 0,
+          label: Text('Izin/Sakit', textAlign: TextAlign.center),
         ),
-        child: Column(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(11),
-              ),
-              child: Icon(
-                Icons.upload_file_outlined,
-                color: colorScheme.primary,
-                size: 22,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              _fileName ?? _documentDescription,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: colorScheme.onSurface,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Format: JPG, PNG, PDF (Maks. 5 MB)',
-              style: TextStyle(
-                color: colorScheme.onSurfaceVariant,
-                fontSize: 10,
-              ),
-            ),
-            const SizedBox(height: 10),
-            OutlinedButton.icon(
-              onPressed: _pickFile,
-              icon: Icon(
-                Icons.attach_file,
-                size: 16,
-                color: colorScheme.primary,
-              ),
-              label: Text(
-                _fileName == null ? 'Kirim File' : 'Ganti File',
-                style: TextStyle(color: colorScheme.primary, fontSize: 11),
-              ),
-              style: OutlinedButton.styleFrom(
-                minimumSize: const Size(98, 34),
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                side: BorderSide(color: colorScheme.primary),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
-            ),
-          ],
+        ButtonSegment(
+          value: 1,
+          label: Text('Upload Surat Kompensasi', textAlign: TextAlign.center),
         ),
+      ],
+      selected: {_selectedType},
+      showSelectedIcon: false,
+      onSelectionChanged: (selection) =>
+          setState(() => _selectedType = selection.first),
+    );
+  }
+
+  Widget _buildAbsenceTypeSelector() {
+    return SegmentedButton<String>(
+      segments: const [
+        ButtonSegment(value: 'sakit', label: Text('Sakit')),
+        ButtonSegment(value: 'izin', label: Text('Izin')),
+      ],
+      selected: {_selectedAbsenceType},
+      showSelectedIcon: false,
+      onSelectionChanged: (selection) =>
+          setState(() => _selectedAbsenceType = selection.first),
+    );
+  }
+
+  Widget _buildCourseDropdown(TextTheme text) {
+    final safeValue = _courses.contains(_selectedCourse)
+        ? _selectedCourse
+        : null;
+    // Menu dibuat selebar kolom isian; bawaannya melebar sampai tepi layar.
+    return ButtonTheme(
+      alignedDropdown: true,
+      child: DropdownButtonFormField<String>(
+        key: ValueKey(safeValue),
+        initialValue: safeValue,
+        isExpanded: true,
+        hint: Text(
+          'Pilih mata kuliah...',
+          style: text.bodyLarge?.copyWith(color: AppColors.inkFaint),
+        ),
+        icon: const Icon(PhosphorIconsRegular.caretDown),
+        iconEnabledColor: AppColors.inkFaint,
+        style: text.bodyLarge,
+        borderRadius: AppRadius.control,
+        items: _courses
+            .map(
+              (course) => DropdownMenuItem(
+                value: course,
+                child: Text(course, overflow: TextOverflow.ellipsis),
+              ),
+            )
+            .toList(),
+        onChanged: (course) => setState(() => _selectedCourse = course),
       ),
     );
   }
 
-  Widget _buildFieldLabel(String label, ColorScheme colorScheme) {
-    return Text(
-      label,
-      style: TextStyle(
-        color: colorScheme.onSurface,
-        fontSize: 12,
-        fontWeight: FontWeight.w500,
-      ),
-    );
-  }
-
-  Widget _buildCourseDropdown(ColorScheme colorScheme) {
-    final safeValue =
-        _courses.contains(_selectedCourse) ? _selectedCourse : null;
-    return DropdownButtonFormField<String>(
-      key: ValueKey(safeValue),
-      initialValue: safeValue,
-      isExpanded: true,
-      hint: const Text('Pilih mata kuliah...'),
-      icon: const Icon(Icons.keyboard_arrow_down),
-      items: _courses
-          .map((course) => DropdownMenuItem(value: course, child: Text(course)))
-          .toList(),
-      onChanged: (course) => setState(() => _selectedCourse = course),
-      decoration: _fieldDecoration(colorScheme),
-      style: TextStyle(color: colorScheme.onSurface, fontSize: 12),
-    );
-  }
-
-  Widget _buildDateField(ColorScheme colorScheme) {
+  Widget _buildDateField(TextTheme text) {
+    final scheme = Theme.of(context).colorScheme;
     final effectiveDate = _selectedDate ?? DateTime.now();
-    final formatted = '${effectiveDate.day.toString().padLeft(2, '0')}/'
+    final formatted =
+        '${effectiveDate.day.toString().padLeft(2, '0')}/'
         '${effectiveDate.month.toString().padLeft(2, '0')}/'
         '${effectiveDate.year}';
-    final displayText =
-        _selectedDate == null ? '$formatted (Hari ini)' : formatted;
-    return InkWell(
-      onTap: _pickDate,
-      borderRadius: BorderRadius.circular(10),
-      child: InputDecorator(
-        decoration: _fieldDecoration(colorScheme),
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                displayText,
-                style: TextStyle(
-                  color: _selectedDate == null
-                      ? colorScheme.onSurfaceVariant
-                      : colorScheme.onSurface,
-                  fontSize: 12,
-                ),
-              ),
+    final displayText = _selectedDate == null
+        ? '$formatted (Hari ini)'
+        : formatted;
+    return Semantics(
+      button: true,
+      child: InkWell(
+        onTap: _pickDate,
+        borderRadius: AppRadius.control,
+        child: InputDecorator(
+          decoration: const InputDecoration(
+            suffixIcon: Icon(PhosphorIconsRegular.calendarBlank, size: 20),
+          ),
+          child: Text(
+            displayText,
+            style: text.bodyLarge?.tabular.copyWith(
+              color: _selectedDate == null
+                  ? scheme.onSurfaceVariant
+                  : scheme.onSurface,
             ),
-            Icon(
-              Icons.calendar_today_outlined,
-              size: 16,
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildNotesField(ColorScheme colorScheme) {
+  Widget _buildNotesField() {
     return TextFormField(
       controller: _notesController,
       maxLines: 3,
       minLines: 3,
-      decoration: _fieldDecoration(colorScheme)
-          .copyWith(hintText: 'Tulis keterangan...'),
-      style: TextStyle(color: colorScheme.onSurface, fontSize: 12),
+      textCapitalization: TextCapitalization.sentences,
+      decoration: const InputDecoration(hintText: 'Tulis keterangan...'),
     );
   }
 
-  InputDecoration _fieldDecoration(ColorScheme colorScheme) {
-    return InputDecoration(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: colorScheme.outlineVariant),
+  Widget _buildAttachment(TextTheme text) {
+    final fileName = _fileName;
+    final faint = text.bodySmall?.copyWith(color: AppColors.inkFaint);
+
+    return Material(
+      color: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: AppRadius.control,
+        side: BorderSide(color: AppColors.fieldLine),
       ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: colorScheme.outlineVariant),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: _isSubmitting ? null : _pickFile,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 64),
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.sm,
+              fileName == null ? AppSpacing.lg : AppSpacing.xs,
+              AppSpacing.sm,
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  fileName == null
+                      ? PhosphorIconsRegular.fileArrowUp
+                      : PhosphorIconsRegular.fileText,
+                  color: AppColors.brand600,
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        fileName ?? _documentDescription,
+                        maxLines: fileName == null ? 2 : 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: text.titleSmall,
+                      ),
+                      Text(
+                        fileName == null
+                            ? 'JPG, PNG, atau PDF. Maksimal 5 MB.'
+                            : 'Ketuk untuk mengganti file.',
+                        style: faint,
+                      ),
+                    ],
+                  ),
+                ),
+                if (fileName != null)
+                  IconButton(
+                    onPressed: _isSubmitting ? null : _removeFile,
+                    tooltip: 'Hapus lampiran',
+                    icon: const Icon(PhosphorIconsRegular.x),
+                  ),
+              ],
+            ),
+          ),
+        ),
       ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(10),
-        borderSide: BorderSide(color: colorScheme.primary),
-      ),
-      hintStyle: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12),
     );
-  }
-}
-
-class _DashedRoundedBorderPainter extends CustomPainter {
-  const _DashedRoundedBorderPainter({required this.color});
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final path = Path()
-      ..addRRect(
-        RRect.fromRectAndRadius(Offset.zero & size, const Radius.circular(14)),
-      );
-    final paint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-
-    for (final metric in path.computeMetrics()) {
-      var distance = 0.0;
-      while (distance < metric.length) {
-        final end = math.min(distance + 5, metric.length).toDouble();
-        canvas.drawPath(metric.extractPath(distance, end), paint);
-        distance = end + 4;
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _DashedRoundedBorderPainter oldDelegate) {
-    return color != oldDelegate.color;
   }
 }

@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../../models/dosen/student_attendance.dart';
 import '../../../theme/style/lecturer_style.dart';
+import '../../../widgets/widgets.dart';
 import 'initials_avatar.dart';
 import 'status_badge.dart';
 
+/// Satu baris mahasiswa di dalam kartu daftar kehadiran.
 class StudentAttendanceTile extends StatelessWidget {
   const StudentAttendanceTile({
     super.key,
@@ -17,61 +19,56 @@ class StudentAttendanceTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
     final time = student.checkInTime ?? '-';
-    final radius = BorderRadius.circular(LecturerStyle.tileRadius);
+    final subtitle = student.checkInTime == null
+        ? student.nim
+        : '${student.nim} · $time';
 
     return Semantics(
       button: true,
       excludeSemantics: true,
-      label: '${student.name}, NIM ${student.nim}, '
+      onTap: onTap,
+      label:
+          '${student.name}, NIM ${student.nim}, '
           'status ${student.status.label}, '
           '${student.checkInTime == null ? "belum absen" : "jam $time"}. '
           'Ketuk untuk melihat detail.',
-      child: Material(
-        color: scheme.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: radius,
-          side: BorderSide(color: scheme.outline),
-        ),
-        child: InkWell(
-          borderRadius: radius,
-          onTap: onTap,
+      child: InkWell(
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            minHeight: LecturerStyle.rowMinHeight,
+          ),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: LecturerStyle.rowInsets,
             child: Row(
               children: [
                 InitialsAvatar(initials: student.initials),
-                const SizedBox(width: 12),
+                const SizedBox(width: AppSpacing.md),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         student.name,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: LecturerStyle.bodySize,
-                          fontWeight: FontWeight.w600,
-                        ),
+                        style: text.titleSmall,
                       ),
                       Text(
-                        student.nim,
-                        style: TextStyle(
-                          fontSize: LecturerStyle.captionSize,
-                          color: scheme.onSurfaceVariant,
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: text.bodySmall?.tabular.copyWith(
+                          color: AppColors.inkFaint,
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  time,
-                  style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
-                ),
-                const SizedBox(width: 10),
+                const SizedBox(width: AppSpacing.md),
                 StatusBadge(status: student.status),
               ],
             ),

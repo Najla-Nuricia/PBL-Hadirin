@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
@@ -7,6 +8,7 @@ import '../../../data/mhs/student_account.dart';
 import '../../../data/mhs/student_data_service.dart';
 import '../../../routing/student_route_paths.dart';
 import '../../../theme/style/auth_style.dart';
+import '../../../widgets/widgets.dart';
 import 'widgets/auth_buttons.dart';
 import 'widgets/auth_header.dart';
 import 'widgets/auth_info_banner.dart';
@@ -42,7 +44,10 @@ class _StudentRegisterPageState extends State<StudentRegisterPage> {
   ];
 
   bool _isSubmitting = false;
-  bool _isLoadingKelas = false;
+  // Pilihan kelas dikunci sampai daftarnya selesai dimuat, supaya kelas yang
+  // sudah dipilih tidak hilang saat daftar dari server menggantikan bawaan.
+  bool _isLoadingKelas = true;
+  bool _kelasLoadFailed = false;
 
   List<Map<String, dynamic>> _kelasList = _defaultKelasList;
   String? _selectedKelas; // nama kelas yang dipilih
@@ -63,7 +68,12 @@ class _StudentRegisterPageState extends State<StudentRegisterPage> {
         });
       }
     } catch (_) {
-      if (mounted) setState(() => _isLoadingKelas = false);
+      if (mounted) {
+        setState(() {
+          _isLoadingKelas = false;
+          _kelasLoadFailed = true;
+        });
+      }
     }
   }
 
@@ -137,25 +147,22 @@ class _StudentRegisterPageState extends State<StudentRegisterPage> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return AuthScaffold(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          AuthHeader(
-            title: 'Registrasi Mahasiswa',
-            subtitle: 'Isi data diri kamu',
-            activeSteps: 1,
-            onBack: _goBack,
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
-                AuthStyle.contentHorizontalPadding,
-                0,
-                AuthStyle.contentHorizontalPadding,
-                32,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.only(bottom: AppSpacing.xxl),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AuthHeader(
+              title: 'Registrasi Mahasiswa',
+              subtitle: 'Isi data diri kamu',
+              activeSteps: 1,
+              totalSteps: 2,
+              onBack: _goBack,
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AuthStyle.contentHorizontalPadding,
               ),
               child: AutofillGroup(
                 child: Form(
@@ -174,7 +181,7 @@ class _StudentRegisterPageState extends State<StudentRegisterPage> {
                         validator: (value) =>
                             _validateRequired(value, 'Nama lengkap'),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AuthStyle.fieldGap),
                       AuthTextField(
                         label: 'NIM',
                         hintText: 'Nomor Induk Mahasiswa',
@@ -187,69 +194,13 @@ class _StudentRegisterPageState extends State<StudentRegisterPage> {
                         autofillHints: const [AutofillHints.username],
                         validator: (value) => _validateRequired(value, 'NIM'),
                       ),
-                      const SizedBox(height: 16),
-                      // ── Kelas Select Box ────────────────────────────────
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Kelas',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: colorScheme.onSurface,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          DropdownButtonFormField<String>(
-                            initialValue: _selectedKelas,
-                            decoration: InputDecoration(
-                              hintText: _isLoadingKelas
-                                  ? 'Memuat daftar kelas...'
-                                  : 'Pilih kelas kamu',
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 14,
-                              ),
-                              suffixIcon: _isLoadingKelas
-                                  ? const Padding(
-                                      padding: EdgeInsets.all(12),
-                                      child: SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                            strokeWidth: 2),
-                                      ),
-                                    )
-                                  : null,
-                            ),
-                            isExpanded: true,
-                            items: _kelasList.map((k) {
-                              final nama = k['nama'] as String;
-                              return DropdownMenuItem<String>(
-                                value: nama,
-                                child: Text(nama),
-                              );
-                            }).toList(),
-                            onChanged: _isSubmitting || _isLoadingKelas
-                                ? null
-                                : (value) =>
-                                    setState(() => _selectedKelas = value),
-                            validator: (value) =>
-                                (value == null || value.trim().isEmpty)
-                                    ? 'Kelas wajib dipilih.'
-                                    : null,
-                          ),
-                        ],
-                      ),
-                      // ───────────────────────────────────────────────────
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AuthStyle.fieldGap),
+                      _buildKelasField(context),
+                      const SizedBox(height: AuthStyle.fieldGap),
                       AuthTextField(
                         label: 'Kata Sandi',
                         hintText: 'Masukkan kata sandi',
+                        helperText: 'Minimal $_minimumPasswordLength karakter.',
                         controller: _passwordController,
                         enabled: !_isSubmitting,
                         isPassword: true,
@@ -257,24 +208,25 @@ class _StudentRegisterPageState extends State<StudentRegisterPage> {
                         autofillHints: const [AutofillHints.newPassword],
                         validator: _validatePassword,
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AuthStyle.fieldGap),
                       AuthTextField(
                         label: 'Konfirmasi Kata Sandi',
                         hintText: 'Ulangi kata sandi',
                         controller: _passwordConfirmationController,
                         enabled: !_isSubmitting,
                         isPassword: true,
+                        showVisibilityToggle: true,
                         textInputAction: TextInputAction.done,
                         onFieldSubmitted: (_) => _continueToFaceScan(),
                         validator: _validatePasswordConfirmation,
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AppSpacing.xl),
                       const AuthInfoBanner(
                         message:
                             'Setelah ini kamu akan diminta scan wajah dari 5 '
                             'arah untuk keperluan absensi.',
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AppSpacing.lg),
                       AuthPrimaryButton(
                         label: 'Lanjut ke Scan Wajah →',
                         onPressed: _continueToFaceScan,
@@ -285,9 +237,62 @@ class _StudentRegisterPageState extends State<StudentRegisterPage> {
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildKelasField(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('Kelas', style: text.titleSmall),
+        const SizedBox(height: AuthStyle.labelGap),
+        // Menu pilihan selebar kolomnya, tidak melebar sampai tepi layar.
+        ButtonTheme(
+          alignedDropdown: true,
+          child: DropdownButtonFormField<String>(
+            initialValue: _selectedKelas,
+            isExpanded: true,
+            style: text.bodyLarge,
+            borderRadius: AppRadius.control,
+            icon: _isLoadingKelas
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      semanticsLabel: 'Memuat daftar kelas',
+                    ),
+                  )
+                : const Icon(PhosphorIconsRegular.caretDown),
+            decoration: InputDecoration(
+              hintText: _isLoadingKelas
+                  ? 'Memuat daftar kelas...'
+                  : 'Pilih kelas kamu',
+              helperText: _kelasLoadFailed
+                  ? 'Daftar kelas terbaru belum bisa dimuat. Pilih dari '
+                        'daftar yang tersedia.'
+                  : null,
+            ),
+            items: _kelasList.map((k) {
+              final nama = k['nama'] as String;
+              return DropdownMenuItem<String>(
+                value: nama,
+                child: Text(nama, maxLines: 1, overflow: TextOverflow.ellipsis),
+              );
+            }).toList(),
+            onChanged: _isSubmitting || _isLoadingKelas
+                ? null
+                : (value) => setState(() => _selectedKelas = value),
+            validator: (value) => (value == null || value.trim().isEmpty)
+                ? 'Kelas wajib dipilih.'
+                : null,
+          ),
+        ),
+      ],
     );
   }
 }

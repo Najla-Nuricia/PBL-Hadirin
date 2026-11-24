@@ -2,6 +2,7 @@ import 'package:go_router/go_router.dart';
 
 import '../data/mhs/dummy_student_auth_repository.dart';
 import '../data/mhs/student_account.dart';
+import '../data/mhs/student_data_service.dart';
 import '../pages/admin/admin_navigation_shell.dart';
 import '../pages/admin/auth/admin_login_page.dart';
 import '../pages/admin/data_academic_page.dart';
@@ -42,7 +43,10 @@ export 'student_route_paths.dart';
 
 final GoRouter studentRouter = createStudentRouter();
 
-GoRouter createStudentRouter({bool showOnboarding = false}) => GoRouter(
+GoRouter createStudentRouter({
+  bool showOnboarding = false,
+  StudentDataService? homeDataService,
+}) => GoRouter(
   initialLocation: showOnboarding
       ? StudentRoutePaths.onboarding
       : StudentRoutePaths.login,
@@ -218,7 +222,8 @@ GoRouter createStudentRouter({bool showOnboarding = false}) => GoRouter(
           routes: [
             GoRoute(
               path: StudentRoutePaths.beranda,
-              builder: (context, state) => const BerandaPage(),
+              builder: (context, state) =>
+                  BerandaPage(dataService: homeDataService),
             ),
           ],
         ),

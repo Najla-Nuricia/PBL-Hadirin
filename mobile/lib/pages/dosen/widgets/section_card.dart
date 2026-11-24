@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../../../theme/style/lecturer_style.dart';
 
+/// Kartu selebar isi layar dengan jarak dalam baku.
 class SectionCard extends StatelessWidget {
   const SectionCard({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(16),
+    this.padding = LecturerStyle.cardInsets,
   });
 
   final Widget child;
@@ -14,16 +15,16 @@ class SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
+    return SizedBox(
       width: double.infinity,
-      padding: padding,
-      decoration: BoxDecoration(
-        color: scheme.surface,
-        borderRadius: BorderRadius.circular(LecturerStyle.cardRadius),
-        border: Border.all(color: scheme.outline),
+      child: Card(
+        clipBehavior: Clip.antiAlias,
+        // Label dan nilai dibaca satu per satu, tidak dilebur menjadi satu
+        // simpul semantik sekartu; pembaca layar dan Appium mencarinya
+        // per teks.
+        semanticContainer: false,
+        child: Padding(padding: padding, child: child),
       ),
-      child: child,
     );
   }
 }
