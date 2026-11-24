@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
+import '../../data/admin/admin_auth_repository.dart';
+import '../../data/admin/admin_master_data_service.dart';
 import '../../data/admin/tahun_ajaran.dart';
 import '../../routing/admin_route_paths.dart';
 import '../../widgets/widgets.dart';
 import 'tambah_tahun_ajaran_page.dart';
-import 'widgets/admin_list.dart';
-import 'widgets/admin_scaffold.dart';
 
 class TahunAjaranListPage extends StatefulWidget {
   const TahunAjaranListPage({super.key});
@@ -18,13 +18,16 @@ class TahunAjaranListPage extends StatefulWidget {
 
 class _TahunAjaranListPageState extends State<TahunAjaranListPage> {
   final _searchController = TextEditingController();
+  List<TahunAjaran> _items = [];
   List<TahunAjaran> _displayed = [];
+  bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _displayed = tahunAjaranRepository.getAll();
     _searchController.addListener(_onSearch);
+    _load();
   }
 
   @override
@@ -35,15 +38,38 @@ class _TahunAjaranListPageState extends State<TahunAjaranListPage> {
   }
 
   void _onSearch() {
+    final query = _searchController.text.trim().toLowerCase();
     setState(() {
-      _displayed = tahunAjaranRepository.search(_searchController.text);
+      _displayed = query.isEmpty
+          ? List.unmodifiable(_items)
+          : _items
+                .where((item) => item.tahun.toLowerCase().contains(query))
+                .toList(growable: false);
     });
   }
 
-  void _refresh() {
-    setState(() {
-      _displayed = tahunAjaranRepository.search(_searchController.text);
-    });
+  Future<void> _load() async {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
+    try {
+      final items = await adminMasterDataService.listTahunAjaran();
+      if (!mounted) return;
+      setState(() {
+        _items = items;
+        _displayed = items;
+        _isLoading = false;
+      });
+    } on AdminRemoteApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = error.message;
+      });
+    }
   }
 
   void _back() {
@@ -58,7 +84,7 @@ class _TahunAjaranListPageState extends State<TahunAjaranListPage> {
     final added = await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (_) => const TambahTahunAjaranPage()),
     );
-    if (added == true) _refresh();
+    if (added == true) await _load();
   }
 
   Future<void> _openEdit(TahunAjaran item) async {
@@ -67,98 +93,364 @@ class _TahunAjaranListPageState extends State<TahunAjaranListPage> {
         builder: (_) => TambahTahunAjaranPage(initialItem: item),
       ),
     );
-    if (updated == true) _refresh();
+    if (updated == true) await _load();
   }
 
   Future<void> _delete(TahunAjaran item) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Hapus tahun ajaran?'),
-        content: Text(
-          'Data ${item.tahun} akan dihapus dan tidak dapat dikembalikan.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Batal'),
+      builder: (context) {
+        final colorScheme = Theme.of(context).colorScheme;
+        return AlertDialog(
+          title: const Text('Hapus tahun ajaran?'),
+          content: Text(
+            'Data ${item.tahun} akan dihapus dan tidak dapat dikembalikan.',
           ),
-          TextButton(
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Batal'),
             ),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Hapus'),
-          ),
-        ],
-      ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: colorScheme.error,
+                foregroundColor: colorScheme.onError,
+              ),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Hapus'),
+            ),
+          ],
+        );
+      },
     );
     if (confirmed != true || !mounted) return;
-    tahunAjaranRepository.delete(item.id);
-    _refresh();
+    try {
+      await adminMasterDataService.deleteTahunAjaran(item.id);
+      if (mounted) await _load();
+    } on AdminRemoteApiException catch (error) {
+      if (mounted) _showError(error.message);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return AdminPageScaffold(
-      title: 'Tahun Ajaran',
-      onBack: _back,
-      bottomBar: AdminBottomBar(
-        child: AppGradientButton(
-          onPressed: _openTambah,
-          icon: PhosphorIconsRegular.plus,
-          label: 'Tambah',
+    return Scaffold(
+      backgroundColor: colorScheme.surface,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildHeader(colorScheme),
+            _buildSearchBar(colorScheme),
+            const SizedBox(height: 8),
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _errorMessage != null
+                  ? _buildError(colorScheme)
+                  : _displayed.isEmpty
+                  ? _buildEmpty(colorScheme)
+                  : ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                      itemCount: _displayed.length,
+                      separatorBuilder: (_, i) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final item = _displayed[index];
+                        return _TahunAjaranCard(
+                          item: item,
+                          onEdit: () => _openEdit(item),
+                          onDelete: () => _delete(item),
+                        );
+                      },
+                    ),
+            ),
+          ],
         ),
       ),
-      children: [
-        const SizedBox(height: AppSpacing.sm),
-        AdminSearchField(
-          controller: _searchController,
+    );
+  }
+
+  Widget _buildHeader(ColorScheme colorScheme) {
+    return SkyHeader(
+      includeStatusBar: false,
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: _back,
+            icon: const Icon(PhosphorIconsRegular.arrowLeft, size: 20),
+            color: AppColors.gownNavy,
+            tooltip: 'Kembali',
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: Text(
+              'Tahun Ajaran',
+              style: Theme.of(context).textTheme.titleLarge
+                  ?.copyWith(color: AppColors.gownNavy),
+            ),
+          ),
+          FilledButton.icon(
+            onPressed: _openTambah,
+            icon: const Icon(PhosphorIconsRegular.plus, size: 18),
+            label: const Text('Tambah'),
+            style: FilledButton.styleFrom(
+              backgroundColor: colorScheme.primary,
+              foregroundColor: colorScheme.onPrimary,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              shape: const RoundedRectangleBorder(
+                borderRadius: AppRadius.control,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchBar(ColorScheme colorScheme) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: TextField(
+        controller: _searchController,
+        decoration: InputDecoration(
           hintText: 'Cari tahun ajaran...',
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        if (_displayed.isEmpty)
-          AppEmptyState(
-            icon: PhosphorIconsRegular.calendarBlank,
-            title: 'Tidak ada tahun ajaran ditemukan.',
-            message: _searchController.text.trim().isEmpty
-                ? 'Tahun ajaran yang ditambahkan akan muncul di sini.'
-                : 'Coba kata kunci lain.',
-          )
-        else
-          AdminListCard(
-            children: [
-              for (final item in _displayed)
-                AdminListRow(
-                  icon: PhosphorIconsRegular.calendarBlank,
-                  title: item.tahun,
-                  subtitle: item.semesterLabel,
-                  badge: AdminStatusBadge(
-                    label: item.status.label,
-                    active: item.status == TahunAjaranStatus.aktif,
+          hintStyle: TextStyle(
+            color: colorScheme.onSurfaceVariant,
+            fontSize: 13,
+          ),
+          prefixIcon: Icon(
+            PhosphorIconsRegular.magnifyingGlass,
+            color: colorScheme.onSurfaceVariant,
+            size: 20,
+          ),
+          suffixIcon: _searchController.text.isNotEmpty
+              ? IconButton(
+                  icon: Icon(
+                    PhosphorIconsRegular.x,
+                    color: colorScheme.onSurfaceVariant,
+                    size: 18,
                   ),
-                  trailing: Row(
-                    mainAxisSize: MainAxisSize.min,
+                  onPressed: () {
+                    _searchController.clear();
+                  },
+                )
+              : null,
+          filled: true,
+          fillColor: colorScheme.surfaceContainerHighest,
+          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: colorScheme.outlineVariant),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: colorScheme.primary),
+          ),
+        ),
+        style: TextStyle(color: colorScheme.onSurface, fontSize: 13),
+      ),
+    );
+  }
+
+  Widget _buildEmpty(ColorScheme colorScheme) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            PhosphorIconsRegular.calendarBlank,
+            size: 48,
+            color: colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Tidak ada tahun ajaran ditemukan.',
+            style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildError(ColorScheme colorScheme) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              PhosphorIconsRegular.cloudSlash,
+              size: 48,
+              color: colorScheme.error,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              _errorMessage!,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton(onPressed: _load, child: const Text('Coba lagi')),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+}
+
+// ─────────────────────────────────────────────────────────
+// Card item tahun ajaran
+// ─────────────────────────────────────────────────────────
+class _TahunAjaranCard extends StatelessWidget {
+  const _TahunAjaranCard({
+    required this.item,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final TahunAjaran item;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isAktif = item.status == TahunAjaranStatus.aktif;
+
+    return Material(
+      color: colorScheme.surface,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: colorScheme.outlineVariant),
+        ),
+        child: Row(
+          children: [
+            // Ikon kalender
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                PhosphorIconsRegular.calendarBlank,
+                color: colorScheme.primary,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      IconButton(
-                        onPressed: () => _openEdit(item),
-                        tooltip: 'Edit tahun ajaran',
-                        icon: const Icon(PhosphorIconsRegular.pencilSimple),
+                      Flexible(
+                        child: Text(
+                          item.tahun,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: colorScheme.onSurface,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
-                      IconButton(
-                        onPressed: () => _delete(item),
-                        tooltip: 'Hapus tahun ajaran',
-                        color: colorScheme.error,
-                        icon: const Icon(PhosphorIconsRegular.trash),
-                      ),
+                      if (isAktif) ...[
+                        const SizedBox(width: 8),
+                        _AktifBadge(colorScheme: colorScheme),
+                      ],
                     ],
                   ),
-                ),
-            ],
+                  const SizedBox(height: 3),
+                  Text(
+                    item.semesterLabel,
+                    style: TextStyle(
+                      color: colorScheme.onSurfaceVariant,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              onPressed: onEdit,
+              tooltip: 'Edit tahun ajaran',
+              constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+              padding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
+              icon: Icon(
+                PhosphorIconsRegular.pencilSimple,
+                color: colorScheme.primary,
+              ),
+            ),
+            IconButton(
+              onPressed: onDelete,
+              tooltip: 'Hapus tahun ajaran',
+              constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+              padding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
+              icon: Icon(PhosphorIconsRegular.trash, color: colorScheme.error),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AktifBadge extends StatelessWidget {
+  const _AktifBadge({required this.colorScheme});
+  final ColorScheme colorScheme;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: colorScheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: colorScheme.secondary,
+              shape: BoxShape.circle,
+            ),
           ),
-      ],
+          const SizedBox(width: 4),
+          Text(
+            'Aktif',
+            style: TextStyle(
+              color: colorScheme.onSecondaryContainer,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

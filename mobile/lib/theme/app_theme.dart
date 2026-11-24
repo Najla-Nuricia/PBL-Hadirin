@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'app_tokens.dart';
 
@@ -101,14 +102,20 @@ abstract final class AppTheme {
       space: 1,
     ),
     appBarTheme: AppBarTheme(
-      backgroundColor: AppColors.canvas,
-      foregroundColor: AppColors.ink,
+      backgroundColor: AppColors.sky,
+      foregroundColor: AppColors.gownNavy,
       elevation: 0,
       scrolledUnderElevation: 0,
       surfaceTintColor: Colors.transparent,
+      systemOverlayStyle: SystemUiOverlayStyle.dark.copyWith(
+        statusBarColor: Colors.transparent,
+      ),
       centerTitle: false,
       titleSpacing: AppSpacing.page,
-      titleTextStyle: _text.titleLarge?.copyWith(fontSize: 19),
+      titleTextStyle: _text.titleLarge?.copyWith(
+        color: AppColors.gownNavy,
+        fontSize: 19,
+      ),
     ),
     cardTheme: const CardThemeData(
       color: AppColors.surface,
@@ -178,7 +185,8 @@ abstract final class AppTheme {
       focusedBorder: _fieldBorder(AppColors.brand600, 2),
       errorBorder: _fieldBorder(AppColors.alfaInk),
       focusedErrorBorder: _fieldBorder(AppColors.alfaInk, 2),
-    ),    textSelectionTheme: const TextSelectionThemeData(
+    ),
+    textSelectionTheme: const TextSelectionThemeData(
       cursorColor: AppColors.brand600,
       selectionColor: AppColors.brand200,
       selectionHandleColor: AppColors.brand600,

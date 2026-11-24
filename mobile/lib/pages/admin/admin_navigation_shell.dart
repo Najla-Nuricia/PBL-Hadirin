@@ -11,14 +11,14 @@ const _adminNavbarItems = [
     label: 'Beranda',
   ),
   (
-    icon: PhosphorIconsRegular.plusCircle,
-    selectedIcon: PhosphorIconsFill.plusCircle,
-    label: 'Tambah Jadwal',
-  ),
-  (
     icon: PhosphorIconsRegular.calendarBlank,
     selectedIcon: PhosphorIconsFill.calendarBlank,
     label: 'Jadwal',
+  ),
+  (
+    icon: PhosphorIconsRegular.userCircle,
+    selectedIcon: PhosphorIconsFill.userCircle,
+    label: 'Akun',
   ),
 ];
 
@@ -30,6 +30,7 @@ class AdminNavigationShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.canvas,
       body: navigationShell,
       bottomNavigationBar: GlassDock(
         child: NavigationBar(

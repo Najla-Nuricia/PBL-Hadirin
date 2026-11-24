@@ -16,6 +16,24 @@ class NimAlreadyRegisteredException implements Exception {
   String toString() => 'NimAlreadyRegisteredException: $nim';
 }
 
+class NimNotWhitelistedException implements Exception {
+  const NimNotWhitelistedException(this.nim);
+
+  final String nim;
+
+  @override
+  String toString() => 'NimNotWhitelistedException: $nim';
+}
+
+class NimCheckResult {
+  const NimCheckResult({required this.whitelisted, required this.registered});
+
+  final bool whitelisted;
+  final bool registered;
+
+  bool get canRegister => whitelisted && !registered;
+}
+
 class RemoteApiException implements Exception {
   const RemoteApiException(this.message, {this.statusCode});
 
@@ -200,6 +218,38 @@ class DummyStudentAuthRepository extends ChangeNotifier {
     return _accounts.containsKey(nim);
   }
 
+  Future<bool> isNimAllowedToRegister(String nim) async {
+    final result = await checkNim(nim);
+    return result.canRegister;
+  }
+
+  Future<NimCheckResult> checkNim(String nim) async {
+    if (useRemoteApi) {
+      try {
+        final uri = Uri.parse('${ApiConfig.baseUrl}/auth/check-nim/${Uri.encodeComponent(nim)}');
+        final response = await _client.get(uri).timeout(_requestTimeout);
+        if (!_isFlutterMockHttpResponse(response) && response.statusCode == 200) {
+          final data = jsonDecode(response.body) as Map<String, dynamic>;
+          return NimCheckResult(
+            whitelisted: data['whitelisted'] == true,
+            registered: data['registered'] == true,
+          );
+        }
+      } catch (_) {
+        if (!_isFlutterTest) {
+          throw RemoteApiException(
+            'Gagal terhubung ke server backend di ${ApiConfig.baseUrl}. Pastikan server backend sedang aktif.',
+          );
+        }
+      }
+    }
+    await Future<void>.delayed(latency);
+    return NimCheckResult(
+      whitelisted: !_accounts.containsKey(nim),
+      registered: _accounts.containsKey(nim),
+    );
+  }
+
   Future<bool> changePassword({
     required String nim,
     required String currentPassword,
@@ -284,7 +334,19 @@ class DummyStudentAuthRepository extends ChangeNotifier {
 
           if (!_isFlutterMockHttpResponse(response)) {
             if (response.statusCode == 409) {
-              throw NimAlreadyRegisteredException(draft.nim);
+              final decoded = jsonDecode(response.body);
+              if (decoded is Map<String, dynamic> &&
+                  decoded['code'] == 'nim_not_whitelisted') {
+                throw NimNotWhitelistedException(draft.nim);
+              }
+              if (decoded is Map<String, dynamic> &&
+                  decoded['code'] == 'nim_already_registered') {
+                throw NimAlreadyRegisteredException(draft.nim);
+              }
+              throw RemoteApiException(
+                _extractDetail(response, 'Registrasi akun gagal.'),
+                statusCode: response.statusCode,
+              );
             }
             if (response.statusCode != 201 && response.statusCode != 200) {
               throw RemoteApiException(

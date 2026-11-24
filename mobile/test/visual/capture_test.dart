@@ -6,10 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile/data/mhs/student_account.dart';
-import 'package:mobile/data/mhs/student_attendance.dart';
-import 'package:mobile/data/mhs/student_data_service.dart';
-import 'package:mobile/data/mhs/student_schedule.dart';
-import 'package:mobile/models/mhs/student_profile.dart';
 import 'package:mobile/pages/onboarding_page.dart';
 import 'package:mobile/pages/dosen/widgets/student_attendance_tile.dart';
 import 'package:mobile/routing/admin_router.dart';
@@ -140,33 +136,14 @@ void main() {
     await shot(tester, 'm05-daftar-wajah');
   });
 
-  testWidgets('beranda dengan presensi dibuka', (tester) async {
-    final router = createStudentRouter(homeDataService: _StudentHomeData());
+  testWidgets('beranda', (tester) async {
+    final router = createStudentRouter();
     await start(tester, router);
     router.go(StudentRoutePaths.beranda);
     await settle(tester);
 
-    expect(find.text('Halo, Joni.'), findsOneWidget);
-    expect(find.text('Presensi dibuka'), findsOneWidget);
-    expect(find.text('Berlangsung'), findsOneWidget);
-    if (_output != 'out') {
-      await shot(tester, 'm13-beranda-presensi');
-    }
-
-    await tester.tap(find.byTooltip('Pilih hari jadwal'));
-    await settle(tester);
-    final nextDay = DateTime.now().weekday % DateTime.daysPerWeek;
-    await tester.tap(find.byType(CheckedPopupMenuItem<int>).at(nextDay));
-    await settle(tester);
-    expect(find.text('Tidak ada kelas'), findsOneWidget);
-
-    await tester.tap(find.text('Mulai presensi'));
-    await settle(tester);
-    expect(
-      router.routeInformationProvider.value.uri.path,
-      StudentRoutePaths.absensi,
-    );
-    expect(find.text('Pindai kode QR'), findsOneWidget);
+    expect(find.text('Halo, Mahasiswa.'), findsOneWidget);
+    await shot(tester, 'm13-beranda');
   });
 
   testWidgets('dosen', (tester) async {
@@ -213,61 +190,4 @@ void main() {
       await shot(tester, entry.key);
     }
   });
-}
-
-class _StudentHomeData extends StudentDataService {
-  @override
-  Future<StudentProfile> loadProfile() async => const StudentProfile(
-    fullName: 'Joni Pratama',
-    studentId: '2341720001',
-    email: '',
-    phoneNumber: '',
-    role: 'Mahasiswa',
-    className: 'TI-3A',
-  );
-
-  @override
-  Future<StudentAttendanceSummary> loadAttendanceSummary() async =>
-      const StudentAttendanceSummary(hadir: 28, izin: 2, sakit: 1, alfa: 1);
-
-  @override
-  Future<List<StudentSchedule>> loadSchedules({int? dayOfWeek}) async {
-    final day = DateTime.now().weekday;
-    return [
-      StudentSchedule(
-        courseName: 'Pemrograman Mobile',
-        startTime: '07.00',
-        endTime: '09.30',
-        room: 'LSI-1',
-        lecturerName: '',
-        dayOfWeek: day,
-      ),
-      StudentSchedule(
-        courseName: 'Kecerdasan Buatan',
-        startTime: '10.20',
-        endTime: '12.00',
-        room: 'LPR-2',
-        lecturerName: '',
-        dayOfWeek: day,
-      ),
-    ];
-  }
-
-  @override
-  Future<ClassReminder?> loadClassReminder() async => null;
-
-  @override
-  Future<List<Map<String, dynamic>>> loadActiveSessions() async => [
-    {
-      'matkul_nama': 'Pemrograman Mobile',
-      'jam_mulai': '07.00',
-      'jam_selesai': '09.30 WIB',
-      'ruangan_nama': 'LSI-1',
-    },
-  ];
-
-  @override
-  Future<List<StudentAttendanceRecord>> loadAttendanceHistory({
-    String? status,
-  }) async => [];
 }

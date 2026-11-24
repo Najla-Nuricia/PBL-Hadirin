@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
+import '../../data/admin/admin_auth_repository.dart';
+import '../../data/admin/admin_jadwal_service.dart';
 import '../../data/admin/jadwal.dart';
 import '../../data/admin/tahun_ajaran.dart';
 import '../../routing/admin_route_paths.dart';
 import '../../widgets/widgets.dart';
-import 'widgets/admin_scaffold.dart';
 import 'widgets/jadwal_form_widgets.dart';
-import 'widgets/labeled_fields.dart';
 
 typedef _JadwalFilter = ({
   String tahunAjaran,
@@ -16,12 +16,11 @@ typedef _JadwalFilter = ({
   KelasKuliah kelas,
 });
 
-/// Tinggi kolom isian tema (satu baris teks 24 dp + padding 2 × 15 dp),
-/// supaya pemilih semester sejajar dengan dropdown di sebelahnya.
-const double _fieldHeight = 54;
-
 class JadwalListPage extends StatefulWidget {
-  const JadwalListPage({super.key});
+  const JadwalListPage({super.key, this.service});
+
+  /// Service opsional untuk pengujian; default memakai backend Hadirin.
+  final AdminJadwalService? service;
 
   @override
   State<JadwalListPage> createState() => _JadwalListPageState();
@@ -34,6 +33,60 @@ class _JadwalListPageState extends State<JadwalListPage> {
   late int _tingkat = _appliedFilter.kelas.tingkat;
   late KelasKuliah _kelas = _appliedFilter.kelas;
   bool _isFilterExpanded = true;
+
+  List<JadwalKuliah> _remoteJadwal = const [];
+  bool _isRemoteLoading = false;
+  String? _remoteError;
+
+  AdminJadwalService get _service => widget.service ?? adminJadwalService;
+  bool get _usesRemote => adminAuthRepository.hasRemoteSession;
+
+  @override
+  void initState() {
+    super.initState();
+    _isRemoteLoading = _usesRemote;
+    if (_usesRemote) {
+      _fetchRemoteJadwal();
+    }
+  }
+
+  Future<void> _fetchRemoteJadwal() async {
+    try {
+      final items = await _service.listJadwal(
+        tahunAjaran: _appliedFilter.tahunAjaran,
+        semester: _appliedFilter.semester,
+        tingkat: _appliedFilter.kelas.tingkat,
+        kelas: _appliedFilter.kelas.nama,
+      );
+      if (!mounted) return;
+      setState(() {
+        _remoteJadwal = items;
+        _isRemoteLoading = false;
+        _remoteError = null;
+      });
+    } on AdminRemoteApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isRemoteLoading = false;
+        _remoteError = e.message;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isRemoteLoading = false;
+        _remoteError = 'Gagal memuat jadwal admin.';
+      });
+    }
+  }
+
+  Future<void> _refreshRemoteJadwal() async {
+    if (!_usesRemote) return;
+    setState(() {
+      _isRemoteLoading = true;
+      _remoteError = null;
+    });
+    await _fetchRemoteJadwal();
+  }
 
   static _JadwalFilter _defaultFilter() {
     final tahunAjaranList = tahunAjaranRepository.getAll();
@@ -65,6 +118,9 @@ class _JadwalListPageState extends State<JadwalListPage> {
         kelas: _kelas,
       );
     });
+    if (_usesRemote) {
+      _refreshRemoteJadwal();
+    }
   }
 
   void _changeTingkat(int? tingkat) {
@@ -77,121 +133,290 @@ class _JadwalListPageState extends State<JadwalListPage> {
 
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
 
-    return ListenableBuilder(
-      listenable: jadwalRepository,
-      builder: (context, _) {
-        final jadwalList = jadwalRepository.filter(
-          tahunAjaran: _appliedFilter.tahunAjaran,
-          semester: _appliedFilter.semester,
-          kelasNama: _appliedFilter.kelas.nama,
-        );
-
-        return AdminPageScaffold(
-          title: 'Daftar Jadwal',
-          description: 'Lihat jadwal kuliah per kelas dan semester.',
-          onBack: () => context.go(AdminRoutePaths.dataAkademik),
+    return Scaffold(
+      backgroundColor: colorScheme.surfaceContainerHighest,
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => context.go(AdminRoutePaths.tambahJadwal),
+        tooltip: 'Tambah Jadwal',
+        child: const Icon(PhosphorIconsRegular.plus),
+      ),
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildFilterCard(),
-            const SizedBox(height: AppSpacing.lg),
-            Text(
-              'Kelas ${_appliedFilter.kelas.nama} · Semester '
-              '${_appliedFilter.semester.label} '
-              '${_appliedFilter.tahunAjaran}',
-              style: text.bodyMedium?.tabular.copyWith(
-                color: AppColors.inkMuted,
-              ),
+            _buildAppBar(),
+            Expanded(
+              child: _usesRemote
+                  ? _buildRemoteBody(colorScheme)
+                  : ListenableBuilder(
+                      listenable: jadwalRepository,
+                      builder: (context, _) {
+                        final jadwalList = jadwalRepository.filter(
+                          tahunAjaran: _appliedFilter.tahunAjaran,
+                          semester: _appliedFilter.semester,
+                          kelasNama: _appliedFilter.kelas.nama,
+                        );
+                        return _buildScheduleList(colorScheme, jadwalList);
+                      },
+                    ),
             ),
-            if (jadwalList.isEmpty)
-              AppEmptyState(
-                icon: PhosphorIconsRegular.calendarSlash,
-                title: 'Belum ada jadwal untuk filter ini.',
-                message: 'Ubah filter atau tambah jadwal baru.',
-                action: OutlinedButton.icon(
-                  onPressed: () => context.go(AdminRoutePaths.tambahJadwal),
-                  icon: const Icon(PhosphorIconsRegular.plusCircle, size: 20),
-                  label: const Text('Tambah Jadwal Baru'),
-                ),
-              )
-            else
-              for (final hari in HariKuliah.values)
-                if (jadwalList.any((item) => item.hari == hari))
-                  _HariSection(
-                    hari: hari,
-                    jadwalList: jadwalList
-                        .where((item) => item.hari == hari)
-                        .toList(),
-                  ),
           ],
-        );
-      },
+        ),
+      ),
     );
   }
 
-  Widget _buildFilterCard() {
+  Widget _buildAppBar() {
+    return SkyHeader(
+      includeStatusBar: false,
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(PhosphorIconsRegular.arrowLeft),
+            color: AppColors.gownNavy,
+            onPressed: () => context.go(AdminRoutePaths.dataAkademik),
+            tooltip: 'Kembali',
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Text(
+            'Daftar Jadwal',
+            style: Theme.of(context).textTheme.titleLarge
+                ?.copyWith(color: AppColors.gownNavy),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRemoteBody(ColorScheme colorScheme) {
+    return RefreshIndicator(
+      onRefresh: _refreshRemoteJadwal,
+      child: _buildScheduleList(
+        colorScheme,
+        _remoteJadwal,
+        isLoading: _isRemoteLoading,
+        errorMessage: _remoteError,
+      ),
+    );
+  }
+
+  Widget _buildScheduleList(
+    ColorScheme colorScheme,
+    List<JadwalKuliah> jadwalList, {
+    bool isLoading = false,
+    String? errorMessage,
+  }) {
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 88),
+      children: [
+        _buildFilterCard(colorScheme),
+        const SizedBox(height: 16),
+        if (isLoading)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 32),
+            child: Center(child: CircularProgressIndicator()),
+          )
+        else if (errorMessage != null)
+          _buildErrorState(colorScheme, errorMessage)
+        else ...[
+          Text(
+            'Kelas ${_appliedFilter.kelas.nama} · Semester '
+            '${_appliedFilter.semester.label} '
+            '${_appliedFilter.tahunAjaran}',
+            style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12),
+          ),
+          const SizedBox(height: 8),
+          if (jadwalList.isEmpty)
+            _buildEmptyState(colorScheme)
+          else
+            for (final hari in HariKuliah.values)
+              if (jadwalList.any((item) => item.hari == hari)) ...[
+                _HariSection(
+                  hari: hari,
+                  jadwalList: jadwalList
+                      .where((item) => item.hari == hari)
+                      .toList(),
+                ),
+                const SizedBox(height: 10),
+              ],
+        ],
+      ],
+    );
+  }
+
+  Widget _buildErrorState(ColorScheme colorScheme, String message) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 32),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            PhosphorIconsRegular.cloudSlash,
+            size: 40,
+            color: colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13),
+          ),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: _refreshRemoteJadwal,
+            icon: const Icon(PhosphorIconsRegular.arrowsClockwise, size: 18),
+            label: const Text('Coba Lagi'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterCard(ColorScheme colorScheme) {
     final tahunAjaranOptions = [
       for (final item in tahunAjaranRepository.getAll()) item.tahun,
     ];
 
     return JadwalSectionCard(
-      icon: PhosphorIconsRegular.funnelSimple,
+      icon: PhosphorIconsRegular.funnel,
       title: 'Filter Jadwal',
       isExpanded: _isFilterExpanded,
       onToggle: () => setState(() => _isFilterExpanded = !_isFilterExpanded),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          AdminFieldPair(
-            first: AdminLabeledField(
-              label: 'Tahun Ajaran',
-              child: JadwalDropdownField<String>(
-                value: _tahunAjaran,
-                items: tahunAjaranOptions,
-                itemLabel: (tahun) => tahun,
-                onChanged: (tahun) {
-                  if (tahun != null) {
-                    setState(() => _tahunAjaran = tahun);
-                  }
-                },
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const JadwalFieldLabel(label: 'Tahun Ajaran'),
+                    JadwalDropdownField<String>(
+                      value: _tahunAjaran,
+                      items: tahunAjaranOptions,
+                      itemLabel: (tahun) => tahun,
+                      onChanged: (tahun) {
+                        if (tahun != null) {
+                          setState(() => _tahunAjaran = tahun);
+                        }
+                      },
+                    ),
+                  ],
+                ),
               ),
-            ),
-            second: AdminLabeledField(
-              label: 'Semester',
-              child: _SemesterSwitcher(
-                value: _semester,
-                onChanged: (semester) => setState(() => _semester = semester),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const JadwalFieldLabel(label: 'Semester'),
+                    _SemesterSwitcher(
+                      value: _semester,
+                      onChanged: (semester) =>
+                          setState(() => _semester = semester),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const JadwalFieldLabel(label: 'Tingkat'),
+                    JadwalDropdownField<int>(
+                      value: _tingkat,
+                      items: JadwalMasterData.tingkat,
+                      itemLabel: (tingkat) => '$tingkat',
+                      onChanged: _changeTingkat,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const JadwalFieldLabel(label: 'Kelas'),
+                    JadwalDropdownField<KelasKuliah>(
+                      key: ValueKey('kelas-filter-$_tingkat'),
+                      value: _kelas,
+                      items: JadwalMasterData.kelasByTingkat(_tingkat),
+                      itemLabel: (kelas) => kelas.nama,
+                      onChanged: (kelas) {
+                        if (kelas != null) setState(() => _kelas = kelas);
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            height: 44,
+            child: FilledButton.icon(
+              onPressed: _applyFilter,
+              icon: const Icon(PhosphorIconsRegular.magnifyingGlass, size: 20),
+              label: const Text(
+                'Tampilkan Jadwal',
+                style: TextStyle(fontWeight: FontWeight.w600),
+              ),
+              style: FilledButton.styleFrom(
+                backgroundColor: colorScheme.primary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
             ),
           ),
-          const SizedBox(height: AppSpacing.lg),
-          AdminFieldPair(
-            first: AdminLabeledField(
-              label: 'Tingkat',
-              child: JadwalDropdownField<int>(
-                value: _tingkat,
-                items: JadwalMasterData.tingkat,
-                itemLabel: (tingkat) => '$tingkat',
-                onChanged: _changeTingkat,
-              ),
-            ),
-            second: AdminLabeledField(
-              label: 'Kelas',
-              child: JadwalDropdownField<KelasKuliah>(
-                key: ValueKey('kelas-filter-$_tingkat'),
-                value: _kelas,
-                items: JadwalMasterData.kelasByTingkat(_tingkat),
-                itemLabel: (kelas) => kelas.nama,
-                onChanged: (kelas) {
-                  if (kelas != null) setState(() => _kelas = kelas);
-                },
-              ),
-            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(ColorScheme colorScheme) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 32),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            PhosphorIconsRegular.calendarX,
+            size: 40,
+            color: colorScheme.onSurfaceVariant,
           ),
-          const SizedBox(height: AppSpacing.lg),
-          OutlinedButton(
-            onPressed: _applyFilter,
-            child: const Text('Tampilkan Jadwal'),
+          const SizedBox(height: 10),
+          Text(
+            'Belum ada jadwal untuk filter ini.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13),
+          ),
+          const SizedBox(height: 8),
+          TextButton.icon(
+            onPressed: () => context.go(AdminRoutePaths.tambahJadwal),
+            icon: const Icon(PhosphorIconsRegular.plus, size: 18),
+            label: const Text('Tambah Jadwal Baru'),
           ),
         ],
       ),
@@ -199,7 +424,6 @@ class _JadwalListPageState extends State<JadwalListPage> {
   }
 }
 
-/// Pemilih dua segmen untuk semester ganjil atau genap.
 class _SemesterSwitcher extends StatelessWidget {
   const _SemesterSwitcher({required this.value, required this.onChanged});
 
@@ -208,16 +432,16 @@ class _SemesterSwitcher extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
 
-    return Material(
-      color: colorScheme.surface,
-      clipBehavior: Clip.antiAlias,
-      shape: RoundedRectangleBorder(
-        borderRadius: AppRadius.control,
-        side: BorderSide(color: colorScheme.outline),
+    return Container(
+      height: 50,
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: colorScheme.outline),
       ),
+      padding: const EdgeInsets.all(3),
       child: Row(
         children: [
           for (final semester in SemesterPeriode.values)
@@ -227,24 +451,24 @@ class _SemesterSwitcher extends StatelessWidget {
                 selected: semester == value,
                 child: InkWell(
                   onTap: () => onChanged(semester),
+                  borderRadius: BorderRadius.circular(8),
                   child: AnimatedContainer(
-                    duration: AppMotion.fast,
-                    height: _fieldHeight,
+                    duration: const Duration(milliseconds: 150),
                     alignment: Alignment.center,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: AppSpacing.xs,
-                    ),
-                    color: colorScheme.primaryContainer.withValues(
-                      alpha: semester == value ? 1 : 0,
+                    decoration: BoxDecoration(
+                      color: semester == value
+                          ? colorScheme.primary
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       semester.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleSmall?.copyWith(
+                      style: TextStyle(
                         color: semester == value
-                            ? colorScheme.onPrimaryContainer
-                            : colorScheme.onSurfaceVariant,
+                            ? colorScheme.onPrimary
+                            : colorScheme.onSurface,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
@@ -265,23 +489,37 @@ class _HariSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const SizedBox(height: AppSpacing.sm),
-        AppSectionHeader(title: hari.label),
-        Card(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              for (var index = 0; index < jadwalList.length; index++) ...[
-                if (index > 0) const Divider(),
-                _JadwalTile(jadwal: jadwalList[index]),
-              ],
-            ],
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            color: colorScheme.primaryContainer.withValues(alpha: 0.6),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            child: Text(
+              hari.label,
+              style: TextStyle(
+                color: colorScheme.onSurface,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
-        ),
-      ],
+          for (var index = 0; index < jadwalList.length; index++) ...[
+            if (index > 0)
+              Divider(height: 1, color: colorScheme.outlineVariant),
+            _JadwalTile(jadwal: jadwalList[index]),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -293,102 +531,50 @@ class _JadwalTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final text = Theme.of(context).textTheme;
-    final timeStyle = text.titleSmall?.tabular;
-    final jamMulai = jadwal.sesiMulai.jamMulai;
+    final colorScheme = Theme.of(context).colorScheme;
+    final mutedColor = colorScheme.onSurfaceVariant;
 
-    return MergeSemantics(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 64),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg,
-            vertical: AppSpacing.md,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            jadwal.mataKuliah.nama,
+            style: TextStyle(
+              color: colorScheme.onSurface,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          const SizedBox(height: 4),
+          Row(
             children: [
-              // Jam mulai tebal, jam selesai pudar; tetap satu teks utuh
-              // "07:50 – 09:30".
-              Text.rich(
-                TextSpan(
-                  children: [
-                    TextSpan(
-                      text: jamMulai,
-                      style: timeStyle?.copyWith(fontWeight: FontWeight.w700),
-                    ),
-                    TextSpan(
-                      text: jadwal.rentangWaktu.substring(jamMulai.length),
-                      style: timeStyle?.copyWith(
-                        color: AppColors.inkFaint,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-                softWrap: false,
-                style: timeStyle,
+              Icon(PhosphorIconsRegular.clock, size: 14, color: mutedColor),
+              const SizedBox(width: 4),
+              Text(
+                jadwal.rentangWaktu,
+                style: TextStyle(color: mutedColor, fontSize: 12),
               ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      jadwal.mataKuliah.nama,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: text.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Wrap(
-                      children: [
-                        _MetaPart(jadwal.kelas.nama, separated: true),
-                        _MetaPart(jadwal.ruangan.nama, separated: true),
-                        _MetaPart(jadwal.dosen.nama),
-                      ],
-                    ),
-                  ],
+              const SizedBox(width: 14),
+              Icon(PhosphorIconsRegular.mapPin, size: 14, color: mutedColor),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  jadwal.ruangan.nama,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: mutedColor, fontSize: 12),
                 ),
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-/// Satu bagian dari baris "kelas · ruangan · dosen". Tiap bagian berupa teks
-/// sendiri supaya bisa pindah baris utuh di layar sempit.
-class _MetaPart extends StatelessWidget {
-  const _MetaPart(this.label, {this.separated = false});
-
-  final String label;
-
-  /// Menambahkan pemisah " · " setelah teks.
-  final bool separated;
-
-  @override
-  Widget build(BuildContext context) {
-    final style = Theme.of(context).textTheme.bodySmall?.tabular
-        .copyWith(color: AppColors.inkFaint);
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Flexible(
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: style,
+          const SizedBox(height: 3),
+          Text(
+            jadwal.dosen.nama,
+            style: TextStyle(color: mutedColor, fontSize: 12),
           ),
-        ),
-        if (separated) Text(' · ', style: style),
-      ],
+        ],
+      ),
     );
   }
 }

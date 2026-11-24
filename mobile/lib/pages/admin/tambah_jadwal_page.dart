@@ -2,17 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
+import '../../data/admin/admin_auth_repository.dart';
+import '../../data/admin/admin_jadwal_options_service.dart';
+import '../../data/admin/admin_jadwal_service.dart';
 import '../../data/admin/jadwal.dart';
 import '../../data/admin/mata_kuliah.dart';
 import '../../data/admin/tahun_ajaran.dart';
 import '../../routing/admin_route_paths.dart';
 import '../../widgets/widgets.dart';
-import 'widgets/admin_scaffold.dart';
 import 'widgets/jadwal_form_widgets.dart';
-import 'widgets/labeled_fields.dart';
 
 class TambahJadwalPage extends StatefulWidget {
-  const TambahJadwalPage({super.key});
+  const TambahJadwalPage({super.key, this.service, this.optionsService});
+
+  /// Service opsional untuk pengujian; default memakai backend Hadirin.
+  final AdminJadwalService? service;
+
+  /// Sumber pilihan form; default memakai endpoint master data backend.
+  final AdminJadwalOptionsService? optionsService;
 
   @override
   State<TambahJadwalPage> createState() => _TambahJadwalPageState();
@@ -34,12 +41,33 @@ class _TambahJadwalPageState extends State<TambahJadwalPage> {
   SesiKuliah? _sesiMulai;
   SesiKuliah? _sesiSelesai;
 
+  bool _isAkademikExpanded = true;
+  bool _isWaktuExpanded = true;
   bool _isSubmitting = false;
   AutovalidateMode _autovalidateMode = AutovalidateMode.disabled;
 
-  /// Rincian bentrok dari percobaan simpan terakhir. Tampil di atas tombol
-  /// simpan sampai isian diubah.
-  String? _conflictMessage;
+  JadwalFormOptions? _options;
+  bool _isLoadingOptions = false;
+  String? _optionsError;
+
+  AdminJadwalService get _service => widget.service ?? adminJadwalService;
+  AdminJadwalOptionsService get _optionsService =>
+      widget.optionsService ?? adminJadwalOptionsService;
+  bool get _usesRemote => adminAuthRepository.hasRemoteSession;
+
+  List<TahunAjaran> get _tahunAjaranOptions =>
+      _options?.tahunAjaran ?? tahunAjaranRepository.getAll();
+  List<MataKuliah> get _mataKuliahOptions =>
+      _options?.mataKuliah ?? mataKuliahRepository.getActive();
+  List<Dosen> get _dosenOptions => _options?.dosen ?? JadwalMasterData.dosen;
+  List<ProgramStudi> get _programStudiOptions =>
+      _options?.programStudi ?? JadwalMasterData.programStudi;
+  List<Ruangan> get _ruanganOptions =>
+      _options?.ruangan ?? JadwalMasterData.ruangan;
+  List<SesiKuliah> get _sesiOptions => _options?.sesi ?? JadwalMasterData.sesi;
+  List<KelasKuliah> get _kelasOptions =>
+      _options?.kelas ??
+      JadwalMasterData.kelasByProgramStudi(_programStudi.kode);
 
   static String _defaultTahunAjaran() {
     final all = tahunAjaranRepository.getAll();
@@ -47,10 +75,100 @@ class _TambahJadwalPageState extends State<TambahJadwalPage> {
     return (aktif.isNotEmpty ? aktif.first : all.first).tahun;
   }
 
-  Future<void> _submit() async {
-    if (_isSubmitting) return;
+  @override
+  void initState() {
+    super.initState();
+    if (_usesRemote) _loadOptions();
+  }
+
+  Future<void> _loadOptions() async {
     setState(() {
-      _conflictMessage = null;
+      _isLoadingOptions = true;
+      _optionsError = null;
+    });
+    try {
+      final options = await _optionsService.load();
+      if (!mounted) return;
+
+      final tahunOptions = options.tahunAjaran;
+      final selected = tahunOptions.any((item) => item.tahun == _tahunAjaran)
+          ? _tahunAjaran
+          : tahunOptions
+                    .where((item) => item.status == TahunAjaranStatus.aktif)
+                    .firstOrNull
+                    ?.tahun ??
+                tahunOptions.firstOrNull?.tahun ??
+                _tahunAjaran;
+      final kelas = await _optionsService.loadKelas(selected);
+      if (!mounted) return;
+
+      final programStudi = options.programStudi.isEmpty
+          ? _programStudi
+          : options.programStudi.firstWhere(
+              (item) => item.kode == _programStudi.kode,
+              orElse: () => options.programStudi.first,
+            );
+      final prodiChanged = programStudi.kode != _programStudi.kode;
+
+      setState(() {
+        _tahunAjaran = selected;
+        _programStudi = programStudi;
+        if (prodiChanged) _kelas = null;
+        _options = options.copyWith(kelas: kelas);
+        _isLoadingOptions = false;
+      });
+    } on AdminRemoteApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingOptions = false;
+        _optionsError = error.message;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingOptions = false;
+        _optionsError = 'Gagal memuat pilihan form dari backend.';
+      });
+    }
+  }
+
+  Future<void> _onTahunChanged(String? tahun) async {
+    if (tahun == null || tahun == _tahunAjaran) return;
+    setState(() {
+      _tahunAjaran = tahun;
+      _kelas = null;
+    });
+    if (!_usesRemote || _options == null) return;
+
+    setState(() => _isLoadingOptions = true);
+    try {
+      final kelas = await _optionsService.loadKelas(tahun);
+      if (!mounted) return;
+      setState(() {
+        _options = _options!.copyWith(kelas: kelas);
+        _isLoadingOptions = false;
+        _optionsError = null;
+      });
+    } on AdminRemoteApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingOptions = false;
+        _optionsError = error.message;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _isLoadingOptions = false;
+        _optionsError = 'Gagal memuat daftar kelas dari backend.';
+      });
+    }
+  }
+
+  Future<void> _submit() async {
+    if (_isSubmitting || _isLoadingOptions || _optionsError != null) return;
+    setState(() {
+      _isAkademikExpanded = true;
+      _isWaktuExpanded = true;
       _autovalidateMode = AutovalidateMode.onUserInteraction;
     });
     if (!_formKey.currentState!.validate()) return;
@@ -58,7 +176,38 @@ class _TambahJadwalPageState extends State<TambahJadwalPage> {
     FocusScope.of(context).unfocus();
     setState(() => _isSubmitting = true);
 
-    // Simulate network latency
+    if (_usesRemote) {
+      try {
+        final created = await _service.createJadwal(
+          tahunAjaran: _tahunAjaran,
+          kelas: _kelas!.nama,
+          mataKuliahKode: _mataKuliah!.kode,
+          dosenNip: _dosen!.nip,
+          ruanganKode: _ruangan!.kode,
+          hari: _hari!,
+          sesiMulai: _sesiMulai!.nomor,
+          sesiSelesai: _sesiSelesai!.nomor,
+          semester: _mataKuliah!.periode,
+        );
+        if (!mounted) return;
+        _finishSubmit();
+        _showMessage(
+          'Jadwal ${created.mataKuliah.nama} untuk ${created.kelas.nama} '
+          'berhasil disimpan.',
+        );
+      } on AdminRemoteApiException catch (error) {
+        if (!mounted) return;
+        setState(() => _isSubmitting = false);
+        _showMessage(error.message);
+      } catch (_) {
+        if (!mounted) return;
+        setState(() => _isSubmitting = false);
+        _showMessage('Gagal menghubungi server untuk menyimpan jadwal.');
+      }
+      return;
+    }
+
+    // Simulate network latency for the offline/demo repository.
     await Future<void>.delayed(const Duration(milliseconds: 600));
     if (!mounted) return;
 
@@ -78,15 +227,19 @@ class _TambahJadwalPageState extends State<TambahJadwalPage> {
     try {
       jadwalRepository.add(jadwal);
     } on JadwalConflictException catch (error) {
-      // Isian dibiarkan apa adanya: cukup bagian yang bentrok yang diperbaiki.
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      setState(() {
-        _isSubmitting = false;
-        _conflictMessage = error.message;
-      });
+      setState(() => _isSubmitting = false);
+      _showMessage('Jadwal bentrok: ${error.message}');
       return;
     }
 
+    _finishSubmit();
+    _showMessage(
+      'Jadwal ${jadwal.mataKuliah.nama} untuk ${jadwal.kelas.nama} '
+      'berhasil disimpan.',
+    );
+  }
+
+  void _finishSubmit() {
     setState(() {
       _isSubmitting = false;
       _mataKuliah = null;
@@ -99,20 +252,12 @@ class _TambahJadwalPageState extends State<TambahJadwalPage> {
       _autovalidateMode = AutovalidateMode.disabled;
       _formGeneration++;
     });
-    _showMessage(
-      'Jadwal ${jadwal.mataKuliah.nama} untuk ${jadwal.kelas.nama} '
-      'berhasil disimpan.',
-    );
   }
 
   void _showMessage(String message) {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
-  }
-
-  void _clearConflict() {
-    if (_conflictMessage != null) setState(() => _conflictMessage = null);
   }
 
   String? _validateKelas(KelasKuliah? kelas) {
@@ -136,71 +281,179 @@ class _TambahJadwalPageState extends State<TambahJadwalPage> {
 
   @override
   Widget build(BuildContext context) {
-    final conflictMessage = _conflictMessage;
+    final colorScheme = Theme.of(context).colorScheme;
 
-    return AdminFormScaffold(
-      title: 'Tambah Jadwal Baru',
-      description: 'Atur mata kuliah, ruang, dan waktu perkuliahan.',
-      onBack: () => context.go(AdminRoutePaths.dataAkademik),
-      onSave: _submit,
-      saveLabel: 'Simpan Jadwal',
-      isSaving: _isSubmitting,
-      notice: conflictMessage == null
-          ? null
-          : AppBanner(
-              tone: StatusTone.danger,
-              title: 'Jadwal bentrok',
-              message: conflictMessage,
+    return Scaffold(
+      backgroundColor: colorScheme.surfaceContainerHighest,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildAppBar(),
+            Expanded(
+              child: Form(
+                key: _formKey,
+                autovalidateMode: _autovalidateMode,
+                child: SingleChildScrollView(
+                  key: ValueKey(_formGeneration),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (_isLoadingOptions)
+                        const LinearProgressIndicator(minHeight: 2),
+                      if (_optionsError != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: colorScheme.errorContainer,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  PhosphorIconsRegular.cloudSlash,
+                                  color: colorScheme.onErrorContainer,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    _optionsError!,
+                                    style: TextStyle(
+                                      color: colorScheme.onErrorContainer,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                                TextButton(
+                                  onPressed: _loadOptions,
+                                  child: const Text('Coba lagi'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      JadwalSectionCard(
+                        icon: PhosphorIconsRegular.graduationCap,
+                        title: 'Informasi Akademik',
+                        isExpanded: _isAkademikExpanded,
+                        onToggle: () => setState(
+                          () => _isAkademikExpanded = !_isAkademikExpanded,
+                        ),
+                        child: _buildAkademikFields(colorScheme),
+                      ),
+                      const SizedBox(height: 12),
+                      JadwalSectionCard(
+                        icon: PhosphorIconsRegular.clock,
+                        title: 'Alokasi Waktu & Tempat',
+                        isExpanded: _isWaktuExpanded,
+                        onToggle: () => setState(
+                          () => _isWaktuExpanded = !_isWaktuExpanded,
+                        ),
+                        child: _buildWaktuFields(colorScheme),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
-      form: Form(
-        key: _formKey,
-        autovalidateMode: _autovalidateMode,
-        onChanged: _clearConflict,
-        child: KeyedSubtree(
-          key: ValueKey(_formGeneration),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const AppSectionHeader(title: 'Informasi Akademik'),
-              ..._buildAkademikFields(context),
-              const SizedBox(height: AppSpacing.sm),
-              const AppSectionHeader(title: 'Alokasi Waktu & Tempat'),
-              ..._buildWaktuFields(context),
-            ],
-          ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+              child: SizedBox(
+                height: 48,
+                child: FilledButton(
+                  onPressed:
+                      (_isSubmitting ||
+                          _isLoadingOptions ||
+                          _optionsError != null)
+                      ? null
+                      : _submit,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colorScheme.primary,
+                    disabledBackgroundColor: colorScheme.primary.withValues(
+                      alpha: 0.38,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: _isSubmitting
+                      ? SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: colorScheme.onPrimary,
+                          ),
+                        )
+                      : const Text(
+                          'Simpan Jadwal',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  List<Widget> _buildAkademikFields(BuildContext context) {
+  Widget _buildAppBar() {
+    return SkyHeader(
+      includeStatusBar: false,
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(PhosphorIconsRegular.arrowLeft),
+            color: AppColors.gownNavy,
+            onPressed: () => context.go(AdminRoutePaths.dataAkademik),
+            tooltip: 'Kembali',
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              'Tambah Jadwal Baru',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleLarge
+                  ?.copyWith(color: AppColors.gownNavy),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAkademikFields(ColorScheme colorScheme) {
     final tahunAjaranOptions = [
-      for (final item in tahunAjaranRepository.getAll()) item.tahun,
+      for (final item in _tahunAjaranOptions) item.tahun,
     ];
     final mataKuliah = _mataKuliah;
 
-    return [
-      AdminLabeledField(
-        label: 'Tahun Ajaran',
-        required: true,
-        child: JadwalDropdownField<String>(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const JadwalFieldLabel(label: 'Tahun Ajaran', required: true),
+        JadwalDropdownField<String>(
           value: _tahunAjaran,
           items: tahunAjaranOptions,
           itemLabel: (tahun) => tahun,
-          onChanged: (tahun) {
-            if (tahun != null) setState(() => _tahunAjaran = tahun);
-          },
+          onChanged: _onTahunChanged,
           validator: (tahun) =>
               tahun == null ? 'Tahun ajaran wajib dipilih.' : null,
         ),
-      ),
-      const SizedBox(height: AppSpacing.lg),
-      AdminLabeledField(
-        label: 'Mata Kuliah',
-        required: true,
-        child: JadwalSearchPickerField<MataKuliah>(
+        const SizedBox(height: 14),
+        const JadwalFieldLabel(label: 'Mata Kuliah', required: true),
+        JadwalSearchPickerField<MataKuliah>(
           value: _mataKuliah,
-          options: mataKuliahRepository.getActive(),
+          options: _mataKuliahOptions,
           itemLabel: (item) => item.nama,
           itemSubtitle: (item) =>
               '${item.kode} · Semester ${item.semester} · ${item.sks} SKS',
@@ -211,19 +464,23 @@ class _TambahJadwalPageState extends State<TambahJadwalPage> {
           validator: (item) =>
               item == null ? 'Mata kuliah wajib dipilih.' : null,
         ),
-      ),
-      if (mataKuliah != null)
-        _FieldHint(
-          'Semester ${mataKuliah.semester} (${mataKuliah.periode.label}) · '
-          '${mataKuliah.sks} SKS',
-        ),
-      const SizedBox(height: AppSpacing.lg),
-      AdminLabeledField(
-        label: 'Dosen Pengampu',
-        required: true,
-        child: JadwalSearchPickerField<Dosen>(
+        if (mataKuliah != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              'Semester ${mataKuliah.semester} (${mataKuliah.periode.label}) · '
+              '${mataKuliah.sks} SKS',
+              style: TextStyle(
+                color: colorScheme.onSurfaceVariant,
+                fontSize: 11,
+              ),
+            ),
+          ),
+        const SizedBox(height: 14),
+        const JadwalFieldLabel(label: 'Dosen Pengampu', required: true),
+        JadwalSearchPickerField<Dosen>(
           value: _dosen,
-          options: JadwalMasterData.dosen,
+          options: _dosenOptions,
           itemLabel: (item) => item.nama,
           itemSubtitle: (item) => 'NIP ${item.nip}',
           searchText: (item) => '${item.nama} ${item.nip}',
@@ -232,14 +489,13 @@ class _TambahJadwalPageState extends State<TambahJadwalPage> {
           onChanged: (item) => setState(() => _dosen = item),
           validator: (item) => item == null ? 'Dosen wajib dipilih.' : null,
         ),
-      ),
-      const SizedBox(height: AppSpacing.lg),
-      AdminLabeledField(
-        label: 'Program Studi',
-        child: JadwalDropdownField<ProgramStudi>(
+        const SizedBox(height: 14),
+        const JadwalFieldLabel(label: 'Program Studi'),
+        JadwalDropdownField<ProgramStudi>(
           value: _programStudi,
-          items: JadwalMasterData.programStudi,
+          items: _programStudiOptions,
           itemLabel: (item) => item.nama,
+          filled: true,
           onChanged: (item) {
             if (item == null || item == _programStudi) return;
             setState(() {
@@ -248,15 +504,12 @@ class _TambahJadwalPageState extends State<TambahJadwalPage> {
             });
           },
         ),
-      ),
-      const SizedBox(height: AppSpacing.lg),
-      AdminLabeledField(
-        label: 'Kelas',
-        required: true,
-        child: JadwalSearchPickerField<KelasKuliah>(
+        const SizedBox(height: 14),
+        const JadwalFieldLabel(label: 'Kelas', required: true),
+        JadwalSearchPickerField<KelasKuliah>(
           key: ValueKey('kelas-${_programStudi.kode}'),
           value: _kelas,
-          options: JadwalMasterData.kelasByProgramStudi(_programStudi.kode),
+          options: _kelasOptions,
           itemLabel: (item) => item.nama,
           itemSubtitle: (item) => 'Tingkat ${item.tingkat}',
           searchText: (item) => item.nama,
@@ -265,76 +518,112 @@ class _TambahJadwalPageState extends State<TambahJadwalPage> {
           onChanged: (item) => setState(() => _kelas = item),
           validator: _validateKelas,
         ),
-      ),
-    ];
+      ],
+    );
   }
 
-  List<Widget> _buildWaktuFields(BuildContext context) {
+  Widget _buildWaktuFields(ColorScheme colorScheme) {
     final sesiMulai = _sesiMulai;
     final sesiSelesai = _sesiSelesai;
 
-    return [
-      AdminFieldPair(
-        // Petunjuk pencarian ruangan butuh kolom yang lebar; di ponsel
-        // kedua isian ditumpuk.
-        minColumnWidth: 240,
-        first: AdminLabeledField(
-          label: 'Ruangan',
-          required: true,
-          child: JadwalSearchPickerField<Ruangan>(
-            value: _ruangan,
-            options: JadwalMasterData.ruangan,
-            itemLabel: (item) => item.nama,
-            searchText: (item) => '${item.nama} ${item.kode}',
-            hintText: 'Cari Ruang (LPR)...',
-            sheetTitle: 'Pilih Ruangan',
-            onChanged: (item) => setState(() => _ruangan = item),
-            validator: (item) => item == null ? 'Wajib dipilih.' : null,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const JadwalFieldLabel(label: 'Ruangan', required: true),
+                  JadwalSearchPickerField<Ruangan>(
+                    value: _ruangan,
+                    options: _ruanganOptions,
+                    itemLabel: (item) => item.nama,
+                    searchText: (item) => '${item.nama} ${item.kode}',
+                    hintText: 'Cari Ruang (LPR)...',
+                    sheetTitle: 'Pilih Ruangan',
+                    onChanged: (item) => setState(() => _ruangan = item),
+                    validator: (item) => item == null ? 'Wajib dipilih.' : null,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const JadwalFieldLabel(label: 'Hari', required: true),
+                  JadwalDropdownField<HariKuliah>(
+                    value: _hari,
+                    items: HariKuliah.values,
+                    itemLabel: (item) => item.label,
+                    hintText: 'Pilih Hari...',
+                    prefixIcon: PhosphorIconsRegular.calendarBlank,
+                    onChanged: (item) => setState(() => _hari = item),
+                    validator: (item) => item == null ? 'Wajib dipilih.' : null,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const JadwalFieldLabel(
+                    label: 'Jam / Sesi Mulai',
+                    required: true,
+                  ),
+                  _buildSesiDropdown(
+                    value: _sesiMulai,
+                    onChanged: (item) => setState(() => _sesiMulai = item),
+                    validator: (item) => item == null ? 'Wajib dipilih.' : null,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const JadwalFieldLabel(
+                    label: 'Jam / Sesi Selesai',
+                    required: true,
+                  ),
+                  _buildSesiDropdown(
+                    value: _sesiSelesai,
+                    onChanged: (item) => setState(() => _sesiSelesai = item),
+                    validator: _validateSesiSelesai,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        if (sesiMulai != null &&
+            sesiSelesai != null &&
+            sesiSelesai.nomor >= sesiMulai.nomor)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              'Waktu kuliah: ${sesiMulai.jamMulai} – ${sesiSelesai.jamSelesai}',
+              style: TextStyle(
+                color: colorScheme.onSurfaceVariant,
+                fontSize: 11,
+              ),
+            ),
           ),
-        ),
-        second: AdminLabeledField(
-          label: 'Hari',
-          required: true,
-          child: JadwalDropdownField<HariKuliah>(
-            value: _hari,
-            items: HariKuliah.values,
-            itemLabel: (item) => item.label,
-            hintText: 'Pilih Hari...',
-            prefixIcon: PhosphorIconsRegular.calendarBlank,
-            onChanged: (item) => setState(() => _hari = item),
-            validator: (item) => item == null ? 'Wajib dipilih.' : null,
-          ),
-        ),
-      ),
-      const SizedBox(height: AppSpacing.lg),
-      AdminFieldPair(
-        minColumnWidth: 140,
-        first: AdminLabeledField(
-          label: 'Jam / Sesi Mulai',
-          required: true,
-          child: _buildSesiDropdown(
-            value: _sesiMulai,
-            onChanged: (item) => setState(() => _sesiMulai = item),
-            validator: (item) => item == null ? 'Wajib dipilih.' : null,
-          ),
-        ),
-        second: AdminLabeledField(
-          label: 'Jam / Sesi Selesai',
-          required: true,
-          child: _buildSesiDropdown(
-            value: _sesiSelesai,
-            onChanged: (item) => setState(() => _sesiSelesai = item),
-            validator: _validateSesiSelesai,
-          ),
-        ),
-      ),
-      if (sesiMulai != null &&
-          sesiSelesai != null &&
-          sesiSelesai.nomor >= sesiMulai.nomor)
-        _FieldHint(
-          'Waktu kuliah: ${sesiMulai.jamMulai} – ${sesiSelesai.jamSelesai}',
-        ),
-    ];
+      ],
+    );
   }
 
   Widget _buildSesiDropdown({
@@ -344,7 +633,7 @@ class _TambahJadwalPageState extends State<TambahJadwalPage> {
   }) {
     return JadwalDropdownField<SesiKuliah>(
       value: value,
-      items: JadwalMasterData.sesi,
+      items: _sesiOptions,
       itemLabel: (item) =>
           'Sesi ${item.nomor} (${item.jamMulai}–${item.jamSelesai})',
       selectedItemLabel: (item) => '${item.nomor}',
@@ -352,25 +641,6 @@ class _TambahJadwalPageState extends State<TambahJadwalPage> {
       prefixIcon: PhosphorIconsRegular.clock,
       onChanged: onChanged,
       validator: validator,
-    );
-  }
-}
-
-/// Keterangan kecil di bawah kolom isian.
-class _FieldHint extends StatelessWidget {
-  const _FieldHint(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 6),
-      child: Text(
-        text,
-        style: Theme.of(context).textTheme.bodySmall?.tabular
-            .copyWith(color: AppColors.inkMuted),
-      ),
     );
   }
 }

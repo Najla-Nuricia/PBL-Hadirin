@@ -442,12 +442,14 @@ class _FaceScanStageState extends State<FaceScanStage>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 36, color: AppColors.onScrimMuted),
-          const SizedBox(height: AppSpacing.sm),
+          Icon(icon, size: 28, color: AppColors.onScrimMuted),
+          const SizedBox(height: AppSpacing.xs),
           Text(
             message,
+            maxLines: 4,
+            overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
-            style: text.bodyMedium?.copyWith(color: Colors.white),
+            style: text.bodySmall?.copyWith(color: Colors.white),
           ),
         ],
       ),

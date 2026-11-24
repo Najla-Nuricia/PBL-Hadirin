@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
+import '../../data/admin/admin_auth_repository.dart';
+import '../../data/admin/admin_master_data_service.dart';
 import '../../data/admin/jadwal.dart';
-import '../../data/admin/mata_kuliah.dart';
 import '../../routing/admin_route_paths.dart';
 import '../../widgets/widgets.dart';
 import 'tambah_mata_kuliah_page.dart';
-import 'widgets/admin_list.dart';
-import 'widgets/admin_scaffold.dart';
 
 class MataKuliahListPage extends StatefulWidget {
   const MataKuliahListPage({super.key});
@@ -19,11 +18,16 @@ class MataKuliahListPage extends StatefulWidget {
 
 class _MataKuliahListPageState extends State<MataKuliahListPage> {
   final _searchController = TextEditingController();
+  List<MataKuliah> _items = [];
+  List<MataKuliah> _displayed = [];
+  bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
     _searchController.addListener(_refreshSearch);
+    _load();
   }
 
   @override
@@ -33,7 +37,44 @@ class _MataKuliahListPageState extends State<MataKuliahListPage> {
     super.dispose();
   }
 
-  void _refreshSearch() => setState(() {});
+  void _refreshSearch() {
+    final query = _searchController.text.trim().toLowerCase();
+    setState(() {
+      _displayed = query.isEmpty
+          ? List.unmodifiable(_items)
+          : _items
+                .where(
+                  (item) =>
+                      item.kode.toLowerCase().contains(query) ||
+                      item.nama.toLowerCase().contains(query),
+                )
+                .toList(growable: false);
+    });
+  }
+
+  Future<void> _load() async {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
+    try {
+      final items = await adminMasterDataService.listMataKuliah();
+      if (!mounted) return;
+      setState(() {
+        _items = items;
+        _displayed = items;
+        _isLoading = false;
+      });
+    } on AdminRemoteApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = error.message;
+      });
+    }
+  }
 
   void _back() {
     if (context.canPop()) {
@@ -49,108 +90,305 @@ class _MataKuliahListPageState extends State<MataKuliahListPage> {
         builder: (_) => TambahMataKuliahPage(initialItem: item),
       ),
     );
-    if (saved == true && mounted) setState(() {});
+    if (saved == true && mounted) await _load();
   }
 
   Future<void> _delete(MataKuliah item) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Hapus mata kuliah?'),
-        content: Text(
-          '${item.kode} · ${item.nama} akan dihapus dan tidak dapat dikembalikan.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Batal'),
+      builder: (context) {
+        final colorScheme = Theme.of(context).colorScheme;
+        return AlertDialog(
+          title: const Text('Hapus mata kuliah?'),
+          content: Text(
+            '${item.kode} · ${item.nama} akan dihapus dan tidak dapat dikembalikan.',
           ),
-          TextButton(
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Batal'),
             ),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Hapus'),
-          ),
-        ],
-      ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: colorScheme.error,
+                foregroundColor: colorScheme.onError,
+              ),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Hapus'),
+            ),
+          ],
+        );
+      },
     );
     if (confirmed != true || !mounted) return;
-    mataKuliahRepository.delete(item.id);
-    setState(() {});
+    try {
+      await adminMasterDataService.deleteMataKuliah(item.kode);
+      if (mounted) await _load();
+    } on AdminRemoteApiException catch (error) {
+      if (mounted) _showError(error.message);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return ListenableBuilder(
-      listenable: mataKuliahRepository,
-      builder: (context, _) {
-        final displayed = mataKuliahRepository.search(_searchController.text);
+    return Scaffold(
+      backgroundColor: colorScheme.surface,
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildHeader(colorScheme),
+            _buildSearchBar(colorScheme),
+            const SizedBox(height: 8),
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _errorMessage != null
+                  ? _buildError(colorScheme)
+                  : _displayed.isEmpty
+                  ? _buildEmpty(colorScheme)
+                  : ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                      itemCount: _displayed.length,
+                      separatorBuilder: (_, index) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final item = _displayed[index];
+                        return _MataKuliahCard(
+                          item: item,
+                          onEdit: () => _openForm(item: item),
+                          onDelete: () => _delete(item),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
-        return AdminPageScaffold(
-          title: 'Mata Kuliah',
-          onBack: _back,
-          bottomBar: AdminBottomBar(
-            child: AppGradientButton(
-              onPressed: () => _openForm(),
-              icon: PhosphorIconsRegular.plus,
-              label: 'Tambah',
+  Widget _buildHeader(ColorScheme colorScheme) {
+    return SkyHeader(
+      includeStatusBar: false,
+      child: Row(
+        children: [
+          IconButton(
+            onPressed: _back,
+            icon: const Icon(PhosphorIconsRegular.arrowLeft, size: 20),
+            color: AppColors.gownNavy,
+            tooltip: 'Kembali',
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          Expanded(
+            child: Text(
+              'Mata Kuliah',
+              style: Theme.of(context).textTheme.titleLarge
+                  ?.copyWith(color: AppColors.gownNavy),
             ),
           ),
-          children: [
-            const SizedBox(height: AppSpacing.sm),
-            AdminSearchField(
-              controller: _searchController,
-              hintText: 'Cari kode atau nama mata kuliah...',
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            if (displayed.isEmpty)
-              AppEmptyState(
-                icon: PhosphorIconsRegular.bookOpen,
-                title: 'Tidak ada mata kuliah ditemukan.',
-                message: _searchController.text.trim().isEmpty
-                    ? 'Mata kuliah yang ditambahkan akan muncul di sini.'
-                    : 'Coba kata kunci lain.',
-              )
-            else
-              AdminListCard(
-                children: [
-                  for (final item in displayed)
-                    AdminListRow(
-                      icon: PhosphorIconsRegular.bookOpen,
-                      title: item.nama,
-                      titleMaxLines: 2,
-                      subtitle:
-                          '${item.kode} · Semester ${item.semester} · '
-                          '${item.sks} SKS',
-                      badge: AdminStatusBadge(
-                        label: item.status.label,
-                        active: item.status == MataKuliahStatus.aktif,
-                      ),
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          IconButton(
-                            onPressed: () => _openForm(item: item),
-                            tooltip: 'Edit mata kuliah',
-                            icon: const Icon(PhosphorIconsRegular.pencilSimple),
-                          ),
-                          IconButton(
-                            onPressed: () => _delete(item),
-                            tooltip: 'Hapus mata kuliah',
-                            color: colorScheme.error,
-                            icon: const Icon(PhosphorIconsRegular.trash),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
+          FilledButton.icon(
+            onPressed: () => _openForm(),
+            icon: const Icon(PhosphorIconsRegular.plus, size: 18),
+            label: const Text('Tambah'),
+            style: FilledButton.styleFrom(
+              backgroundColor: colorScheme.primary,
+              foregroundColor: colorScheme.onPrimary,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              shape: const RoundedRectangleBorder(
+                borderRadius: AppRadius.control,
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSearchBar(ColorScheme colorScheme) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: TextField(
+        controller: _searchController,
+        decoration: InputDecoration(
+          hintText: 'Cari kode atau nama mata kuliah...',
+          hintStyle: TextStyle(
+            color: colorScheme.onSurfaceVariant,
+            fontSize: 13,
+          ),
+          prefixIcon: Icon(
+            PhosphorIconsRegular.magnifyingGlass,
+            color: colorScheme.onSurfaceVariant,
+            size: 20,
+          ),
+          suffixIcon: _searchController.text.isNotEmpty
+              ? IconButton(
+                  onPressed: _searchController.clear,
+                  icon: Icon(
+                    PhosphorIconsRegular.x,
+                    color: colorScheme.onSurfaceVariant,
+                    size: 18,
+                  ),
+                )
+              : null,
+          filled: true,
+          fillColor: colorScheme.surfaceContainerHighest,
+          contentPadding: const EdgeInsets.symmetric(vertical: 12),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide.none,
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: colorScheme.outlineVariant),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: colorScheme.primary),
+          ),
+        ),
+        style: TextStyle(color: colorScheme.onSurface, fontSize: 13),
+      ),
+    );
+  }
+
+  Widget _buildEmpty(ColorScheme colorScheme) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            PhosphorIconsRegular.bookOpen,
+            size: 48,
+            color: colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Tidak ada mata kuliah ditemukan.',
+            style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 14),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildError(ColorScheme colorScheme) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              PhosphorIconsRegular.cloudSlash,
+              size: 48,
+              color: colorScheme.error,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              _errorMessage!,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton(onPressed: _load, child: const Text('Coba lagi')),
           ],
-        );
-      },
+        ),
+      ),
+    );
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+}
+
+class _MataKuliahCard extends StatelessWidget {
+  const _MataKuliahCard({
+    required this.item,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final MataKuliah item;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 13, 6, 13),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              PhosphorIconsRegular.bookOpen,
+              color: colorScheme.primary,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.nama,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: colorScheme.onSurface,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${item.kode} · Semester ${item.semester} · ${item.sks} SKS',
+                  style: TextStyle(
+                    color: colorScheme.onSurfaceVariant,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            onPressed: onEdit,
+            tooltip: 'Edit mata kuliah',
+            constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+            padding: EdgeInsets.zero,
+            visualDensity: VisualDensity.compact,
+            icon: Icon(
+              PhosphorIconsRegular.pencilSimple,
+              color: colorScheme.primary,
+            ),
+          ),
+          IconButton(
+            onPressed: onDelete,
+            tooltip: 'Hapus mata kuliah',
+            constraints: const BoxConstraints.tightFor(width: 32, height: 32),
+            padding: EdgeInsets.zero,
+            visualDensity: VisualDensity.compact,
+            icon: Icon(PhosphorIconsRegular.trash, color: colorScheme.error),
+          ),
+        ],
+      ),
     );
   }
 }

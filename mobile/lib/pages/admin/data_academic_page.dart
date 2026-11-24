@@ -24,6 +24,9 @@ void _openModule(BuildContext context, String title) {
     case 'Dosen':
       context.go(AdminRoutePaths.tambahDosen);
       break;
+    case 'Whitelist NIM':
+      context.go(AdminRoutePaths.whitelistNim);
+      break;
     default:
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -62,6 +65,11 @@ class DataAcademicPage extends StatelessWidget {
       icon: PhosphorIconsRegular.door,
       title: 'Ruangan',
       subtitle: 'Kelola data ruangan',
+    ),
+    (
+      icon: PhosphorIconsRegular.shieldCheck,
+      title: 'Whitelist NIM',
+      subtitle: 'Kelola NIM yang diizinkan registrasi',
     ),
   ];
 

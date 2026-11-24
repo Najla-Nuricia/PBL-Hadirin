@@ -2,13 +2,15 @@ import 'package:go_router/go_router.dart';
 
 import '../data/mhs/dummy_student_auth_repository.dart';
 import '../data/mhs/student_account.dart';
-import '../data/mhs/student_data_service.dart';
+import '../pages/admin/admin_change_password_page.dart';
 import '../pages/admin/admin_navigation_shell.dart';
+import '../pages/admin/admin_profile_page.dart';
 import '../pages/admin/auth/admin_login_page.dart';
 import '../pages/admin/data_academic_page.dart';
 import '../pages/admin/jadwal_list_page.dart';
 import '../pages/admin/mata_kuliah_list_page.dart';
 import '../pages/admin/tahun_ajaran_list_page.dart';
+import '../pages/admin/whitelist_nim_page.dart';
 import '../pages/admin/tambah_jadwal_page.dart';
 import '../pages/admin/tambah_kelas_page.dart';
 import '../pages/admin/tambah_ruangan_page.dart';
@@ -43,10 +45,7 @@ export 'student_route_paths.dart';
 
 final GoRouter studentRouter = createStudentRouter();
 
-GoRouter createStudentRouter({
-  bool showOnboarding = false,
-  StudentDataService? homeDataService,
-}) => GoRouter(
+GoRouter createStudentRouter({bool showOnboarding = false}) => GoRouter(
   initialLocation: showOnboarding
       ? StudentRoutePaths.onboarding
       : StudentRoutePaths.login,
@@ -132,6 +131,14 @@ GoRouter createStudentRouter({
       builder: (context, state) => const AdminLoginPage(),
     ),
     GoRoute(
+      path: AdminRoutePaths.tambahJadwal,
+      builder: (context, state) => const TambahJadwalPage(),
+    ),
+    GoRoute(
+      path: AdminRoutePaths.changePassword,
+      builder: (context, state) => const AdminChangePasswordPage(),
+    ),
+    GoRoute(
       path: AdminRoutePaths.tahunAjaran,
       builder: (context, state) => const TahunAjaranListPage(),
       routes: [
@@ -161,6 +168,10 @@ GoRouter createStudentRouter({
       path: AdminRoutePaths.tambahDosen,
       builder: (context, state) => const TambahDosenPage(),
     ),
+    GoRoute(
+      path: AdminRoutePaths.whitelistNim,
+      builder: (context, state) => const WhitelistNimPage(),
+    ),
     StatefulShellRoute.indexedStack(
       builder: (context, state, navigationShell) =>
           AdminNavigationShell(navigationShell: navigationShell),
@@ -176,16 +187,16 @@ GoRouter createStudentRouter({
         StatefulShellBranch(
           routes: [
             GoRoute(
-              path: AdminRoutePaths.tambahJadwal,
-              builder: (context, state) => const TambahJadwalPage(),
+              path: AdminRoutePaths.jadwal,
+              builder: (context, state) => const JadwalListPage(),
             ),
           ],
         ),
         StatefulShellBranch(
           routes: [
             GoRoute(
-              path: AdminRoutePaths.jadwal,
-              builder: (context, state) => const JadwalListPage(),
+              path: AdminRoutePaths.akun,
+              builder: (context, state) => const AdminProfilePage(),
             ),
           ],
         ),
@@ -222,8 +233,7 @@ GoRouter createStudentRouter({
           routes: [
             GoRoute(
               path: StudentRoutePaths.beranda,
-              builder: (context, state) =>
-                  BerandaPage(dataService: homeDataService),
+              builder: (context, state) => const BerandaPage(),
             ),
           ],
         ),

@@ -81,6 +81,8 @@ void main() {
       await tester.tap(find.text('Lanjutkan ke Scan Wajah'));
       await tester.pumpAndSettle();
       expect(find.text('Kirim Verifikasi Wajah'), findsOneWidget);
+      await tester.tap(find.byTooltip('Kembali').last);
+      await tester.pumpAndSettle();
 
       // 5. Navigate to Surat -> test dynamic schedule dropdown + live submit + DB cleanup.
       String? createdPengajuanId;

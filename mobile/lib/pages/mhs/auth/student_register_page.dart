@@ -106,18 +106,17 @@ class _StudentRegisterPageState extends State<StudentRegisterPage> {
     );
 
     setState(() => _isSubmitting = true);
-    final isNimRegistered = await studentAuthRepository.isNimRegistered(
-      draft.nim,
-    );
+    final nimResult = await studentAuthRepository.checkNim(draft.nim);
     if (!mounted) return;
     setState(() => _isSubmitting = false);
 
-    if (isNimRegistered) {
+    if (!nimResult.canRegister) {
+      final message = nimResult.registered
+          ? 'NIM sudah terdaftar. Silakan login.'
+          : 'NIM belum terdaftar dalam whitelist admin.';
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
-        ..showSnackBar(
-          const SnackBar(content: Text('NIM sudah terdaftar. Silakan login.')),
-        );
+        ..showSnackBar(SnackBar(content: Text(message)));
       return;
     }
 
