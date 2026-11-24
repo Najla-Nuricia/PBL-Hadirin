@@ -1,37 +1,43 @@
 import 'package:flutter/material.dart';
 
+import '../../../theme/app_tokens.dart';
+import '../../../theme/style/lecturer_style.dart';
+
 class InitialsAvatar extends StatelessWidget {
   const InitialsAvatar({
     super.key,
     required this.initials,
-    this.size = 36,
-    this.fontSize = 12,
-    this.bordered = false,
+    this.size = LecturerStyle.rowLeadingSize,
   });
 
   final String initials;
   final double size;
-  final double fontSize;
-  final bool bordered;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      width: size,
-      height: size,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: bordered ? scheme.surface : scheme.primaryContainer,
-        border: bordered ? Border.all(color: scheme.primary, width: 2) : null,
-      ),
-      child: Text(
-        initials,
-        style: TextStyle(
-          fontSize: fontSize,
-          fontWeight: FontWeight.w700,
-          color: scheme.primary,
+    final text = Theme.of(context).textTheme;
+    final style = size >= LecturerStyle.headerAvatarSize
+        ? text.titleLarge
+        : text.titleSmall;
+
+    return ExcludeSemantics(
+      child: Container(
+        width: size,
+        height: size,
+        alignment: Alignment.center,
+        decoration: const BoxDecoration(
+          shape: BoxShape.circle,
+          color: AppColors.brand100,
+        ),
+        child: Text(
+          initials,
+          maxLines: 1,
+          // Lingkaran berukuran tetap, jadi inisial tidak ikut skala teks.
+          textScaler: TextScaler.noScaling,
+          style: style?.copyWith(
+            color: AppColors.brand800,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
     );

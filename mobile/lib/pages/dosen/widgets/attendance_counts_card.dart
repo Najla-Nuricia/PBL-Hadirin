@@ -1,56 +1,48 @@
 import 'package:flutter/material.dart';
 
 import '../../../models/dosen/attendance_summary.dart';
-import '../../../theme/style/lecturer_style.dart';
+import '../../../widgets/widgets.dart';
 import 'section_card.dart';
 
-/// Ringkasan jumlah Hadir / Izin / Sakit / Alfa + persentase kehadiran.
+/// Rekap Hadir / Izin / Sakit / Alfa dengan total dan persentase kehadiran.
 class AttendanceCountsView extends StatelessWidget {
-  const AttendanceCountsView({super.key, required this.summary});
+  const AttendanceCountsView({
+    super.key,
+    required this.summary,
+    this.showTotal = true,
+  });
 
   final AttendanceSummary summary;
 
+  /// Matikan bila total sudah tampil di tempat lain pada kartu yang sama.
+  final bool showTotal;
+
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final entries = [
-      ('Hadir', summary.hadir, scheme.primary),
-      ('Izin', summary.izin, Colors.orange),
-      ('Sakit', summary.sakit, Colors.blue),
-      ('Alfa', summary.alfa, scheme.error),
-    ];
+    final caption = Theme.of(context).textTheme.bodySmall?.tabular;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final (label, value, color) in entries)
-              _CountChip(label: label, value: value, color: color),
-          ],
+        AttendanceBar(
+          hadir: summary.hadir,
+          izin: summary.izin,
+          sakit: summary.sakit,
+          alfa: summary.alfa,
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: AppSpacing.md),
         Row(
           children: [
-            Expanded(
-              child: Text(
-                'Total: ${summary.total} mahasiswa',
-                style: TextStyle(
-                  fontSize: LecturerStyle.captionSize,
-                  fontWeight: FontWeight.w600,
-                  color: scheme.onSurfaceVariant,
+            if (showTotal)
+              Expanded(
+                child: Text(
+                  'Total: ${summary.total} mahasiswa',
+                  style: caption?.copyWith(color: AppColors.inkMuted),
                 ),
               ),
-            ),
             Text(
               '${summary.persentaseKehadiran}% hadir',
-              style: TextStyle(
-                fontSize: LecturerStyle.captionSize,
-                fontWeight: FontWeight.w700,
-                color: scheme.primary,
-              ),
+              style: caption?.copyWith(fontWeight: FontWeight.w700),
             ),
           ],
         ),
@@ -75,43 +67,10 @@ class AttendanceCountsCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            title,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 12),
+          Text(title, style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: AppSpacing.md),
           AttendanceCountsView(summary: summary),
         ],
-      ),
-    );
-  }
-}
-
-class _CountChip extends StatelessWidget {
-  const _CountChip({required this.label, required this.value, required this.color});
-
-  final String label;
-  final int value;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(LecturerStyle.controlRadius),
-        border: Border.all(color: color.withValues(alpha: 0.30)),
-      ),
-      child: Text.rich(
-        TextSpan(
-          children: [
-            TextSpan(text: '$label '),
-            TextSpan(text: '$value', style: const TextStyle(fontWeight: FontWeight.w700)),
-          ],
-        ),
-        style: TextStyle(fontSize: LecturerStyle.captionSize, color: scheme.onSurface),
       ),
     );
   }

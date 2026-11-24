@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../data/admin/admin_auth_repository.dart';
 import '../../data/admin/admin_jadwal_options_service.dart';
@@ -8,6 +9,7 @@ import '../../data/admin/jadwal.dart';
 import '../../data/admin/mata_kuliah.dart';
 import '../../data/admin/tahun_ajaran.dart';
 import '../../routing/admin_route_paths.dart';
+import '../../widgets/widgets.dart';
 import 'widgets/jadwal_form_widgets.dart';
 
 class TambahJadwalPage extends StatefulWidget {
@@ -288,7 +290,7 @@ class _TambahJadwalPageState extends State<TambahJadwalPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildAppBar(colorScheme),
+            _buildAppBar(),
             Expanded(
               child: Form(
                 key: _formKey,
@@ -313,7 +315,7 @@ class _TambahJadwalPageState extends State<TambahJadwalPage> {
                             child: Row(
                               children: [
                                 Icon(
-                                  Icons.cloud_off_outlined,
+                                  PhosphorIconsRegular.cloudSlash,
                                   color: colorScheme.onErrorContainer,
                                   size: 20,
                                 ),
@@ -336,7 +338,7 @@ class _TambahJadwalPageState extends State<TambahJadwalPage> {
                           ),
                         ),
                       JadwalSectionCard(
-                        icon: Icons.school_outlined,
+                        icon: PhosphorIconsRegular.graduationCap,
                         title: 'Informasi Akademik',
                         isExpanded: _isAkademikExpanded,
                         onToggle: () => setState(
@@ -346,7 +348,7 @@ class _TambahJadwalPageState extends State<TambahJadwalPage> {
                       ),
                       const SizedBox(height: 12),
                       JadwalSectionCard(
-                        icon: Icons.schedule,
+                        icon: PhosphorIconsRegular.clock,
                         title: 'Alokasi Waktu & Tempat',
                         isExpanded: _isWaktuExpanded,
                         onToggle: () => setState(
@@ -403,28 +405,25 @@ class _TambahJadwalPageState extends State<TambahJadwalPage> {
     );
   }
 
-  Widget _buildAppBar(ColorScheme colorScheme) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(4, 6, 16, 6),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        border: Border(bottom: BorderSide(color: colorScheme.outlineVariant)),
-      ),
+  Widget _buildAppBar() {
+    return SkyHeader(
+      includeStatusBar: false,
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.chevron_left),
-            color: colorScheme.onSurface,
+            icon: const Icon(PhosphorIconsRegular.arrowLeft),
+            color: AppColors.gownNavy,
             onPressed: () => context.go(AdminRoutePaths.dataAkademik),
             tooltip: 'Kembali',
           ),
-          const SizedBox(width: 8),
-          Text(
-            'Tambah Jadwal Baru',
-            style: TextStyle(
-              color: colorScheme.onSurface,
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              'Tambah Jadwal Baru',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleLarge
+                  ?.copyWith(color: AppColors.gownNavy),
             ),
           ),
         ],
@@ -562,7 +561,7 @@ class _TambahJadwalPageState extends State<TambahJadwalPage> {
                     items: HariKuliah.values,
                     itemLabel: (item) => item.label,
                     hintText: 'Pilih Hari...',
-                    prefixIcon: Icons.calendar_today_outlined,
+                    prefixIcon: PhosphorIconsRegular.calendarBlank,
                     onChanged: (item) => setState(() => _hari = item),
                     validator: (item) => item == null ? 'Wajib dipilih.' : null,
                   ),
@@ -639,7 +638,7 @@ class _TambahJadwalPageState extends State<TambahJadwalPage> {
           'Sesi ${item.nomor} (${item.jamMulai}–${item.jamSelesai})',
       selectedItemLabel: (item) => '${item.nomor}',
       hintText: 'Sesi',
-      prefixIcon: Icons.schedule,
+      prefixIcon: PhosphorIconsRegular.clock,
       onChanged: onChanged,
       validator: validator,
     );

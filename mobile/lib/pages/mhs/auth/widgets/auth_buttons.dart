@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
-import '../../../../theme/style/auth_style.dart';
+import '../../../../widgets/widgets.dart';
 
+/// Aksi utama formulir: selebar isi, bergradien, dengan indikator saat
+/// sedang diproses.
 class AuthPrimaryButton extends StatelessWidget {
   const AuthPrimaryButton({
     required this.label,
@@ -16,39 +18,43 @@ class AuthPrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return SizedBox(
-      height: AuthStyle.buttonHeight,
-      child: FilledButton(
-        onPressed: isLoading ? null : onPressed,
-        style: FilledButton.styleFrom(
-          backgroundColor: colorScheme.primary,
-          foregroundColor: colorScheme.onPrimary,
-          disabledBackgroundColor: colorScheme.primary.withValues(alpha: 0.38),
-          disabledForegroundColor: colorScheme.onPrimary,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AuthStyle.fieldRadius),
-          ),
-          textStyle: const TextStyle(
-            fontSize: AuthStyle.bodySize,
-            fontWeight: FontWeight.w600,
+      width: double.infinity,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          borderRadius: AppRadius.control,
+          gradient: isLoading ? null : AppColors.brandGradient,
+          color: isLoading ? AppColors.surfaceInset : null,
+          boxShadow: isLoading ? null : AppColors.shadowBrand,
+        ),
+        child: ClipRRect(
+          borderRadius: AppRadius.control,
+          child: FilledButton(
+            onPressed: isLoading ? null : onPressed,
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              disabledBackgroundColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              foregroundColor: Colors.white,
+            ),
+            child: isLoading
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                      semanticsLabel: 'Sedang diproses',
+                    ),
+                  )
+                : Text(label),
           ),
         ),
-        child: isLoading
-            ? SizedBox.square(
-                dimension: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: colorScheme.onPrimary,
-                ),
-              )
-            : Text(label),
       ),
     );
   }
 }
 
+/// Aksi kedua di bawah aksi utama.
 class AuthSecondaryButton extends StatelessWidget {
   const AuthSecondaryButton({
     required this.label,
@@ -61,22 +67,13 @@ class AuthSecondaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return SizedBox(
-      height: AuthStyle.buttonHeight,
+      width: double.infinity,
       child: OutlinedButton(
         onPressed: onPressed,
         style: OutlinedButton.styleFrom(
-          foregroundColor: colorScheme.primary,
-          side: BorderSide(color: colorScheme.primary, width: 1.8),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AuthStyle.fieldRadius),
-          ),
-          textStyle: const TextStyle(
-            fontSize: AuthStyle.bodySize,
-            fontWeight: FontWeight.w600,
-          ),
+          backgroundColor: Colors.white.withValues(alpha: 0.7),
+          side: const BorderSide(color: AppColors.lineStrong),
         ),
         child: Text(label),
       ),

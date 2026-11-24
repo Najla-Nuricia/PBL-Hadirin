@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/admin/admin_account.dart';
@@ -119,7 +120,7 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
                                     ),
                                   )
                                 : Icon(
-                                    Icons.refresh,
+                                    PhosphorIconsRegular.arrowsClockwise,
                                     color: colorScheme.primary,
                                     size: 19,
                                   ),
@@ -141,7 +142,7 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
                       ),
                     ),
                     child: Icon(
-                      Icons.person_outline,
+                      PhosphorIconsRegular.user,
                       size: 42,
                       color: colorScheme.onSurfaceVariant,
                     ),
@@ -196,13 +197,13 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
                       child: Column(
                         children: [
                           _AdminInfoRow(
-                            icon: Icons.alternate_email,
+                            icon: PhosphorIconsRegular.at,
                             label: 'Username',
                             value: account.username,
                           ),
                           _AdminDivider(colorScheme: colorScheme),
                           _AdminInfoRow(
-                            icon: Icons.email_outlined,
+                            icon: PhosphorIconsRegular.envelopeSimple,
                             label: 'Email',
                             value: account.email.isEmpty
                                 ? 'Belum diisi'
@@ -210,7 +211,7 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
                           ),
                           _AdminDivider(colorScheme: colorScheme),
                           _AdminInfoRow(
-                            icon: Icons.person_outline,
+                            icon: PhosphorIconsRegular.user,
                             label: 'Role',
                             value: account.role,
                             isLast: true,
@@ -227,7 +228,7 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
                       child: Column(
                         children: [
                           _AdminActionRow(
-                            icon: Icons.mail_outline,
+                            icon: PhosphorIconsRegular.envelope,
                             iconColor: colorScheme.primary,
                             iconBg: colorScheme.primaryContainer,
                             label: 'Ubah Email',
@@ -236,7 +237,7 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
                           ),
                           _AdminDivider(colorScheme: colorScheme),
                           _AdminActionRow(
-                            icon: Icons.key_outlined,
+                            icon: PhosphorIconsRegular.key,
                             iconColor: const Color(0xFFF5A623),
                             iconBg: const Color(0xFFFEF3C7),
                             label: 'Ubah Kata Sandi',
@@ -246,7 +247,7 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
                           ),
                           _AdminDivider(colorScheme: colorScheme),
                           _AdminActionRow(
-                            icon: Icons.logout,
+                            icon: PhosphorIconsRegular.signOut,
                             iconColor: colorScheme.error,
                             iconBg: colorScheme.errorContainer,
                             label: 'Keluar',
@@ -376,7 +377,7 @@ class _AdminActionRow extends StatelessWidget {
             ),
             if (showChevron)
               Icon(
-                Icons.chevron_right,
+                PhosphorIconsRegular.caretRight,
                 size: 20,
                 color: colorScheme.onSurfaceVariant,
               ),
@@ -471,8 +472,8 @@ class _AdminEmailDialogState extends State<_AdminEmailDialog> {
                       : 'Tampilkan kata sandi',
                   icon: Icon(
                     _isPasswordVisible
-                        ? Icons.visibility_off_outlined
-                        : Icons.visibility_outlined,
+                        ? PhosphorIconsRegular.eyeSlash
+                        : PhosphorIconsRegular.eye,
                     size: 19,
                   ),
                 ),
@@ -511,7 +512,7 @@ class _AdminLogoutDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return AlertDialog(
-      icon: Icon(Icons.logout_rounded, color: colorScheme.error),
+      icon: Icon(PhosphorIconsRegular.signOut, color: colorScheme.error),
       title: const Text('Keluar dari akun?'),
       content: const Text(
         'Sesi admin akan berakhir dan Anda perlu masuk lagi.',

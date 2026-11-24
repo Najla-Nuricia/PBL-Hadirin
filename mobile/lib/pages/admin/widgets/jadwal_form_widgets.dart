@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
+import '../../../widgets/widgets.dart';
+import 'labeled_fields.dart';
+
+/// Dekorasi kolom isian jadwal. Bentuk, garis, dan warna datang dari tema;
+/// [filled] memberi latar abu-abu untuk nilai bawaan.
 InputDecoration jadwalInputDecoration(
   ColorScheme colorScheme, {
   String? hintText,
@@ -7,73 +13,20 @@ InputDecoration jadwalInputDecoration(
   bool filled = false,
   String? errorText,
 }) {
-  OutlineInputBorder border(Color color, [double width = 1]) {
-    return OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: BorderSide(color: color, width: width),
-    );
-  }
-
   return InputDecoration(
     hintText: hintText,
     hintMaxLines: 1,
-    hintStyle: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13),
     errorText: errorText,
-    prefixIcon: prefixIcon == null
-        ? null
-        : Icon(prefixIcon, size: 18, color: colorScheme.onSurfaceVariant),
-    filled: filled,
-    fillColor: colorScheme.surfaceContainerHighest,
-    isDense: true,
-    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
-    border: border(colorScheme.outline),
-    enabledBorder: border(colorScheme.outline),
-    focusedBorder: border(colorScheme.primary, 1.5),
-    errorBorder: border(colorScheme.error),
-    focusedErrorBorder: border(colorScheme.error, 1.5),
+    prefixIcon: prefixIcon == null ? null : Icon(prefixIcon, size: 20),
+    fillColor: filled ? colorScheme.surfaceContainerHigh : null,
   );
 }
 
-class JadwalFieldLabel extends StatelessWidget {
-  const JadwalFieldLabel({
-    required this.label,
-    this.required = false,
-    super.key,
-  });
-
-  final String label;
-  final bool required;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Text.rich(
-        TextSpan(
-          text: label,
-          children: [
-            if (required)
-              TextSpan(
-                text: ' *',
-                style: TextStyle(
-                  color: colorScheme.error,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-          ],
-        ),
-        style: TextStyle(
-          color: colorScheme.onSurface,
-          fontSize: 13,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
-  }
+class JadwalFieldLabel extends AdminFieldLabel {
+  const JadwalFieldLabel({required super.label, super.required, super.key});
 }
 
+/// Kartu berjudul yang isinya bisa dilipat.
 class JadwalSectionCard extends StatelessWidget {
   const JadwalSectionCard({
     required this.icon,
@@ -92,54 +45,60 @@ class JadwalSectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
+    return Card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           InkWell(
             onTap: onToggle,
-            borderRadius: BorderRadius.circular(14),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
-              child: Row(
-                children: [
-                  Icon(icon, size: 20, color: colorScheme.onSurface),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: TextStyle(
-                        color: colorScheme.onSurface,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(minHeight: 56),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                child: Row(
+                  children: [
+                    Icon(icon, size: 20, color: AppColors.inkMuted),
+                    const SizedBox(width: AppSpacing.md),
+                    Expanded(
+                      child: Text(
+                        title,
+                        style: Theme.of(context).textTheme.titleSmall,
                       ),
                     ),
-                  ),
-                  Icon(
-                    isExpanded
-                        ? Icons.keyboard_arrow_up
-                        : Icons.keyboard_arrow_down,
-                    color: colorScheme.onSurfaceVariant,
-                    semanticLabel: isExpanded ? 'Tutup $title' : 'Buka $title',
-                  ),
-                ],
+                    const SizedBox(width: AppSpacing.sm),
+                    Icon(
+                      isExpanded
+                          ? PhosphorIconsRegular.caretUp
+                          : PhosphorIconsRegular.caretDown,
+                      color: AppColors.inkFaint,
+                      semanticLabel: isExpanded
+                          ? 'Tutup $title'
+                          : 'Buka $title',
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-          // Collapsed fields stay mounted so the form still validates them.
-          Visibility(
-            visible: isExpanded,
-            maintainState: true,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 0, 14, 16),
-              child: child,
+          AnimatedSize(
+            duration: MediaQuery.disableAnimationsOf(context)
+                ? Duration.zero
+                : AppMotion.fast,
+            curve: AppMotion.curve,
+            alignment: Alignment.topCenter,
+            // Isian yang dilipat tetap terpasang agar form masih memvalidasinya.
+            child: Visibility(
+              visible: isExpanded,
+              maintainState: true,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg,
+                  0,
+                  AppSpacing.lg,
+                  AppSpacing.lg,
+                ),
+                child: child,
+              ),
             ),
           ),
         ],
@@ -174,30 +133,29 @@ class JadwalDropdownField<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textStyle = TextStyle(color: colorScheme.onSurface, fontSize: 14);
+    final theme = Theme.of(context);
+    final textStyle = theme.textTheme.bodyLarge;
 
     return DropdownButtonFormField<T>(
       initialValue: value,
       isExpanded: true,
       validator: validator,
       onChanged: onChanged,
-      icon: Icon(
-        Icons.keyboard_arrow_down,
-        color: colorScheme.onSurfaceVariant,
+      borderRadius: AppRadius.control,
+      icon: const Icon(
+        PhosphorIconsRegular.caretDown,
+        color: AppColors.inkFaint,
       ),
       hint: hintText == null
           ? null
           : Text(
               hintText!,
+              maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: colorScheme.onSurfaceVariant,
-                fontSize: 13,
-              ),
+              style: textStyle?.copyWith(color: AppColors.inkFaint),
             ),
       decoration: jadwalInputDecoration(
-        colorScheme,
+        theme.colorScheme,
         prefixIcon: prefixIcon,
         filled: filled,
       ),
@@ -210,8 +168,9 @@ class JadwalDropdownField<T> extends StatelessWidget {
                   alignment: Alignment.centerLeft,
                   child: Text(
                     selectedItemLabel!(item),
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: textStyle,
+                    style: textStyle?.tabular,
                   ),
                 ),
             ],
@@ -219,7 +178,11 @@ class JadwalDropdownField<T> extends StatelessWidget {
         for (final item in items)
           DropdownMenuItem<T>(
             value: item,
-            child: Text(itemLabel(item), overflow: TextOverflow.ellipsis),
+            child: Text(
+              itemLabel(item),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
       ],
     );
@@ -259,7 +222,7 @@ class JadwalSearchPickerField<T> extends StatelessWidget {
       initialValue: value,
       validator: validator,
       builder: (field) {
-        final colorScheme = Theme.of(context).colorScheme;
+        final theme = Theme.of(context);
         final selected = field.value;
 
         Future<void> openPicker() async {
@@ -287,30 +250,28 @@ class JadwalSearchPickerField<T> extends StatelessWidget {
           label: sheetTitle,
           child: InkWell(
             onTap: openPicker,
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: AppRadius.control,
             child: InputDecorator(
               isEmpty: selected == null,
               decoration:
                   jadwalInputDecoration(
-                    colorScheme,
+                    theme.colorScheme,
                     hintText: hintText,
-                    prefixIcon: Icons.search,
+                    prefixIcon: PhosphorIconsRegular.magnifyingGlass,
                     errorText: field.errorText,
                   ).copyWith(
-                    suffixIcon: Icon(
-                      Icons.keyboard_arrow_down,
-                      color: colorScheme.onSurfaceVariant,
+                    suffixIcon: const Icon(
+                      PhosphorIconsRegular.caretDown,
+                      color: AppColors.inkFaint,
                     ),
                   ),
               child: selected == null
                   ? null
                   : Text(
                       itemLabel(selected),
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: colorScheme.onSurface,
-                        fontSize: 14,
-                      ),
+                      style: theme.textTheme.bodyLarge,
                     ),
             ),
           ),
@@ -353,7 +314,8 @@ class _SearchPickerSheetState<T> extends State<_SearchPickerSheet<T>> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final text = theme.textTheme;
     final query = _query.trim().toLowerCase();
     final results = query.isEmpty
         ? widget.options
@@ -371,51 +333,73 @@ class _SearchPickerSheetState<T> extends State<_SearchPickerSheet<T>> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-              child: Text(
-                widget.title,
-                style: TextStyle(
-                  color: colorScheme.onSurface,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                ),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.page,
+                0,
+                AppSpacing.page,
+                AppSpacing.md,
               ),
+              child: Text(widget.title, style: text.titleLarge),
             ),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.page),
               child: TextField(
                 controller: _searchController,
                 autofocus: true,
+                textInputAction: TextInputAction.search,
                 onChanged: (value) => setState(() => _query = value),
-                style: TextStyle(color: colorScheme.onSurface, fontSize: 14),
                 decoration: jadwalInputDecoration(
-                  colorScheme,
+                  theme.colorScheme,
                   hintText: 'Ketik untuk mencari...',
-                  prefixIcon: Icons.search,
+                  prefixIcon: PhosphorIconsRegular.magnifyingGlass,
                 ),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.sm),
             Expanded(
               child: results.isEmpty
-                  ? Center(
-                      child: Text(
-                        'Tidak ditemukan.',
-                        style: TextStyle(color: colorScheme.onSurfaceVariant),
+                  ? const SingleChildScrollView(
+                      child: AppEmptyState(
+                        icon: PhosphorIconsRegular.magnifyingGlassMinus,
+                        title: 'Tidak ditemukan.',
+                        message: 'Coba kata kunci lain.',
                       ),
                     )
                   : ListView.builder(
                       itemCount: results.length,
                       itemBuilder: (context, index) {
                         final item = results[index];
+                        final isSelected = item == widget.selected;
                         return ListTile(
-                          title: Text(widget.itemLabel(item)),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: AppSpacing.page,
+                          ),
+                          title: Text(
+                            widget.itemLabel(item),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: text.titleSmall?.copyWith(
+                              color: isSelected
+                                  ? theme.colorScheme.primary
+                                  : null,
+                            ),
+                          ),
                           subtitle: widget.itemSubtitle == null
                               ? null
-                              : Text(widget.itemSubtitle!(item)),
-                          selected: item == widget.selected,
-                          trailing: item == widget.selected
-                              ? Icon(Icons.check, color: colorScheme.primary)
+                              : Text(
+                                  widget.itemSubtitle!(item),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: text.bodySmall?.tabular.copyWith(
+                                    color: AppColors.inkFaint,
+                                  ),
+                                ),
+                          selected: isSelected,
+                          trailing: isSelected
+                              ? Icon(
+                                  PhosphorIconsRegular.check,
+                                  color: theme.colorScheme.primary,
+                                )
                               : null,
                           onTap: () => Navigator.of(context).pop(item),
                         );

@@ -7,34 +7,41 @@ import 'package:mobile/data/admin/admin_whitelist_nim_service.dart';
 
 void main() {
   http.Response response(Map<String, dynamic> body, [int status = 200]) =>
-      http.Response(jsonEncode(body), status, headers: {'Content-Type': 'application/json'});
+      http.Response(
+        jsonEncode(body),
+        status,
+        headers: {'Content-Type': 'application/json'},
+      );
 
-  test('list whitelist mengirim token admin dan membaca status registrasi', () async {
-    final service = AdminWhitelistNimService(
-      tokenProvider: () => 'jwt-admin',
-      httpClient: MockClient((request) async {
-        expect(request.method, 'GET');
-        expect(request.url.path, '/admin/whitelist-nim');
-        expect(request.headers['Authorization'], 'Bearer jwt-admin');
-        return response({
-          'data': [
-            {
-              'nim': '2341720001',
-              'nama_mahasiswa': 'Mahasiswa Demo',
-              'kelas': 'TI-3A',
-              'status': 'Sudah Registrasi',
-            },
-          ],
-          'total': 1,
-        });
-      }),
-    );
+  test(
+    'list whitelist mengirim token admin dan membaca status registrasi',
+    () async {
+      final service = AdminWhitelistNimService(
+        tokenProvider: () => 'jwt-admin',
+        httpClient: MockClient((request) async {
+          expect(request.method, 'GET');
+          expect(request.url.path, '/admin/whitelist-nim');
+          expect(request.headers['Authorization'], 'Bearer jwt-admin');
+          return response({
+            'data': [
+              {
+                'nim': '2341720001',
+                'nama_mahasiswa': 'Mahasiswa Demo',
+                'kelas': 'TI-3A',
+                'status': 'Sudah Registrasi',
+              },
+            ],
+            'total': 1,
+          });
+        }),
+      );
 
-    final result = await service.list();
+      final result = await service.list();
 
-    expect(result.single.nim, '2341720001');
-    expect(result.single.sudahRegistrasi, isTrue);
-  });
+      expect(result.single.nim, '2341720001');
+      expect(result.single.sudahRegistrasi, isTrue);
+    },
+  );
 
   test('create dan delete whitelist memanggil endpoint yang benar', () async {
     var calls = 0;

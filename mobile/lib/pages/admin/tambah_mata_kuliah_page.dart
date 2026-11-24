@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/admin/admin_auth_repository.dart';
@@ -170,7 +171,7 @@ class AdminFormScaffold extends StatelessWidget {
           onPressed: () => context.canPop()
               ? context.pop()
               : context.go(AdminRoutePaths.mataKuliah),
-          icon: Icon(Icons.arrow_back_ios_new_rounded, color: cs.primary),
+          icon: Icon(PhosphorIconsRegular.arrowLeft, color: cs.primary),
           tooltip: 'Kembali',
         ),
         title: Text(

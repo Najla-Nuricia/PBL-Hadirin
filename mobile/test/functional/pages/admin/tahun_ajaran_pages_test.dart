@@ -38,10 +38,10 @@ void main() {
       router.routeInformationProvider.value.uri.path,
       AdminRoutePaths.tahunAjaran,
     );
-    expect(find.byIcon(Icons.arrow_back_ios_new_rounded), findsOneWidget);
+    expect(find.byTooltip('Kembali'), findsOneWidget);
 
     // Test back button on TahunAjaranListPage -> returns to data akademik
-    await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
+    await tester.tap(find.byTooltip('Kembali'));
     await tester.pumpAndSettle();
 
     expect(
@@ -58,10 +58,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Tambah Tahun Ajaran'), findsOneWidget);
-    expect(find.byIcon(Icons.arrow_back_ios_new_rounded), findsOneWidget);
+    expect(find.byTooltip('Kembali'), findsOneWidget);
 
     // Test back button on TambahTahunAjaranPage -> returns to TahunAjaranListPage
-    await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
+    await tester.tap(find.byTooltip('Kembali'));
     await tester.pumpAndSettle();
 
     expect(find.text('Tahun Ajaran'), findsWidgets);

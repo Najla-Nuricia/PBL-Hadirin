@@ -7,10 +7,9 @@ class LecturerHomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-      appBar: const LecturerAppBar(title: 'Beranda'),
-      body: const Center(child: Text('Beranda Dosen')),
+    return const Scaffold(
+      appBar: LecturerAppBar(title: 'Beranda'),
+      body: Center(child: Text('Beranda Dosen')),
     );
   }
 }

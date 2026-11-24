@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/admin/admin_auth_repository.dart';
 import '../../data/admin/admin_whitelist_nim_service.dart';
 import '../../data/admin/whitelist_nim.dart';
 import '../../routing/admin_route_paths.dart';
+import '../../widgets/widgets.dart';
 import 'tambah_whitelist_nim_page.dart';
 
 class WhitelistNimPage extends StatefulWidget {
@@ -163,49 +165,40 @@ class _WhitelistNimPageState extends State<WhitelistNimPage> {
   }
 
   Widget _buildHeader(ColorScheme colorScheme) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 12, 16, 12),
+    return SkyHeader(
+      includeStatusBar: false,
       child: Row(
         children: [
           IconButton(
             onPressed: _back,
-            icon: Icon(
-              Icons.arrow_back_ios_new_rounded,
-              size: 20,
-              color: colorScheme.primary,
-            ),
+            icon: const Icon(PhosphorIconsRegular.arrowLeft, size: 20),
+            color: AppColors.gownNavy,
             tooltip: 'Kembali',
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: AppSpacing.xs),
           Expanded(
             child: Text(
               'Whitelist NIM',
-              style: TextStyle(
-                color: colorScheme.onSurface,
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-              ),
+              style: Theme.of(context).textTheme.titleLarge
+                  ?.copyWith(color: AppColors.gownNavy),
             ),
           ),
           IconButton(
             onPressed: _load,
-            icon: Icon(Icons.refresh_rounded, color: colorScheme.primary),
+            icon: const Icon(PhosphorIconsRegular.arrowsClockwise),
+            color: AppColors.gownNavy,
             tooltip: 'Muat ulang',
           ),
-          const SizedBox(width: 4),
           FilledButton.icon(
             onPressed: () => _openForm(),
-            icon: const Icon(Icons.add, size: 18),
-            label: const Text(
-              'Tambah',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
+            icon: const Icon(PhosphorIconsRegular.plus, size: 18),
+            label: const Text('Tambah'),
             style: FilledButton.styleFrom(
               backgroundColor: colorScheme.primary,
               foregroundColor: colorScheme.onPrimary,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+              shape: const RoundedRectangleBorder(
+                borderRadius: AppRadius.control,
               ),
             ),
           ),
@@ -227,7 +220,7 @@ class _WhitelistNimPageState extends State<WhitelistNimPage> {
             fontSize: 13,
           ),
           prefixIcon: Icon(
-            Icons.search,
+            PhosphorIconsRegular.magnifyingGlass,
             color: colorScheme.onSurfaceVariant,
             size: 20,
           ),
@@ -235,7 +228,7 @@ class _WhitelistNimPageState extends State<WhitelistNimPage> {
               ? IconButton(
                   onPressed: _searchController.clear,
                   icon: Icon(
-                    Icons.close,
+                    PhosphorIconsRegular.x,
                     color: colorScheme.onSurfaceVariant,
                     size: 18,
                   ),
@@ -268,7 +261,7 @@ class _WhitelistNimPageState extends State<WhitelistNimPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            Icons.verified_user_outlined,
+            PhosphorIconsRegular.shieldCheck,
             size: 48,
             color: colorScheme.onSurfaceVariant,
           ),
@@ -289,7 +282,11 @@ class _WhitelistNimPageState extends State<WhitelistNimPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.cloud_off_outlined, size: 48, color: colorScheme.error),
+            Icon(
+              PhosphorIconsRegular.cloudSlash,
+              size: 48,
+              color: colorScheme.error,
+            ),
             const SizedBox(height: 12),
             Text(
               _errorMessage!,
@@ -339,7 +336,9 @@ class _WhitelistNimCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
-              item.sudahRegistrasi ? Icons.check_circle : Icons.cancel,
+              item.sudahRegistrasi
+                  ? PhosphorIconsFill.checkCircle
+                  : PhosphorIconsFill.xCircle,
               color: item.sudahRegistrasi
                   ? Colors.green.shade700
                   : Colors.red.shade600,
@@ -365,8 +364,6 @@ class _WhitelistNimCard extends StatelessWidget {
                         ),
                       ),
                     ),
-      
-                    
                   ],
                 ),
                 const SizedBox(height: 4),
@@ -388,7 +385,10 @@ class _WhitelistNimCard extends StatelessWidget {
             constraints: const BoxConstraints.tightFor(width: 32, height: 32),
             padding: EdgeInsets.zero,
             visualDensity: VisualDensity.compact,
-            icon: Icon(Icons.edit_outlined, color: colorScheme.primary),
+            icon: Icon(
+              PhosphorIconsRegular.pencilSimple,
+              color: colorScheme.primary,
+            ),
           ),
           IconButton(
             onPressed: item.sudahRegistrasi ? null : onDelete,
@@ -396,7 +396,7 @@ class _WhitelistNimCard extends StatelessWidget {
             constraints: const BoxConstraints.tightFor(width: 32, height: 32),
             padding: EdgeInsets.zero,
             visualDensity: VisualDensity.compact,
-            icon: Icon(Icons.delete_outline, color: colorScheme.error),
+            icon: Icon(PhosphorIconsRegular.trash, color: colorScheme.error),
           ),
         ],
       ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/admin/admin_auth_repository.dart';
@@ -167,7 +168,7 @@ class _TambahTahunAjaranPageState extends State<TambahTahunAjaranPage> {
         leading: IconButton(
           onPressed: _back,
           icon: Icon(
-            Icons.arrow_back_ios_new_rounded,
+            PhosphorIconsRegular.arrowLeft,
             size: 20,
             color: colorScheme.primary,
           ),
@@ -551,7 +552,7 @@ class _StatusDropdown extends StatelessWidget {
           .toList(),
       onChanged: onChanged,
       icon: Icon(
-        Icons.keyboard_arrow_down,
+        PhosphorIconsRegular.caretDown,
         color: colorScheme.onSurfaceVariant,
       ),
       decoration: InputDecoration(
@@ -626,7 +627,11 @@ class _SemesterToggleCard extends StatelessWidget {
                 ),
               ),
               child: selected
-                  ? Icon(Icons.check, size: 12, color: colorScheme.onPrimary)
+                  ? Icon(
+                      PhosphorIconsRegular.check,
+                      size: 12,
+                      color: colorScheme.onPrimary,
+                    )
                   : null,
             ),
             const SizedBox(width: 8),
@@ -697,7 +702,7 @@ class _DatePickerField extends StatelessWidget {
       child: InputDecorator(
         decoration: InputDecoration(
           suffixIcon: Icon(
-            Icons.calendar_today_outlined,
+            PhosphorIconsRegular.calendarBlank,
             size: 18,
             color: colorScheme.onSurfaceVariant,
           ),

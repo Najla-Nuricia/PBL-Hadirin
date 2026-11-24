@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../routing/admin_route_paths.dart';
-import 'tambah_mata_kuliah_page.dart';
+import '../../widgets/widgets.dart';
+import 'widgets/admin_scaffold.dart';
 import 'widgets/labeled_fields.dart';
 
 const _programStudi = [
@@ -37,9 +38,9 @@ class _TambahDosenPageState extends State<TambahDosenPage> {
 
   void _save() {
     if (!_formKey.currentState!.validate()) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Dosen berhasil ditambahkan')),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Dosen berhasil ditambahkan')));
     if (context.canPop()) {
       context.pop();
     } else {
@@ -51,10 +52,13 @@ class _TambahDosenPageState extends State<TambahDosenPage> {
   Widget build(BuildContext context) {
     return AdminFormScaffold(
       title: 'Tambah Dosen',
+      onSave: _save,
       form: Form(
         key: _formKey,
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            const SizedBox(height: AppSpacing.md),
             LabeledTextField(
               label: 'NIP',
               required: true,
@@ -64,7 +68,7 @@ class _TambahDosenPageState extends State<TambahDosenPage> {
               helper: 'Masukkan NIP dosen',
               validator: _required('NIP'),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
             LabeledTextField(
               label: 'Nama Dosen',
               required: true,
@@ -72,7 +76,7 @@ class _TambahDosenPageState extends State<TambahDosenPage> {
               hint: 'Agung Nugroho Pramudhita, S.T., M.T.',
               validator: _required('Nama dosen'),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
             LabeledTextField(
               label: 'Email',
               controller: _emailController,
@@ -83,7 +87,7 @@ class _TambahDosenPageState extends State<TambahDosenPage> {
                 return email.contains('@') ? null : 'Email tidak valid';
               },
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
             LabeledDropdown(
               label: 'Program Studi',
               required: true,
@@ -91,7 +95,7 @@ class _TambahDosenPageState extends State<TambahDosenPage> {
               items: _programStudi,
               onChanged: (value) => setState(() => _prodi = value),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.lg),
             LabeledDropdown(
               label: 'Status',
               required: true,
@@ -102,7 +106,6 @@ class _TambahDosenPageState extends State<TambahDosenPage> {
           ],
         ),
       ),
-      onSave: _save,
     );
   }
 

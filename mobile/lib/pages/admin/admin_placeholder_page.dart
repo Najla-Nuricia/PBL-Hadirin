@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
+
+import '../../widgets/widgets.dart';
 
 class AdminPlaceholderPage extends StatelessWidget {
   const AdminPlaceholderPage({required this.title, super.key});
@@ -8,8 +11,9 @@ class AdminPlaceholderPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-      body: Center(child: Text(title)),
+      body: Center(
+        child: AppEmptyState(icon: PhosphorIconsRegular.wrench, title: title),
+      ),
     );
   }
 }

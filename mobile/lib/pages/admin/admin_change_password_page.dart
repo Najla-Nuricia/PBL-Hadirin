@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/admin/admin_auth_repository.dart';
@@ -92,7 +93,10 @@ class _AdminChangePasswordPageState extends State<AdminChangePasswordPage> {
                     alignment: Alignment.centerLeft,
                     child: IconButton(
                       tooltip: 'Kembali',
-                      icon: const Icon(Icons.arrow_back_ios_new, size: 19),
+                      icon: const Icon(
+                        PhosphorIconsRegular.arrowLeft,
+                        size: 19,
+                      ),
                       color: colorScheme.primary,
                       onPressed: () => context.pop(),
                     ),
@@ -274,8 +278,8 @@ class _AdminChangePasswordPageState extends State<AdminChangePasswordPage> {
                   : 'Tampilkan password',
               icon: Icon(
                 isVisible
-                    ? Icons.visibility_off_outlined
-                    : Icons.visibility_outlined,
+                    ? PhosphorIconsRegular.eyeSlash
+                    : PhosphorIconsRegular.eye,
                 size: 19,
                 color: colorScheme.onSurfaceVariant,
               ),

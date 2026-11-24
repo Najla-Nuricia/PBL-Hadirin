@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 
-import '../../../theme/style/lecturer_style.dart';
+import '../../../theme/app_tokens.dart';
 
-/// Membatasi lebar konten agar tetap rapi di Mobile Web / tablet.
+/// Membatasi lebar isi dan menaruhnya di tengah pada layar lebar.
 class ContentConstraint extends StatelessWidget {
   const ContentConstraint({
     super.key,
     required this.child,
-    this.maxWidth = LecturerStyle.maxContentWidth,
+    this.maxWidth = AppSizes.contentMaxWidth,
   });
 
   final Widget child;
@@ -17,9 +17,11 @@ class ContentConstraint extends StatelessWidget {
   Widget build(BuildContext context) {
     return Align(
       alignment: Alignment.topCenter,
+      // Tinggi mengikuti isi, supaya aman dipakai di batang bawah Scaffold.
+      heightFactor: 1,
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxWidth),
-        child: child,
+        child: SizedBox(width: double.infinity, child: child),
       ),
     );
   }

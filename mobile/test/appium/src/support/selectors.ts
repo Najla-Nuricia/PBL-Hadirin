@@ -7,7 +7,7 @@
 
 export const LOCATORS = {
   onboarding: {
-    next: '~Next',
+    next: '~Mulai',
     mahasiswa: '~Mahasiswa',
     dosen: '~Dosen',
     admin: '~Login Sebagai Sekretaris Jurusan',
@@ -34,7 +34,7 @@ export const LOCATORS = {
       passwordField: 'android=new UiSelector().className("android.widget.EditText").instance(1)',
       submitButton: '~Masuk',
       errorSnackbar: '~NIM atau password salah.',
-      forgotPassword: 'Forgot password?',
+      forgotPassword: 'Lupa kata sandi?',
     },
     register: {
       title: '~Registrasi Mahasiswa',

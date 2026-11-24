@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../data/admin/admin_auth_repository.dart';
 import '../../../routing/admin_route_paths.dart';
+import '../../../widgets/widgets.dart';
 
 /// Kompatibilitas dengan kode/QA lama yang memakai kredensial demo.
 abstract final class AdminDemoCredentials {
@@ -65,121 +68,127 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
 
-    return Scaffold(
-      backgroundColor: colorScheme.surface,
-      body: SafeArea(
-        child: Align(
-          alignment: const Alignment(0, -0.56),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(
-                    'Login Sekretaris Jurusan',
-                    style: TextStyle(
-                      color: colorScheme.onSurface,
-                      fontSize: 21,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  Text(
-                    'Username',
-                    style: TextStyle(
-                      color: colorScheme.onSurface,
-                      fontSize: 12,
-                    ),
-                  ),
-                  const SizedBox(height: 7),
-                  TextFormField(
-                    controller: _usernameController,
-                    textInputAction: TextInputAction.next,
-                    decoration: _inputDecoration(
-                      context,
-                      hintText: 'Masukkan Username',
-                    ),
-                    validator: (value) => (value ?? '').trim().isEmpty
-                        ? 'Username wajib diisi.'
-                        : null,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Password',
-                    style: TextStyle(
-                      color: colorScheme.onSurface,
-                      fontSize: 12,
-                    ),
-                  ),
-                  const SizedBox(height: 7),
-                  TextFormField(
-                    controller: _passwordController,
-                    obscureText: !_isPasswordVisible,
-                    onFieldSubmitted: (_) => _submit(),
-                    decoration: _inputDecoration(
-                      context,
-                      hintText: 'Masukkan Password',
-                    ).copyWith(
-                      suffixIcon: IconButton(
-                        onPressed: () => setState(
-                          () => _isPasswordVisible = !_isPasswordVisible,
-                        ),
-                        tooltip: _isPasswordVisible
-                            ? 'Sembunyikan password'
-                            : 'Tampilkan password',
-                        icon: Icon(
-                          _isPasswordVisible
-                              ? Icons.visibility_off_outlined
-                              : Icons.visibility_outlined,
-                          size: 19,
-                          color: colorScheme.onSurfaceVariant,
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: skyStatusBar,
+      child: Scaffold(
+        backgroundColor: AppColors.canvas,
+        body: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SkyHeader(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const WordmarkPill(),
+                    const SizedBox(height: AppSpacing.xl),
+                    Semantics(
+                      header: true,
+                      child: Text(
+                        'Login Sekretaris Jurusan',
+                        style: text.headlineLarge?.copyWith(
+                          color: AppColors.gownNavy,
                         ),
                       ),
                     ),
-                    validator: (value) => (value ?? '').isEmpty
-                        ? 'Password wajib diisi.'
-                        : null,
-                  ),
-                  const SizedBox(height: 32),
-                  SizedBox(
-                    height: 42,
-                    child: FilledButton(
-                      onPressed: _submit,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: colorScheme.primary,
-                        foregroundColor: colorScheme.onPrimary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(11),
-                        ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      'Kelola data akademik dan jadwal perkuliahan.',
+                      style: text.bodyLarge?.copyWith(
+                        color: AppColors.gownNavy,
+                        fontWeight: FontWeight.w500,
                       ),
-                      child: _isSubmitting
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text(
-                            'Masuk',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: AppSizes.contentMaxWidth,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.page,
+                      AppSpacing.lg,
+                      AppSpacing.page,
+                      AppSpacing.xxl,
+                    ),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text('Username', style: text.labelLarge),
+                          const SizedBox(height: AppSpacing.xs),
+                          TextFormField(
+                            controller: _usernameController,
+                            textInputAction: TextInputAction.next,
+                            decoration:
+                                _inputDecoration(
+                                  context,
+                                  hintText: 'Masukkan Username',
+                                ).copyWith(
+                                  prefixIcon: const Icon(
+                                    PhosphorIconsRegular.user,
+                                  ),
+                                ),
+                            validator: (value) => (value ?? '').trim().isEmpty
+                                ? 'Username wajib diisi.'
+                                : null,
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          Text('Password', style: text.labelLarge),
+                          const SizedBox(height: AppSpacing.xs),
+                          TextFormField(
+                            controller: _passwordController,
+                            obscureText: !_isPasswordVisible,
+                            onFieldSubmitted: (_) => _submit(),
+                            decoration:
+                                _inputDecoration(
+                                  context,
+                                  hintText: 'Masukkan Password',
+                                ).copyWith(
+                                  prefixIcon: const Icon(
+                                    PhosphorIconsRegular.lock,
+                                  ),
+                                  suffixIcon: IconButton(
+                                    onPressed: () => setState(
+                                      () => _isPasswordVisible =
+                                          !_isPasswordVisible,
+                                    ),
+                                    tooltip: _isPasswordVisible
+                                        ? 'Sembunyikan password'
+                                        : 'Tampilkan password',
+                                    icon: Icon(
+                                      _isPasswordVisible
+                                          ? PhosphorIconsRegular.eyeSlash
+                                          : PhosphorIconsRegular.eye,
+                                    ),
+                                  ),
+                                ),
+                            validator: (value) => (value ?? '').isEmpty
+                                ? 'Password wajib diisi.'
+                                : null,
+                          ),
+                          const SizedBox(height: AppSpacing.xxl),
+                          AppGradientButton(
+                            onPressed: _isSubmitting ? null : _submit,
+                            label: 'Masuk',
+                            icon: PhosphorIconsRegular.signIn,
+                            isBusy: _isSubmitting,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
-      ),
-      bottomNavigationBar: Container(
-        height: 5,
-        color: colorScheme.primary,
       ),
     );
   }
@@ -192,10 +201,7 @@ class _AdminLoginPageState extends State<AdminLoginPage> {
 
     return InputDecoration(
       hintText: hintText,
-      hintStyle: TextStyle(
-        color: colorScheme.onSurfaceVariant,
-        fontSize: 12,
-      ),
+      hintStyle: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12),
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(10),

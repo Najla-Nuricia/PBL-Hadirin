@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -6,6 +6,7 @@ import '../../../data/dosen/dummy_lecturer_auth_repository.dart';
 import '../../../data/dosen/lecturer_providers.dart';
 import '../../../routing/lecturer_route_paths.dart';
 import '../../../theme/style/auth_style.dart';
+import '../../../widgets/widgets.dart';
 import '../../mhs/auth/widgets/auth_buttons.dart';
 import '../../mhs/auth/widgets/auth_header.dart';
 import '../../mhs/auth/widgets/auth_scaffold.dart';
@@ -57,7 +58,7 @@ class _LecturerLoginPageState extends ConsumerState<LecturerLoginPage> {
       setState(() => _isSubmitting = false);
       final message = e is LecturerRemoteApiException
           ? e.message
-          : 'Gagal masuk. Periksa koneksi ke server backend.';
+          : 'Gagal masuk. Periksa koneksi internet, lalu coba lagi.';
       _showMessage(message);
     }
   }
@@ -69,25 +70,25 @@ class _LecturerLoginPageState extends ConsumerState<LecturerLoginPage> {
   }
 
   void _showForgotPasswordUnavailable() {
-    _showMessage('Fitur lupa password belum tersedia.');
+    _showMessage('Fitur lupa kata sandi belum tersedia.');
   }
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return AuthScaffold(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const AuthHeader(title: 'Login Dosen', activeSteps: 1),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
-                AuthStyle.contentHorizontalPadding,
-                0,
-                AuthStyle.contentHorizontalPadding,
-                24,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.only(bottom: AppSpacing.xxl),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const AuthHeader(
+              title: 'Login Dosen',
+              subtitle: 'Masuk dengan email dan kata sandi.',
+              activeSteps: 1,
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AuthStyle.contentHorizontalPadding,
               ),
               child: AutofillGroup(
                 child: Form(
@@ -109,7 +110,9 @@ class _LecturerLoginPageState extends ConsumerState<LecturerLoginPage> {
                           return null;
                         },
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: AuthStyle.fieldGap),
+                      // Label dan pesan "password" dipertahankan: tes dan
+                      // skenario Appium mencarinya dengan teks ini.
                       AuthTextField(
                         label: 'Password',
                         hintText: 'Masukkan password',
@@ -124,31 +127,23 @@ class _LecturerLoginPageState extends ConsumerState<LecturerLoginPage> {
                             ? 'Password wajib diisi.'
                             : null,
                       ),
+                      const SizedBox(height: AppSpacing.xs),
                       Align(
-                        alignment: Alignment.centerLeft,
+                        alignment: Alignment.centerRight,
                         child: TextButton(
                           onPressed: _isSubmitting
                               ? null
                               : _showForgotPasswordUnavailable,
-                          style: TextButton.styleFrom(
-                            foregroundColor: colorScheme.primary,
-                            padding: EdgeInsets.zero,
-                            minimumSize: const Size(0, 32),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            textStyle: const TextStyle(
-                              fontSize: AuthStyle.captionSize,
-                            ),
-                          ),
-                          child: const Text('Lupa password?'),
+                          child: const Text('Lupa kata sandi?'),
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AppSpacing.md),
                       AuthPrimaryButton(
                         label: 'Masuk',
                         onPressed: _submit,
                         isLoading: _isSubmitting,
                       ),
-                      const SizedBox(height: 9),
+                      const SizedBox(height: AppSpacing.md),
                       AuthSecondaryButton(
                         label: 'Daftar',
                         onPressed: _isSubmitting
@@ -160,8 +155,8 @@ class _LecturerLoginPageState extends ConsumerState<LecturerLoginPage> {
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../data/admin/admin_auth_repository.dart';
 import '../../data/admin/admin_master_data_service.dart';
 import '../../data/admin/jadwal.dart';
 import '../../routing/admin_route_paths.dart';
+import '../../widgets/widgets.dart';
 import 'tambah_mata_kuliah_page.dart';
 
 class MataKuliahListPage extends StatefulWidget {
@@ -168,40 +170,34 @@ class _MataKuliahListPageState extends State<MataKuliahListPage> {
   }
 
   Widget _buildHeader(ColorScheme colorScheme) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 12, 16, 12),
+    return SkyHeader(
+      includeStatusBar: false,
       child: Row(
         children: [
           IconButton(
             onPressed: _back,
-            icon: Icon(
-              Icons.arrow_back_ios_new_rounded,
-              size: 20,
-              color: colorScheme.primary,
-            ),
+            icon: const Icon(PhosphorIconsRegular.arrowLeft, size: 20),
+            color: AppColors.gownNavy,
             tooltip: 'Kembali',
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: AppSpacing.xs),
           Expanded(
             child: Text(
               'Mata Kuliah',
-              style: TextStyle(
-                color: colorScheme.onSurface,
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-              ),
+              style: Theme.of(context).textTheme.titleLarge
+                  ?.copyWith(color: AppColors.gownNavy),
             ),
           ),
           FilledButton.icon(
             onPressed: () => _openForm(),
-            icon: const Icon(Icons.add, size: 18),
+            icon: const Icon(PhosphorIconsRegular.plus, size: 18),
             label: const Text('Tambah'),
             style: FilledButton.styleFrom(
               backgroundColor: colorScheme.primary,
               foregroundColor: colorScheme.onPrimary,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+              shape: const RoundedRectangleBorder(
+                borderRadius: AppRadius.control,
               ),
             ),
           ),
@@ -222,7 +218,7 @@ class _MataKuliahListPageState extends State<MataKuliahListPage> {
             fontSize: 13,
           ),
           prefixIcon: Icon(
-            Icons.search,
+            PhosphorIconsRegular.magnifyingGlass,
             color: colorScheme.onSurfaceVariant,
             size: 20,
           ),
@@ -230,7 +226,7 @@ class _MataKuliahListPageState extends State<MataKuliahListPage> {
               ? IconButton(
                   onPressed: _searchController.clear,
                   icon: Icon(
-                    Icons.close,
+                    PhosphorIconsRegular.x,
                     color: colorScheme.onSurfaceVariant,
                     size: 18,
                   ),
@@ -263,7 +259,7 @@ class _MataKuliahListPageState extends State<MataKuliahListPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            Icons.menu_book_outlined,
+            PhosphorIconsRegular.bookOpen,
             size: 48,
             color: colorScheme.onSurfaceVariant,
           ),
@@ -284,7 +280,11 @@ class _MataKuliahListPageState extends State<MataKuliahListPage> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.cloud_off_outlined, size: 48, color: colorScheme.error),
+            Icon(
+              PhosphorIconsRegular.cloudSlash,
+              size: 48,
+              color: colorScheme.error,
+            ),
             const SizedBox(height: 12),
             Text(
               _errorMessage!,
@@ -337,7 +337,7 @@ class _MataKuliahCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
-              Icons.menu_book_outlined,
+              PhosphorIconsRegular.bookOpen,
               color: colorScheme.primary,
               size: 20,
             ),
@@ -374,7 +374,10 @@ class _MataKuliahCard extends StatelessWidget {
             constraints: const BoxConstraints.tightFor(width: 32, height: 32),
             padding: EdgeInsets.zero,
             visualDensity: VisualDensity.compact,
-            icon: Icon(Icons.edit_outlined, color: colorScheme.primary),
+            icon: Icon(
+              PhosphorIconsRegular.pencilSimple,
+              color: colorScheme.primary,
+            ),
           ),
           IconButton(
             onPressed: onDelete,
@@ -382,7 +385,7 @@ class _MataKuliahCard extends StatelessWidget {
             constraints: const BoxConstraints.tightFor(width: 32, height: 32),
             padding: EdgeInsets.zero,
             visualDensity: VisualDensity.compact,
-            icon: Icon(Icons.delete_outline, color: colorScheme.error),
+            icon: Icon(PhosphorIconsRegular.trash, color: colorScheme.error),
           ),
         ],
       ),

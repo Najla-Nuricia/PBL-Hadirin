@@ -1,39 +1,22 @@
 import 'dart:convert';
 import 'dart:io' show Platform;
-import 'dart:typed_data';
 
-import 'package:camera/camera.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../data/location_service.dart';
 import '../../data/mhs/dummy_student_auth_repository.dart';
 import '../../data/mhs/student_data_service.dart';
+import '../../features/face_scan/presensi_failure.dart';
 import '../../routing/student_route_paths.dart';
+import '../../widgets/widgets.dart';
+import 'absensi_parts.dart';
+import 'face_verification_page.dart';
 
-enum _CameraStatus {
-  idle,
-  initializing,
-  ready,
-  unavailable,
-  permissionDenied,
-  failed,
-}
-
-const _cameraPermissionErrorCodes = {
-  'CameraAccessDenied',
-  'CameraAccessDeniedWithoutPrompt',
-  'CameraAccessRestricted',
-  'AudioAccessDenied',
-  'AudioAccessDeniedWithoutPrompt',
-  'AudioAccessRestricted',
-  'permissionDenied',
-  'NotAllowedError',
-};
-
-/// Halaman presensi dua tahap: validasi sesi QR + GPS kampus dan verifikasi wajah via kamera.
+/// Presensi: pindai QR kelas atau masukkan token, lalu verifikasi wajah.
 class AbsensiPage extends StatefulWidget {
   const AbsensiPage({super.key});
 
@@ -41,29 +24,18 @@ class AbsensiPage extends StatefulWidget {
   State<AbsensiPage> createState() => _AbsensiPageState();
 }
 
-class _AbsensiPageState extends State<AbsensiPage>
-    with TickerProviderStateMixin, WidgetsBindingObserver {
-  // Koordinat perangkat diambil dari GPS asli (lihat LocationService).
-  int _currentStep = 0; // 0 = Scan/Token QR, 1 = Verifikasi Wajah (Kamera)
+class _AbsensiPageState extends State<AbsensiPage> with WidgetsBindingObserver {
   bool _isLoadingSessions = false;
   bool _isSubmitting = false;
-  bool _isCapturing = false;
-  bool _isInitializingCamera = false;
-  bool _attendanceDone = false;
-
-  CameraController? _cameraController;
-  List<CameraDescription> _cameras = const [];
-  CameraLensDirection _preferredLens = CameraLensDirection.front;
-  _CameraStatus _cameraStatus = _CameraStatus.idle;
+  String? _loadError;
 
   List<Map<String, dynamic>> _activeSessions = const [];
   String? _selectedSessionId;
   bool _faceRegistered = true;
 
-  Uint8List? _probeImageBytes;
-  String? _probeImageName;
-  String? _statusMessage;
-  String? _errorMessage;
+  PresensiFailure? _failure;
+  String? _tokenError;
+  Map<String, dynamic>? _receipt;
 
   DeviceLocation? _location;
   bool _isLocating = false;
@@ -73,25 +45,18 @@ class _AbsensiPageState extends State<AbsensiPage>
   bool _isStartingQrScanner = false;
   String? _qrScannerError;
   String? _handledQrToken;
+  bool _faceScanOpen = false;
+
+  final _tokenController = TextEditingController();
 
   // Di lingkungan flutter test plugin scanner tidak tersedia, jadi jangan mount.
   bool get _isFlutterTest =>
       !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
 
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1200),
-    );
-    _pulseAnimation = Tween<double>(begin: 0.92, end: 1.0).animate(
-      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
-    );
     _loadInitialData();
     _refreshLocation();
     _startQrScanner();
@@ -100,191 +65,27 @@ class _AbsensiPageState extends State<AbsensiPage>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.inactive) {
-      if (_currentStep == 0) {
-        _stopQrScanner();
-      } else {
-        _disposeCamera();
-      }
+      _stopQrScanner();
       return;
     }
     if (state != AppLifecycleState.resumed) return;
     _refreshLocation();
-    if (_attendanceDone) return;
-    if (_currentStep == 0) {
-      _startQrScanner();
-    } else if (_cameraController == null) {
-      _initializeCamera();
-    }
-  }
-
-  void _setSubmitting(bool value) {
-    if (value) {
-      _pulseController.repeat(reverse: true);
-    } else {
-      _pulseController.stop();
-      _pulseController.value = 1.0;
-    }
-    setState(() => _isSubmitting = value);
+    if (_receipt == null && !_faceScanOpen) _startQrScanner();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _disposeCamera(notify: false);
     _qrScanner?.dispose();
     _qrScanner = null;
-    _pulseController.dispose();
+    _tokenController.dispose();
     super.dispose();
-  }
-
-  Future<void> _disposeCamera({bool notify = true}) async {
-    final controller = _cameraController;
-    if (controller == null) return;
-    _cameraController = null;
-    if (notify && mounted) {
-      setState(() => _cameraStatus = _CameraStatus.idle);
-    }
-    await controller.dispose();
-  }
-
-  Future<void> _initializeCamera() async {
-    if (_isInitializingCamera) return;
-    _isInitializingCamera = true;
-    await _disposeCamera(notify: false);
-    if (mounted) {
-      setState(() => _cameraStatus = _CameraStatus.initializing);
-    }
-
-    CameraController? controller;
-    try {
-      final cameras = await availableCameras();
-      if (cameras.isEmpty) {
-        _setCameraStatus(_CameraStatus.unavailable);
-        return;
-      }
-      _cameras = cameras;
-
-      final preferred = cameras
-          .where((c) => c.lensDirection == _preferredLens)
-          .toList();
-      final candidates = [
-        ...preferred,
-        ...cameras.where((c) => !preferred.contains(c)),
-      ];
-
-      CameraException? lastCameraError;
-      for (final candidate in candidates) {
-        for (final preset in const [
-          ResolutionPreset.medium,
-          ResolutionPreset.low,
-          ResolutionPreset.high,
-        ]) {
-          CameraController? candidateController;
-          try {
-            candidateController = CameraController(
-              candidate,
-              preset,
-              enableAudio: false,
-            );
-            await candidateController.initialize();
-            if (!mounted || _currentStep != 1) {
-              await candidateController.dispose();
-              return;
-            }
-            controller = candidateController;
-            setState(() {
-              _cameraController = candidateController;
-              _cameraStatus = _CameraStatus.ready;
-              _errorMessage = null;
-            });
-            return;
-          } on CameraException catch (e) {
-            lastCameraError = e;
-            await candidateController?.dispose();
-          }
-        }
-      }
-
-      if (lastCameraError != null) {
-        throw lastCameraError;
-      }
-    } on CameraException catch (error) {
-      await controller?.dispose();
-      debugPrint('Attendance camera initialization failed: ${error.code}');
-      if (_cameraPermissionErrorCodes.contains(error.code)) {
-        _setCameraStatus(_CameraStatus.permissionDenied);
-        setState(() {
-          _errorMessage = 'Izin kamera belum aktif. Berikan izin kamera di browser/perangkat lalu tekan Coba Buka Kamera Lagi.';
-        });
-      } else if (error.code == 'cameraNotFound') {
-        _setCameraStatus(_CameraStatus.unavailable);
-        setState(() {
-          _errorMessage = 'Kamera tidak terdeteksi (cameraNotFound). Pastikan webcam terhubung dan diizinkan.';
-        });
-      } else {
-        _setCameraStatus(_CameraStatus.failed);
-        setState(() {
-          _errorMessage =
-              'Kamera gagal dibuka (${error.code}). Pastikan kamera tidak dipakai aplikasi lain lalu coba lagi.';
-        });
-      }
-    } catch (error) {
-      await controller?.dispose();
-      debugPrint('Attendance camera unavailable on this platform: $error');
-      _setCameraStatus(_CameraStatus.unavailable);
-      setState(() {
-        _errorMessage = 'Kamera tidak tersedia di platform ini.';
-      });
-    } finally {
-      _isInitializingCamera = false;
-    }
-  }
-
-  void _setCameraStatus(_CameraStatus status) {
-    if (mounted) setState(() => _cameraStatus = status);
-  }
-
-  Future<void> _switchCameraLens() async {
-    _preferredLens = _preferredLens == CameraLensDirection.front
-        ? CameraLensDirection.back
-        : CameraLensDirection.front;
-    await _initializeCamera();
-  }
-
-  Future<void> _captureFromCamera() async {
-    final controller = _cameraController;
-    if (controller == null ||
-        !controller.value.isInitialized ||
-        controller.value.isTakingPicture ||
-        _isCapturing) {
-      return;
-    }
-    setState(() => _isCapturing = true);
-    try {
-      final photo = await controller.takePicture();
-      final bytes = await photo.readAsBytes();
-      if (!mounted) return;
-      if (bytes.isEmpty) {
-        _showSnackBar('Hasil foto kamera kosong.');
-        return;
-      }
-      setState(() {
-        _probeImageBytes = bytes;
-        _probeImageName = photo.name.isNotEmpty ? photo.name : 'capture.jpg';
-        _errorMessage = null;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      _showSnackBar('Gagal mengambil foto dari kamera: $e');
-    } finally {
-      if (mounted) setState(() => _isCapturing = false);
-    }
   }
 
   Future<void> _loadInitialData() async {
     setState(() {
       _isLoadingSessions = true;
-      _errorMessage = null;
+      _loadError = null;
     });
     try {
       final results = await Future.wait([
@@ -301,22 +102,12 @@ class _AbsensiPageState extends State<AbsensiPage>
         }
         _faceRegistered = (faceStatus['is_registered'] as bool?) ?? false;
       });
-    } catch (e) {
+    } catch (error) {
       if (!mounted) return;
-      setState(() => _errorMessage = _cleanError(e));
+      setState(() => _loadError = PresensiFailure.from(error).message);
     } finally {
       if (mounted) setState(() => _isLoadingSessions = false);
     }
-  }
-
-  String _cleanError(Object error) =>
-      error.toString().replaceFirst('Exception: ', '');
-
-  void _showSnackBar(String message) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _refreshLocation() async {
@@ -330,14 +121,18 @@ class _AbsensiPageState extends State<AbsensiPage>
       if (!mounted) return;
       setState(() {
         _location = location;
-        _locationError = null;
+        if (_failure?.recovery == PresensiRecovery.refreshLocation) {
+          _failure = null;
+        }
       });
-    } on LocationException catch (e) {
+    } on LocationException catch (error) {
+      if (mounted) setState(() => _locationError = error.message);
+    } catch (_) {
       if (!mounted) return;
-      setState(() => _locationError = e.message);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _locationError = 'Gagal membaca lokasi: $e');
+      setState(
+        () => _locationError =
+            'Lokasi belum bisa dibaca. Pastikan GPS aktif, lalu coba lagi.',
+      );
     } finally {
       if (mounted) setState(() => _isLocating = false);
     }
@@ -362,12 +157,13 @@ class _AbsensiPageState extends State<AbsensiPage>
       // Tunggu widget MobileScanner ter-mount & attach ke controller.
       await WidgetsBinding.instance.endOfFrame;
       await scanner.start();
-      if (!mounted) return;
-      setState(() => _qrScannerError = null);
-    } catch (e) {
+      if (mounted) setState(() => _qrScannerError = null);
+    } catch (_) {
       if (!mounted) return;
       setState(() {
-        _qrScannerError = 'Kamera pemindai QR tidak tersedia. Periksa izin kamera lalu coba lagi.';
+        _qrScannerError =
+            'Pemindai QR tidak bisa dibuka. Izinkan Kamera di pengaturan '
+            'aplikasi, atau masukkan token secara manual.';
         _qrScanner = null;
       });
       await Future<void>.delayed(Duration.zero);
@@ -377,10 +173,10 @@ class _AbsensiPageState extends State<AbsensiPage>
     }
   }
 
-  Future<void> _stopQrScanner({bool notify = true}) async {
+  Future<void> _stopQrScanner() async {
     final scanner = _qrScanner;
     if (scanner == null) return;
-    if (notify && mounted) {
+    if (mounted) {
       setState(() => _qrScanner = null);
       // Beri satu frame agar widget MobileScanner lepas dari controller.
       await Future<void>.delayed(Duration.zero);
@@ -391,7 +187,7 @@ class _AbsensiPageState extends State<AbsensiPage>
   }
 
   void _onQrDetected(BarcodeCapture capture) {
-    if (_isSubmitting || _attendanceDone) return;
+    if (_isSubmitting || _receipt != null) return;
     for (final barcode in capture.barcodes) {
       final raw = barcode.rawValue?.trim();
       if (raw == null || raw.isEmpty) continue;
@@ -429,27 +225,44 @@ class _AbsensiPageState extends State<AbsensiPage>
     return trimmed;
   }
 
+  void _submitManualToken() {
+    if (_isSubmitting) return;
+    final token = _extractQrToken(_tokenController.text);
+    FocusScope.of(context).unfocus();
+    if (token.isEmpty) {
+      setState(
+        () => _tokenError = 'Token belum diisi. Ketik token dari dosen.',
+      );
+      return;
+    }
+    _submitQrAttendance(token);
+  }
+
   Future<void> _submitQrAttendance(String qrToken) async {
     if (!studentAuthRepository.hasRemoteSession) {
       _handledQrToken = null;
-      _showSnackBar('Login terlebih dahulu untuk mencatat presensi QR.');
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('Masuk dulu untuk mencatat presensi lewat QR.'),
+          ),
+        );
       return;
     }
     final location = _location;
     if (location == null) {
       _handledQrToken = null;
-      setState(
-        () => _errorMessage = 'Lokasi belum terdeteksi. Aktifkan GPS lalu tekan Muat Ulang Lokasi.',
-      );
+      setState(() => _failure = PresensiFailure.locationMissing);
       return;
     }
 
     setState(() {
-      _errorMessage = null;
+      _failure = null;
+      _isSubmitting = true;
     });
-    _setSubmitting(true);
     try {
-      final res = await studentDataService.submitQrAttendance(
+      final result = await studentDataService.submitQrAttendance(
         qrToken: qrToken,
         latitude: location.latitude,
         longitude: location.longitude,
@@ -457,527 +270,316 @@ class _AbsensiPageState extends State<AbsensiPage>
       );
       if (!mounted) return;
       await _stopQrScanner();
+      if (mounted) setState(() => _receipt = result);
+    } catch (error) {
       if (!mounted) return;
-      setState(() {
-        _attendanceDone = true;
-        _statusMessage =
-            (res['message'] as String?) ?? 'Presensi QR berhasil dicatat!';
-      });
-      _showSnackBar(_statusMessage!);
-    } catch (e) {
-      if (!mounted) return;
-      final msg = _cleanError(e);
       _handledQrToken = null;
-      setState(() => _errorMessage = msg);
-      _showSnackBar(msg);
+      setState(() => _failure = PresensiFailure.from(error));
     } finally {
-      if (mounted) _setSubmitting(false);
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 
-  void _proceedToFaceStep() {
-    _stopQrScanner();
-    setState(() {
-      _currentStep = 1;
-      _errorMessage = null;
-      _attendanceDone = false;
-      _statusMessage = null;
-    });
-    _initializeCamera();
+  Map<String, dynamic>? get _selectedSession {
+    for (final session in _activeSessions) {
+      if (session['sesi_presensi_id'] == _selectedSessionId) return session;
+    }
+    return _activeSessions.isNotEmpty ? _activeSessions.first : null;
   }
 
-  Future<void> _submitFaceAttendance() async {
-    if (_probeImageBytes == null || _probeImageBytes!.isEmpty) {
-      setState(
-        () => _errorMessage = 'Ambil foto wajah dari kamera terlebih dahulu.',
-      );
-      return;
-    }
-    final location = _location;
-    if (location == null) {
-      setState(
-        () => _errorMessage = 'Lokasi belum terdeteksi. Aktifkan GPS lalu tekan Muat Ulang Lokasi.',
-      );
-      return;
-    }
-    final effectiveSessionId =
-        _selectedSessionId ??
-        (_activeSessions.isNotEmpty
-            ? _activeSessions.first['sesi_presensi_id'] as String?
-            : null);
-
-    setState(() => _errorMessage = null);
-    _setSubmitting(true);
-    try {
-      final res = await studentDataService.submitFaceAttendance(
-        imageBytes: _probeImageBytes!,
-        filename: _probeImageName ?? 'probe.jpg',
-        sesiPresensiId: effectiveSessionId,
-        latitude: location.latitude,
-        longitude: location.longitude,
-        accuracy: location.accuracy,
-      );
-      if (!mounted) return;
-      final sim = res['similarity'] ?? res['similarity_score'];
-      final simSuffix = sim is num
-          ? ' (kemiripan ${(sim * 100).toStringAsFixed(1)}%)'
-          : '';
-      await _disposeCamera();
-      if (!mounted) return;
+  /// Kamera hanya boleh dipakai satu pemakai, jadi pemindai QR dilepas dulu.
+  Future<void> _openFaceScan() async {
+    FocusScope.of(context).unfocus();
+    _faceScanOpen = true;
+    await _stopQrScanner();
+    if (!mounted) return;
+    final session = _selectedSession;
+    final result = await Navigator.of(context, rootNavigator: true)
+        .push<Map<String, dynamic>>(
+          MaterialPageRoute(
+            builder: (_) => FaceVerificationPage(
+              sessionId: session?['sesi_presensi_id'] as String?,
+              courseName: session?['matkul_nama'] as String?,
+              initialLocation: _location,
+              faceRegistered:
+                  _faceRegistered || !studentAuthRepository.hasRemoteSession,
+            ),
+          ),
+        );
+    _faceScanOpen = false;
+    if (!mounted) return;
+    if (result != null) {
       setState(() {
-        _attendanceDone = true;
-        _statusMessage =
-            '${(res['message'] as String?) ?? 'Presensi wajah berhasil!'}$simSuffix';
+        _failure = null;
+        _receipt = result;
       });
-      _showSnackBar(_statusMessage!);
-    } catch (e) {
-      if (!mounted) return;
-      final msg = _cleanError(e);
-      setState(() => _errorMessage = msg);
-      _showSnackBar(msg);
-    } finally {
-      if (mounted) _setSubmitting(false);
+    } else {
+      _startQrScanner();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final receipt = _receipt;
 
     return Scaffold(
-      backgroundColor: colorScheme.surface,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildAppBar(colorScheme),
-            _buildStepper(colorScheme),
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: _loadInitialData,
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _buildScanArea(colorScheme),
-                      const SizedBox(height: 16),
-                      _buildStatusBanner(colorScheme),
-
-                      if (_currentStep == 0) ...[
-                        const SizedBox(height: 16),
-                        _buildSessionSelector(colorScheme),
-                        if (_qrScannerError != null) ...[
-                          const SizedBox(height: 12),
-                          Text(
-                            _qrScannerError!,
-                            style: TextStyle(
-                              color: colorScheme.error,
-                              fontSize: 12,
+      appBar: SkyAppBar(
+        leading: IconButton(
+          icon: const Icon(PhosphorIconsRegular.arrowLeft),
+          tooltip: 'Kembali',
+          onPressed: () => context.go(StudentRoutePaths.beranda),
+        ),
+        title: const Text('Presensi'),
+        actions: [
+          if (receipt == null)
+            IconButton(
+              icon: const Icon(PhosphorIconsRegular.arrowsClockwise),
+              tooltip: 'Muat ulang sesi',
+              onPressed: _isLoadingSessions ? null : _loadInitialData,
+            ),
+        ],
+      ),
+      body: AuroraBackground(
+        child: SafeArea(
+          child: receipt != null
+              ? PresensiReceipt(
+                  data: receipt,
+                  fallbackCourse: _selectedSession?['matkul_nama'] as String?,
+                  onDone: () => context.go(StudentRoutePaths.beranda),
+                  onHistory: () => context.go(StudentRoutePaths.riwayat),
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: RefreshIndicator(
+                        onRefresh: _loadInitialData,
+                        child: SingleChildScrollView(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          keyboardDismissBehavior:
+                              ScrollViewKeyboardDismissBehavior.onDrag,
+                          padding: const EdgeInsets.fromLTRB(
+                            AppSpacing.page,
+                            AppSpacing.md,
+                            AppSpacing.page,
+                            AppSpacing.xxl,
+                          ),
+                          child: Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(
+                                maxWidth: AppSizes.contentMaxWidth,
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: _buildContent(context),
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 8),
-                          OutlinedButton.icon(
-                            onPressed: _isStartingQrScanner
-                                ? null
-                                : _startQrScanner,
-                            icon: const Icon(Icons.qr_code_scanner),
-                            label: const Text('Coba Buka Pemindai QR'),
-                          ),
-                        ],
-                      ] else if (!_attendanceDone) ...[
-                        const SizedBox(height: 16),
-                        _buildFacePreviewCard(colorScheme),
-                      ],
-                      const SizedBox(height: 16),
-                      _buildLocationCard(colorScheme),
-                      const SizedBox(height: 20),
-                      _buildActionButtons(colorScheme),
-                    ],
-                  ),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.page,
+                        AppSpacing.md,
+                        AppSpacing.page,
+                        AppSpacing.lg,
+                      ),
+                      child: AppGradientButton(
+                        onPressed: _isSubmitting ? null : _openFaceScan,
+                        icon: PhosphorIconsDuotone.userFocus,
+                        label: 'Lanjutkan ke Scan Wajah',
+                        isBusy: _isSubmitting,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ),
-          ],
         ),
       ),
     );
   }
 
-  Widget _buildAppBar(ColorScheme colorScheme) {
-    return Container(
-      height: 52,
-      color: colorScheme.surface,
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: Row(
-        children: [
-          IconButton(
-            icon: const Icon(Icons.chevron_left),
-            color: colorScheme.onSurfaceVariant,
-            onPressed: () {
-              if (_currentStep == 1 && !_attendanceDone) {
-                _disposeCamera();
-                setState(() {
-                  _currentStep = 0;
-                  _errorMessage = null;
-                });
-                _startQrScanner();
-              } else {
-                context.go(StudentRoutePaths.beranda);
-              }
-            },
-            tooltip: 'Kembali',
+  List<Widget> _buildContent(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final failure = _failure;
+    final scannerError = _qrScannerError;
+
+    return [
+      const AppPageHeading(
+        title: 'Pindai kode QR',
+        description: 'Gunakan kode dari dosen atau presensi dengan wajah.',
+      ),
+      _buildSessionInfo(context),
+      const SizedBox(height: AppSpacing.md),
+      QrScannerFrame(
+        scanner: _qrScanner,
+        onDetect: _onQrDetected,
+        label: _isSubmitting
+            ? 'Mengirim ke server…'
+            : _qrScanner == null
+            ? 'Pemindai belum aktif'
+            : 'Arahkan kamera ke kode QR',
+        busy: _isSubmitting,
+      ),
+      if (scannerError != null) ...[
+        const SizedBox(height: AppSpacing.md),
+        AppBanner(
+          tone: StatusTone.danger,
+          message: scannerError,
+          action: OutlinedButton.icon(
+            onPressed: _isStartingQrScanner ? null : _startQrScanner,
+            icon: const Icon(PhosphorIconsRegular.scan, size: 20),
+            label: const Text('Coba buka pemindai QR'),
           ),
-          RichText(
-            text: TextSpan(
+        ),
+      ],
+      const SizedBox(height: AppSpacing.lg),
+      Text('Atau masukkan token', style: text.titleSmall),
+      const SizedBox(height: 6),
+      Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: TextField(
+              key: const ValueKey('manual-token-field'),
+              controller: _tokenController,
+              enabled: !_isSubmitting,
+              textInputAction: TextInputAction.done,
+              autocorrect: false,
+              enableSuggestions: false,
+              onChanged: (_) {
+                if (_tokenError != null) setState(() => _tokenError = null);
+              },
+              onSubmitted: (_) => _submitManualToken(),
+              decoration: InputDecoration(
+                hintText: 'Token dari dosen',
+                prefixIcon: const Icon(PhosphorIconsRegular.key),
+                errorText: _tokenError,
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          FilledButton.tonal(
+            onPressed: _isSubmitting ? null : _submitManualToken,
+            child: const Text('Kirim'),
+          ),
+        ],
+      ),
+      const SizedBox(height: AppSpacing.md),
+      LocationStatusRow(
+        location: _location,
+        error: _locationError,
+        locating: _isLocating,
+        onRefresh: _refreshLocation,
+      ),
+      if (failure != null) ...[
+        const SizedBox(height: AppSpacing.md),
+        AppBanner(
+          tone: StatusTone.danger,
+          icon: failure.icon,
+          title: failure.title,
+          message: failure.message,
+        ),
+      ],
+    ];
+  }
+
+  Widget _buildSessionInfo(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    if (_isLoadingSessions) {
+      return const AppSkeleton(height: 76, radius: AppRadius.lg);
+    }
+    final loadError = _loadError;
+    if (loadError != null) {
+      return AppBanner(
+        tone: StatusTone.danger,
+        title: 'Sesi presensi belum bisa dimuat',
+        message: loadError,
+        action: OutlinedButton(
+          onPressed: _loadInitialData,
+          child: const Text('Coba lagi'),
+        ),
+      );
+    }
+    if (_activeSessions.isEmpty) {
+      return AppBanner(
+        tone: StatusTone.neutral,
+        message: studentAuthRepository.hasRemoteSession
+            ? 'Belum ada sesi presensi yang dibuka untuk kelas Anda. '
+                  'Tarik layar ke bawah untuk memuat ulang.'
+            : 'Mode pratinjau. Masuk untuk melihat sesi presensi yang dibuka.',
+      );
+    }
+
+    String detail(Map<String, dynamic> session) => [
+      (session['jam_mulai'] as String?) ?? '',
+      (session['ruangan_nama'] as String?) ?? '',
+    ].where((part) => part.isNotEmpty).join(' · ');
+
+    if (_activeSessions.length == 1) {
+      final session = _activeSessions.first;
+      final sub = detail(session);
+      return Card(
+        child: DecoratedBox(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFFE9F7F0), Colors.white],
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Row(
               children: [
-                TextSpan(
-                  text: 'Absensi',
-                  style: TextStyle(
-                    color: colorScheme.onSurface,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: const BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [AppColors.hadir, AppColors.brandCyan],
+                    ),
+                    borderRadius: AppRadius.control,
+                    boxShadow: AppColors.shadowSoft,
+                  ),
+                  child: const Icon(
+                    PhosphorIconsRegular.graduationCap,
+                    size: 22,
+                    color: Colors.white,
                   ),
                 ),
-                TextSpan(
-                  text: ' - ${_currentStep == 0 ? 'Scan QR' : 'Scan Wajah'}',
-                  style: TextStyle(
-                    color: colorScheme.onSurfaceVariant,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w400,
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Presensi dibuka',
+                        style: text.labelMedium?.copyWith(
+                          color: AppColors.hadirInk,
+                        ),
+                      ),
+                      Text(
+                        (session['matkul_nama'] as String?) ?? '-',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: text.titleSmall,
+                      ),
+                      if (sub.isNotEmpty)
+                        Text(
+                          sub,
+                          style: text.bodySmall?.tabular.copyWith(
+                            color: AppColors.inkFaint,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
-          const Spacer(),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            color: colorScheme.onSurfaceVariant,
-            onPressed: _isLoadingSessions ? null : _loadInitialData,
-            tooltip: 'Muat ulang sesi',
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStepper(ColorScheme colorScheme) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        border: Border(bottom: BorderSide(color: colorScheme.outlineVariant)),
-      ),
-      child: Row(
-        children: [
-          _StepIndicatorItem(
-            stepNumber: 1,
-            label: 'Scan QR',
-            isActive: _currentStep == 0,
-            isDone: _currentStep > 0 || _attendanceDone,
-            colorScheme: colorScheme,
-          ),
-          Expanded(
-            child: Container(
-              height: 1.5,
-              color: _currentStep > 0 || _attendanceDone
-                  ? colorScheme.primary
-                  : colorScheme.outlineVariant,
-              margin: const EdgeInsets.symmetric(horizontal: 8),
-            ),
-          ),
-          _StepIndicatorItem(
-            stepNumber: 2,
-            label: 'Scan Wajah',
-            isActive: _currentStep == 1,
-            isDone: _currentStep == 1 && _attendanceDone,
-            colorScheme: colorScheme,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildScanArea(ColorScheme colorScheme) {
-    final isDone = _attendanceDone;
-    final qrScanner = _currentStep == 0 && !isDone ? _qrScanner : null;
-    final showQrScanner = qrScanner != null;
-    final showLiveCamera =
-        _currentStep == 1 &&
-        !isDone &&
-        _probeImageBytes == null &&
-        _cameraStatus == _CameraStatus.ready &&
-        _cameraController != null &&
-        _cameraController!.value.isInitialized;
-
-    return Container(
-      width: double.infinity,
-      height: (showLiveCamera || showQrScanner) ? 290 : 210,
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isDone ? colorScheme.secondary : colorScheme.outlineVariant,
-          width: isDone ? 2 : 1,
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          if (showQrScanner)
-            Positioned.fill(
-              child: MobileScanner(
-                controller: qrScanner,
-                fit: BoxFit.cover,
-                onDetect: _onQrDetected,
-                errorBuilder: (context, error) => ColoredBox(
-                  color: colorScheme.surfaceContainerHighest,
-                  child: Center(
-                    child: Text(
-                      'Kamera pemindai QR tidak tersedia.',
-                      style: TextStyle(
-                        color: colorScheme.error,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-                placeholderBuilder: (context) =>
-                    ColoredBox(color: colorScheme.surfaceContainerHighest),
-              ),
-            )
-          else if (showLiveCamera)
-            Positioned.fill(
-              child: FittedBox(
-                fit: BoxFit.cover,
-                child: SizedBox(
-                  width: _cameraController!.value.previewSize?.height ?? 320,
-                  height: _cameraController!.value.previewSize?.width ?? 240,
-                  child: CameraPreview(_cameraController!),
-                ),
-              ),
-            ),
-          AnimatedBuilder(
-            animation: _pulseAnimation,
-            builder: (context, child) => Transform.scale(
-              scale: _isSubmitting ? _pulseAnimation.value : 1.0,
-              child: child,
-            ),
-            child: Container(
-              width: (showLiveCamera || showQrScanner) ? 180 : 150,
-              height: (showLiveCamera || showQrScanner) ? 180 : 150,
-              decoration: BoxDecoration(
-                border: Border.all(
-                  color: isDone
-                      ? colorScheme.secondary
-                      : (showLiveCamera || showQrScanner)
-                      ? Colors.white70
-                      : colorScheme.onSurfaceVariant.withValues(alpha: 0.35),
-                  width: 2,
-                ),
-                borderRadius: BorderRadius.circular(
-                  showLiveCamera
-                      ? 90
-                      : showQrScanner
-                      ? 24
-                      : 14,
-                ),
-              ),
-              child: (showLiveCamera || showQrScanner)
-                  ? null
-                  : Center(
-                      child: isDone
-                          ? Icon(
-                              Icons.check_circle_outline,
-                              color: colorScheme.secondary,
-                              size: 52,
-                            )
-                          : (_currentStep == 1 && _probeImageBytes != null)
-                          ? ClipRRect(
-                              borderRadius: BorderRadius.circular(12),
-                              child: Image.memory(
-                                _probeImageBytes!,
-                                fit: BoxFit.cover,
-                                width: 146,
-                                height: 146,
-                              ),
-                            )
-                          : _currentStep == 1 &&
-                                _cameraStatus == _CameraStatus.initializing
-                          ? const CircularProgressIndicator(strokeWidth: 2.5)
-                          : (_currentStep == 1 &&
-                                (_cameraStatus == _CameraStatus.unavailable ||
-                                    _cameraStatus == _CameraStatus.failed ||
-                                    _cameraStatus ==
-                                        _CameraStatus.permissionDenied))
-                          ? Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.videocam_off_outlined,
-                                  color: colorScheme.error,
-                                  size: 38,
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  'Kamera Tidak Aktif',
-                                  style: TextStyle(
-                                    color: colorScheme.onSurfaceVariant,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            )
-                          : Icon(
-                              _currentStep == 0
-                                  ? Icons.qr_code_scanner
-                                  : Icons.face_retouching_natural,
-                              color: colorScheme.primary.withValues(
-                                alpha: 0.65,
-                              ),
-                              size: 52,
-                            ),
-                    ),
-            ),
-          ),
-          if (showLiveCamera && _cameras.length > 1)
-            Positioned(
-              top: 10,
-              right: 10,
-              child: CircleAvatar(
-                radius: 18,
-                backgroundColor: Colors.black54,
-                child: IconButton(
-                  padding: EdgeInsets.zero,
-                  icon: const Icon(
-                    Icons.cameraswitch_outlined,
-                    color: Colors.white,
-                    size: 18,
-                  ),
-                  onPressed: _switchCameraLens,
-                  tooltip: 'Ganti Kamera',
-                ),
-              ),
-            ),
-          if (showQrScanner && !_isSubmitting)
-            Positioned(
-              bottom: 12,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: colorScheme.surface.withValues(alpha: 0.85),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'Arahkan kamera ke QR',
-                  style: TextStyle(
-                    color: colorScheme.primary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-          if (_isSubmitting)
-            Positioned(
-              bottom: 12,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 4,
-                ),
-                decoration: BoxDecoration(
-                  color: colorScheme.surface.withValues(alpha: 0.85),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'Memproses ke server...',
-                  style: TextStyle(
-                    color: colorScheme.primary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatusBanner(ColorScheme colorScheme) {
-    final cameraHint = switch (_cameraStatus) {
-      _CameraStatus.initializing => 'Membuka kamera perangkat...',
-      _CameraStatus.permissionDenied => 'Izin kamera belum aktif. Berikan izin kamera di browser/perangkat lalu tekan Coba Buka Kamera Lagi.',
-      _CameraStatus.unavailable => 'Kamera langsung tidak terdeteksi (cameraNotFound). Pastikan webcam terhubung dan diizinkan.',
-      _CameraStatus.failed => 'Kamera gagal dibuka. Pastikan kamera tidak dipakai aplikasi lain lalu tekan Coba Buka Kamera Lagi.',
-      _CameraStatus.ready =>
-        _probeImageBytes == null
-            ? 'Arahkan wajah ke bingkai kamera lalu tekan Ambil Foto Wajah'
-            : 'Foto wajah siap dikirim untuk verifikasi MobileFaceNet',
-      _CameraStatus.idle => 'Siapkan verifikasi wajah via kamera',
-    };
-
-    final message =
-        _errorMessage ??
-        _statusMessage ??
-        (_currentStep == 0
-            ? (_qrScanner == null
-                  ? 'Pemindai QR tidak aktif. Tekan Coba Buka Pemindai QR.'
-                  : 'Arahkan kamera ke QR presensi')
-            : cameraHint);
-    final isError = _errorMessage != null;
-    final isSuccess = !isError && _attendanceDone;
-
-    return Text(
-      message,
-      textAlign: TextAlign.center,
-      style: TextStyle(
-        color: isError
-            ? colorScheme.error
-            : (isSuccess
-                  ? colorScheme.secondary
-                  : colorScheme.onSurfaceVariant),
-        fontSize: 13,
-        fontWeight: (isError || isSuccess) ? FontWeight.w600 : FontWeight.w400,
-      ),
-    );
-  }
-
-  Widget _buildSessionSelector(ColorScheme colorScheme) {
-    if (_isLoadingSessions) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.symmetric(vertical: 8),
-          child: SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
-        ),
-      );
-    }
-
-    if (_activeSessions.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: colorScheme.outlineVariant),
-        ),
-        child: Text(
-          studentAuthRepository.hasRemoteSession
-              ? 'Belum ada sesi presensi aktif untuk kelas kamu saat ini.'
-              : 'Mode pratinjau: masuk untuk melihat sesi aktif dari server.',
-          style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12),
         ),
       );
     }
@@ -986,324 +588,26 @@ class _AbsensiPageState extends State<AbsensiPage>
         _activeSessions.any((s) => s['sesi_presensi_id'] == _selectedSessionId)
         ? _selectedSessionId
         : null;
-
     return DropdownButtonFormField<String>(
       key: ValueKey(validSelection),
       initialValue: validSelection,
       isExpanded: true,
-      decoration: InputDecoration(
-        labelText: 'Sesi Presensi Aktif',
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 12,
-          vertical: 10,
-        ),
-      ),
-      items: _activeSessions.map((session) {
-        final id = session['sesi_presensi_id'] as String;
-        final matkul = (session['matkul_nama'] as String?) ?? '-';
-        final jam = (session['jam_mulai'] as String?) ?? '';
-        final ruang = (session['ruangan_nama'] as String?) ?? '';
-        final subtitle = [jam, ruang].where((s) => s.isNotEmpty).join(' • ');
-        return DropdownMenuItem(
-          value: id,
-          child: Text(
-            subtitle.isNotEmpty ? '$matkul ($subtitle)' : matkul,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 13),
-          ),
-        );
-      }).toList(),
-      onChanged: (val) => setState(() => _selectedSessionId = val),
-    );
-  }
-
-  Widget _buildFacePreviewCard(ColorScheme colorScheme) {
-    final cameraReady =
-        _cameraStatus == _CameraStatus.ready &&
-        _cameraController != null &&
-        _cameraController!.value.isInitialized;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (!_faceRegistered && studentAuthRepository.hasRemoteSession)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
+      decoration: const InputDecoration(labelText: 'Sesi presensi yang dibuka'),
+      items: [
+        for (final session in _activeSessions)
+          DropdownMenuItem(
+            value: session['sesi_presensi_id'] as String,
             child: Text(
-              'Perhatian: data wajah belum terdaftar di akun ini.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: colorScheme.error,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        if (_probeImageBytes == null && cameraReady)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: FilledButton.icon(
-              onPressed: (_isSubmitting || _isCapturing)
-                  ? null
-                  : _captureFromCamera,
-              icon: _isCapturing
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.camera_alt),
-              label: Text(
-                _isCapturing ? 'Mengambil foto...' : 'Ambil Foto Wajah',
-              ),
-            ),
-          )
-        else if (_probeImageBytes != null)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: OutlinedButton.icon(
-              onPressed: _isSubmitting
-                  ? null
-                  : () {
-                      setState(() {
-                        _probeImageBytes = null;
-                        _probeImageName = null;
-                      });
-                      if (_cameraController == null) {
-                        _initializeCamera();
-                      }
-                    },
-              icon: const Icon(Icons.refresh),
-              label: const Text('Ambil Ulang dari Kamera'),
-            ),
-          )
-        else
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: FilledButton.tonalIcon(
-              onPressed: _isInitializingCamera ? null : _initializeCamera,
-              icon: const Icon(Icons.videocam_outlined),
-              label: const Text('Coba Buka Kamera Lagi'),
+              [
+                (session['matkul_nama'] as String?) ?? '-',
+                detail(session),
+              ].where((part) => part.isNotEmpty).join(' · '),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
       ],
-    );
-  }
-
-  Widget _buildLocationCard(ColorScheme colorScheme) {
-    final location = _location;
-    final hasError = _locationError != null;
-    final statusColor = hasError
-        ? colorScheme.error
-        : location != null
-        ? colorScheme.primary
-        : colorScheme.onSurfaceVariant;
-    final title = hasError
-        ? 'Lokasi Tidak Terdeteksi'
-        : location != null
-        ? 'Lokasi Perangkat'
-        : 'Mendeteksi Lokasi...';
-    final detail = hasError
-        ? _locationError!
-        : location != null
-        ? '${location.formattedCoordinates} (akurasi ${location.formattedAccuracy})'
-        : 'Mengambil koordinat GPS perangkat...';
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: hasError ? colorScheme.error : colorScheme.outlineVariant,
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.location_on_outlined, color: statusColor, size: 22),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: colorScheme.onSurfaceVariant,
-                    fontSize: 11,
-                  ),
-                ),
-                Text(
-                  detail,
-                  style: TextStyle(
-                    color: hasError ? colorScheme.error : colorScheme.onSurface,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          if (_isLocating)
-            Icon(Icons.location_searching, size: 22, color: statusColor)
-          else if (location != null)
-            Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                color: colorScheme.primary,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(Icons.check, color: colorScheme.onPrimary, size: 16),
-            )
-          else
-            IconButton(
-              onPressed: _refreshLocation,
-              icon: const Icon(Icons.refresh, size: 20),
-              tooltip: 'Muat Ulang Lokasi',
-              visualDensity: VisualDensity.compact,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionButtons(ColorScheme colorScheme) {
-    if (_attendanceDone) {
-      return SizedBox(
-        width: double.infinity,
-        height: 52,
-        child: FilledButton(
-          onPressed: () => context.go(StudentRoutePaths.beranda),
-          style: FilledButton.styleFrom(
-            backgroundColor: colorScheme.secondary,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-            ),
-          ),
-          child: const Text(
-            'Selesai',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-          ),
-        ),
-      );
-    }
-
-    if (_currentStep == 0) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          SizedBox(
-            height: 52,
-            child: FilledButton(
-              onPressed: _isSubmitting ? null : _proceedToFaceStep,
-              style: FilledButton.styleFrom(
-                backgroundColor: colorScheme.primary,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-              child: const Text(
-                'Lanjutkan ke Scan Wajah',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-
-    return SizedBox(
-      width: double.infinity,
-      height: 52,
-      child: FilledButton(
-        onPressed: _isSubmitting ? null : _submitFaceAttendance,
-        style: FilledButton.styleFrom(
-          backgroundColor: colorScheme.primary,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
-        ),
-        child: _isSubmitting
-            ? SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  color: colorScheme.onPrimary,
-                  strokeWidth: 2,
-                ),
-              )
-            : const Text(
-                'Kirim Verifikasi Wajah',
-                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-              ),
-      ),
-    );
-  }
-}
-
-class _StepIndicatorItem extends StatelessWidget {
-  const _StepIndicatorItem({
-    required this.stepNumber,
-    required this.label,
-    required this.isActive,
-    required this.isDone,
-    required this.colorScheme,
-  });
-
-  final int stepNumber;
-  final String label;
-  final bool isActive;
-  final bool isDone;
-  final ColorScheme colorScheme;
-
-  @override
-  Widget build(BuildContext context) {
-    final activeColor = isActive || isDone
-        ? colorScheme.primary
-        : colorScheme.onSurfaceVariant;
-
-    return Column(
-      children: [
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          width: 28,
-          height: 28,
-          decoration: BoxDecoration(
-            color: isActive || isDone
-                ? colorScheme.primary
-                : colorScheme.outlineVariant,
-            shape: BoxShape.circle,
-          ),
-          child: Center(
-            child: isDone
-                ? Icon(Icons.check, color: colorScheme.onPrimary, size: 14)
-                : Text(
-                    '$stepNumber',
-                    style: TextStyle(
-                      color: isActive
-                          ? colorScheme.onPrimary
-                          : colorScheme.onSurfaceVariant,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          label,
-          style: TextStyle(
-            color: activeColor,
-            fontSize: 11,
-            fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-          ),
-        ),
-      ],
+      onChanged: (value) => setState(() => _selectedSessionId = value),
     );
   }
 }

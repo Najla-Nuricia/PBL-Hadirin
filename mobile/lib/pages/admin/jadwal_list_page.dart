@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../data/admin/admin_auth_repository.dart';
 import '../../data/admin/admin_jadwal_service.dart';
 import '../../data/admin/jadwal.dart';
 import '../../data/admin/tahun_ajaran.dart';
 import '../../routing/admin_route_paths.dart';
+import '../../widgets/widgets.dart';
 import 'widgets/jadwal_form_widgets.dart';
 
 typedef _JadwalFilter = ({
@@ -138,14 +140,14 @@ class _JadwalListPageState extends State<JadwalListPage> {
       floatingActionButton: FloatingActionButton(
         onPressed: () => context.go(AdminRoutePaths.tambahJadwal),
         tooltip: 'Tambah Jadwal',
-        child: const Icon(Icons.add),
+        child: const Icon(PhosphorIconsRegular.plus),
       ),
       body: SafeArea(
         bottom: false,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _buildAppBar(colorScheme),
+            _buildAppBar(),
             Expanded(
               child: _usesRemote
                   ? _buildRemoteBody(colorScheme)
@@ -167,29 +169,22 @@ class _JadwalListPageState extends State<JadwalListPage> {
     );
   }
 
-  Widget _buildAppBar(ColorScheme colorScheme) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(4, 6, 16, 6),
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        border: Border(bottom: BorderSide(color: colorScheme.outlineVariant)),
-      ),
+  Widget _buildAppBar() {
+    return SkyHeader(
+      includeStatusBar: false,
       child: Row(
         children: [
           IconButton(
-            icon: const Icon(Icons.chevron_left),
-            color: colorScheme.onSurface,
+            icon: const Icon(PhosphorIconsRegular.arrowLeft),
+            color: AppColors.gownNavy,
             onPressed: () => context.go(AdminRoutePaths.dataAkademik),
             tooltip: 'Kembali',
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: AppSpacing.sm),
           Text(
             'Daftar Jadwal',
-            style: TextStyle(
-              color: colorScheme.onSurface,
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-            ),
+            style: Theme.of(context).textTheme.titleLarge
+                ?.copyWith(color: AppColors.gownNavy),
           ),
         ],
       ),
@@ -264,7 +259,7 @@ class _JadwalListPageState extends State<JadwalListPage> {
       child: Column(
         children: [
           Icon(
-            Icons.cloud_off_outlined,
+            PhosphorIconsRegular.cloudSlash,
             size: 40,
             color: colorScheme.onSurfaceVariant,
           ),
@@ -277,7 +272,7 @@ class _JadwalListPageState extends State<JadwalListPage> {
           const SizedBox(height: 8),
           TextButton.icon(
             onPressed: _refreshRemoteJadwal,
-            icon: const Icon(Icons.refresh, size: 18),
+            icon: const Icon(PhosphorIconsRegular.arrowsClockwise, size: 18),
             label: const Text('Coba Lagi'),
           ),
         ],
@@ -291,7 +286,7 @@ class _JadwalListPageState extends State<JadwalListPage> {
     ];
 
     return JadwalSectionCard(
-      icon: Icons.filter_alt_outlined,
+      icon: PhosphorIconsRegular.funnel,
       title: 'Filter Jadwal',
       isExpanded: _isFilterExpanded,
       onToggle: () => setState(() => _isFilterExpanded = !_isFilterExpanded),
@@ -378,7 +373,7 @@ class _JadwalListPageState extends State<JadwalListPage> {
             height: 44,
             child: FilledButton.icon(
               onPressed: _applyFilter,
-              icon: const Icon(Icons.search, size: 20),
+              icon: const Icon(PhosphorIconsRegular.magnifyingGlass, size: 20),
               label: const Text(
                 'Tampilkan Jadwal',
                 style: TextStyle(fontWeight: FontWeight.w600),
@@ -407,7 +402,7 @@ class _JadwalListPageState extends State<JadwalListPage> {
       child: Column(
         children: [
           Icon(
-            Icons.event_busy_outlined,
+            PhosphorIconsRegular.calendarX,
             size: 40,
             color: colorScheme.onSurfaceVariant,
           ),
@@ -420,7 +415,7 @@ class _JadwalListPageState extends State<JadwalListPage> {
           const SizedBox(height: 8),
           TextButton.icon(
             onPressed: () => context.go(AdminRoutePaths.tambahJadwal),
-            icon: const Icon(Icons.add, size: 18),
+            icon: const Icon(PhosphorIconsRegular.plus, size: 18),
             label: const Text('Tambah Jadwal Baru'),
           ),
         ],
@@ -555,14 +550,14 @@ class _JadwalTile extends StatelessWidget {
           const SizedBox(height: 4),
           Row(
             children: [
-              Icon(Icons.schedule, size: 14, color: mutedColor),
+              Icon(PhosphorIconsRegular.clock, size: 14, color: mutedColor),
               const SizedBox(width: 4),
               Text(
                 jadwal.rentangWaktu,
                 style: TextStyle(color: mutedColor, fontSize: 12),
               ),
               const SizedBox(width: 14),
-              Icon(Icons.location_on_outlined, size: 14, color: mutedColor),
+              Icon(PhosphorIconsRegular.mapPin, size: 14, color: mutedColor),
               const SizedBox(width: 4),
               Flexible(
                 child: Text(

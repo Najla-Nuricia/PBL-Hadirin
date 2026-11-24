@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/mhs/dummy_student_auth_repository.dart';
@@ -9,6 +10,7 @@ import '../../data/mhs/student_data_service.dart';
 import '../../data/mhs/student_schedule.dart';
 import '../../models/mhs/student_profile.dart';
 import '../../routing/student_route_paths.dart';
+import '../../widgets/widgets.dart';
 
 class BerandaPage extends StatefulWidget {
   const BerandaPage({super.key});
@@ -43,8 +45,9 @@ class _BerandaPageState extends State<BerandaPage> {
         : (studentAuthRepository.currentAccount?.nim ?? _account.nim);
     final cls = (_profile?.className.isNotEmpty == true)
         ? _profile!.className
-        : (studentAuthRepository.currentAccount?.className ?? _account.className);
-    return cls.isNotEmpty ? '$nim · $cls' : nim;
+        : (studentAuthRepository.currentAccount?.className ??
+              _account.className);
+    return cls.isNotEmpty ? '$cls · $nim' : nim;
   }
 
   StudentProfile? _profile;
@@ -76,7 +79,9 @@ class _BerandaPageState extends State<BerandaPage> {
     final current = studentAuthRepository.currentAccount;
     if (!mounted) return;
     setState(() {
-      if (_profile != null && current != null && current.nim == _profile!.studentId) {
+      if (_profile != null &&
+          current != null &&
+          current.nim == _profile!.studentId) {
         _profile = StudentProfile(
           fullName: current.fullName,
           studentId: _profile!.studentId,
@@ -143,8 +148,10 @@ class _BerandaPageState extends State<BerandaPage> {
     await scheduleReminderService.sync(_schedules, _enabledAlarmIds());
   }
 
-  Set<int> _enabledAlarmIds() =>
-      _alarmStates.entries.where((entry) => entry.value).map((e) => e.key).toSet();
+  Set<int> _enabledAlarmIds() => _alarmStates.entries
+      .where((entry) => entry.value)
+      .map((e) => e.key)
+      .toSet();
 
   Future<void> _onAlarmToggle(int scheduleId, bool value) async {
     setState(() => _alarmStates[scheduleId] = value);
@@ -162,7 +169,9 @@ class _BerandaPageState extends State<BerandaPage> {
 
   /// Tombol uji: bunyikan notifikasi + tampilkan banner tanpa tunggu 30 menit.
   Future<void> _fireTestReminder() async {
-    final schedule = _schedules.isEmpty ? dummySchedules.first : _schedules.first;
+    final schedule = _schedules.isEmpty
+        ? dummySchedules.first
+        : _schedules.first;
     try {
       await scheduleReminderService.showTestReminder(schedule);
     } catch (e) {
@@ -196,17 +205,22 @@ class _BerandaPageState extends State<BerandaPage> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: colorScheme.surfaceContainerHighest,
+      backgroundColor: AppColors.canvas,
       body: SafeArea(
         child: Column(
           children: [
-            _buildHeader(colorScheme),
+            _buildHeader(),
             Expanded(
               child: RefreshIndicator(
                 onRefresh: _loadData,
                 child: SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 16),
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.page,
+                    AppSpacing.lg,
+                    AppSpacing.page,
+                    AppSpacing.xxl,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
@@ -224,14 +238,21 @@ class _BerandaPageState extends State<BerandaPage> {
                               padding: const EdgeInsets.all(16),
                               child: Column(
                                 children: [
-                                  Icon(Icons.warning_amber_rounded,
-                                      color: Theme.of(context).colorScheme.onErrorContainer),
+                                  Icon(
+                                    PhosphorIconsRegular.warning,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onErrorContainer,
+                                  ),
                                   const SizedBox(height: 8),
                                   Text(
                                     'Gagal memuat data: $_loadError',
                                     textAlign: TextAlign.center,
                                     style: TextStyle(
-                                        color: Theme.of(context).colorScheme.onErrorContainer),
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onErrorContainer,
+                                    ),
                                   ),
                                   const SizedBox(height: 8),
                                   TextButton(
@@ -243,38 +264,40 @@ class _BerandaPageState extends State<BerandaPage> {
                             ),
                           ),
                         )
-                      else ...[ 
-                      if (_showReminder && _reminder != null)
-                        Semantics(
-                          label: 'Pengingat kelas',
-                          child: _ReminderBanner(
-                            reminder: _reminder!,
-                            onDismiss: () =>
-                                setState(() => _showReminder = false),
-                            onTest: _fireTestReminder,
+                      else ...[
+                        if (_showReminder && _reminder != null)
+                          Semantics(
+                            label: 'Pengingat kelas',
+                            child: _ReminderBanner(
+                              reminder: _reminder!,
+                              onDismiss: () =>
+                                  setState(() => _showReminder = false),
+                              onTest: _fireTestReminder,
+                            ),
                           ),
+                        if (_showReminder && _reminder != null)
+                          const SizedBox(height: 12),
+                        _QuickActions(
+                          onAbsensiTap: () =>
+                              context.go(StudentRoutePaths.absensi),
+                          onSuratTap: () => context.go(StudentRoutePaths.surat),
                         ),
-                      if (_showReminder && _reminder != null)
-                        const SizedBox(height: 12),
-                    _QuickActions(
-                      onAbsensiTap: () => context.go(StudentRoutePaths.absensi),
-                      onSuratTap: () => context.go(StudentRoutePaths.surat),
-                    ),
-                    const SizedBox(height: 16),
-                    _AttendanceSummaryCard(
-                      summary: _summary,
-                      onViewAll: () => context.go(StudentRoutePaths.riwayat),
-                    ),
-                    const SizedBox(height: 16),
-                      _ScheduleSection(
-                        selectedDay: _selectedDay,
-                        schedules: _schedules,
-                        onDaySelected: (day) =>
-                            setState(() => _selectedDay = day),
-                        alarmToggles: _alarmStates,
-                        onAlarmToggle: _onAlarmToggle,
-                      ),
-                    ], // end else
+                        const SizedBox(height: 16),
+                        _AttendanceSummaryCard(
+                          summary: _summary,
+                          onViewAll: () =>
+                              context.go(StudentRoutePaths.riwayat),
+                        ),
+                        const SizedBox(height: 16),
+                        _ScheduleSection(
+                          selectedDay: _selectedDay,
+                          schedules: _schedules,
+                          onDaySelected: (day) =>
+                              setState(() => _selectedDay = day),
+                          alarmToggles: _alarmStates,
+                          onAlarmToggle: _onAlarmToggle,
+                        ),
+                      ], // end else
                     ],
                   ),
                 ),
@@ -287,57 +310,72 @@ class _BerandaPageState extends State<BerandaPage> {
     );
   }
 
-  Widget _buildHeader(ColorScheme colorScheme) {
-    final now = TimeOfDay.now();
-    final timeStr =
-        '${now.hour.toString().padLeft(2, '0')}.${now.minute.toString().padLeft(2, '0')}';
+  Widget _buildHeader() {
+    final text = Theme.of(context).textTheme;
+    final displayName = _displayName.trim();
+    final firstName = displayName.isEmpty
+        ? ''
+        : displayName.split(RegExp(r'\s+')).first;
 
-    return Container(
-      color: colorScheme.surface,
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return SkyHeader(
+      includeStatusBar: false,
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Selamat datang,',
-                  style: TextStyle(
-                    color: colorScheme.onSurfaceVariant,
-                    fontSize: 12,
-                  ),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const WordmarkPill(),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md,
+                  vertical: AppSpacing.sm,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  _displayName,
-                  style: TextStyle(
-                    color: colorScheme.onSurface,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                  ),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: AppRadius.pill,
+                  boxShadow: AppColors.shadowSoft,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  _displaySubtitle,
-                  style: TextStyle(
-                    color: colorScheme.onSurfaceVariant,
-                    fontSize: 12,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      PhosphorIconsRegular.mapPin,
+                      size: 16,
+                      color: AppColors.ribbonOrange,
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Text(
+                      'JTI Polinema',
+                      style: text.labelMedium?.copyWith(
+                        color: AppColors.gownNavy,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          Semantics(
+            header: true,
+            child: Text(
+              firstName.isEmpty ? 'Halo.' : 'Halo, $firstName.',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: text.headlineMedium?.copyWith(
+                color: AppColors.gownNavy,
+                fontSize: 28,
+              ),
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(height: AppSpacing.xs),
           Text(
-            timeStr,
-            style: TextStyle(
-              color: colorScheme.onSurface,
-              fontSize: 22,
-              fontWeight: FontWeight.w700,
-              letterSpacing: -0.5,
+            _displaySubtitle,
+            style: text.bodyMedium?.copyWith(
+              color: AppColors.gownNavy,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -373,7 +411,7 @@ class _ReminderBanner extends StatelessWidget {
       child: Row(
         children: [
           Icon(
-            Icons.notifications_active_outlined,
+            PhosphorIconsRegular.bellRinging,
             color: colorScheme.onTertiaryContainer,
             size: 20,
           ),
@@ -406,7 +444,7 @@ class _ReminderBanner extends StatelessWidget {
             tooltip: 'Uji alarm',
             onPressed: onTest,
             icon: Icon(
-              Icons.alarm_outlined,
+              PhosphorIconsRegular.alarm,
               color: colorScheme.onTertiaryContainer,
               size: 18,
             ),
@@ -417,7 +455,7 @@ class _ReminderBanner extends StatelessWidget {
           GestureDetector(
             onTap: onDismiss,
             child: Icon(
-              Icons.close,
+              PhosphorIconsRegular.x,
               color: colorScheme.onTertiaryContainer,
               size: 18,
             ),
@@ -445,7 +483,7 @@ class _QuickActions extends StatelessWidget {
       children: [
         Expanded(
           child: _ActionCard(
-            icon: Icons.videocam_outlined,
+            icon: PhosphorIconsRegular.videoCamera,
             label: 'Absensi',
             sublabel: 'Scan Wajah',
             backgroundColor: colorScheme.primary,
@@ -456,7 +494,7 @@ class _QuickActions extends StatelessWidget {
         const SizedBox(width: 10),
         Expanded(
           child: _ActionCard(
-            icon: Icons.description_outlined,
+            icon: PhosphorIconsRegular.fileText,
             label: 'Surat',
             sublabel: 'Izin / Sakit',
             backgroundColor: colorScheme.surface,
@@ -784,10 +822,8 @@ class _ScheduleSection extends StatelessWidget {
                     alarmToggles[ScheduleReminderService.idFor(schedule)] ??
                     false,
                 isLast: schedule == filteredSchedules.last,
-                onAlarmToggle: (val) => onAlarmToggle(
-                  ScheduleReminderService.idFor(schedule),
-                  val,
-                ),
+                onAlarmToggle: (val) =>
+                    onAlarmToggle(ScheduleReminderService.idFor(schedule), val),
               ),
         ],
       ),
@@ -847,7 +883,7 @@ class _ScheduleItem extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              Icons.access_time,
+                              PhosphorIconsRegular.clock,
                               size: 12,
                               color: colorScheme.onSurfaceVariant,
                             ),
@@ -865,7 +901,7 @@ class _ScheduleItem extends StatelessWidget {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(
-                              Icons.location_on_outlined,
+                              PhosphorIconsRegular.mapPin,
                               size: 12,
                               color: colorScheme.onSurfaceVariant,
                             ),
@@ -922,7 +958,7 @@ class _AlarmInfoBanner extends StatelessWidget {
       child: Row(
         children: [
           Icon(
-            Icons.info_outline,
+            PhosphorIconsRegular.info,
             size: 14,
             color: colorScheme.onSurfaceVariant,
           ),
