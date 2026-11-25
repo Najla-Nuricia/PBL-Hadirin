@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
-import '../../theme/style/navbar_style.dart';
+import '../../widgets/widgets.dart';
 
 const _lecturerNavbarItems = [
   (
-    icon: Icons.fact_check_outlined,
-    selectedIcon: Icons.fact_check,
+    icon: PhosphorIconsRegular.clipboardText,
+    selectedIcon: PhosphorIconsFill.clipboardText,
     label: 'Kehadiran',
     branchIndex: 1,
   ),
   (
-    icon: Icons.person_outline,
-    selectedIcon: Icons.person,
+    icon: PhosphorIconsRegular.userCircle,
+    selectedIcon: PhosphorIconsFill.userCircle,
     label: 'Profil',
     branchIndex: 2,
   ),
@@ -28,122 +29,57 @@ class LecturerNavigationShell extends StatelessWidget {
   final StatefulNavigationShell navigationShell;
   final bool showNavbar;
 
+  /// Cabang Beranda menampilkan layar yang sama dengan Kehadiran, jadi tab
+  /// Kehadiran yang ditandai saat cabang itu aktif.
+  int get _selectedIndex {
+    final index = _lecturerNavbarItems.indexWhere(
+      (item) => item.branchIndex == navigationShell.currentIndex,
+    );
+    return index < 0 ? 0 : index;
+  }
+
+  void _select(int index) {
+    final branchIndex = _lecturerNavbarItems[index].branchIndex;
+    navigationShell.goBranch(
+      branchIndex,
+      initialLocation: branchIndex == navigationShell.currentIndex,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final selectedIndex = _selectedIndex;
 
     return Scaffold(
-      backgroundColor: colorScheme.surfaceContainerHighest,
       body: navigationShell,
       bottomNavigationBar: showNavbar
-          ? _LecturerBottomNavigationBar(
-              currentIndex: navigationShell.currentIndex,
-              onTap: (index) {
-                navigationShell.goBranch(
-                  _lecturerNavbarItems[index].branchIndex,
-                  initialLocation:
-                      _lecturerNavbarItems[index].branchIndex ==
-                      navigationShell.currentIndex,
-                );
-              },
+          ? GlassDock(
+              child: NavigationBar(
+                selectedIndex: selectedIndex,
+                labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+                onDestinationSelected: _select,
+                destinations: [
+                  for (final (index, item) in _lecturerNavbarItems.indexed)
+                    // Appium memilih tab lewat accessibility id yang sama
+                    // persis dengan labelnya. Semantik bawaan menambahkan
+                    // urutan tab ke label, jadi diganti di sini.
+                    Semantics(
+                      container: true,
+                      button: true,
+                      selected: index == selectedIndex,
+                      label: item.label,
+                      onTap: () => _select(index),
+                      excludeSemantics: true,
+                      child: NavigationDestination(
+                        icon: Icon(item.icon),
+                        selectedIcon: Icon(item.selectedIcon),
+                        label: item.label,
+                      ),
+                    ),
+                ],
+              ),
             )
           : null,
-    );
-  }
-}
-
-class _LecturerBottomNavigationBar extends StatelessWidget {
-  const _LecturerBottomNavigationBar({
-    required this.currentIndex,
-    required this.onTap,
-  });
-
-  final int currentIndex;
-  final ValueChanged<int> onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.paddingOf(context).bottom;
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6),
-      child: Container(
-        decoration: BoxDecoration(
-          color: colorScheme.surface,
-          boxShadow: [
-            BoxShadow(
-              color: colorScheme.onSurface.withValues(alpha: 0.05),
-              blurRadius: 10,
-              offset: const Offset(0, -5),
-            ),
-          ],
-        ),
-        padding: EdgeInsets.only(bottom: bottomInset),
-        child: SizedBox(
-          height: NavbarStyle.navbarHeight,
-          child: Row(
-            children: [
-              for (var index = 0; index < _lecturerNavbarItems.length; index++)
-                Expanded(
-                  child: _LecturerNavbarItem(
-                    icon: _lecturerNavbarItems[index].icon,
-                    selectedIcon: _lecturerNavbarItems[index].selectedIcon,
-                    label: _lecturerNavbarItems[index].label,
-                    selected:
-                        currentIndex == _lecturerNavbarItems[index].branchIndex,
-                    onTap: () => onTap(index),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _LecturerNavbarItem extends StatelessWidget {
-  const _LecturerNavbarItem({
-    required this.icon,
-    required this.selectedIcon,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final IconData selectedIcon;
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final color = selected ? colorScheme.primary : colorScheme.onSurfaceVariant;
-
-    return InkWell(
-      onTap: onTap,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            selected ? selectedIcon : icon,
-            size: NavbarStyle.normalIconSize,
-            color: color,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontSize: NavbarStyle.textSize,
-              fontWeight: selected ? FontWeight.bold : FontWeight.w500,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

@@ -1,31 +1,123 @@
 // lib/pages/dosen/cek_presensi_page.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
+import '../../data/dosen/lecturer_providers.dart';
 import '../../data/dosen/presensi_options.dart';
+import '../../models/dosen/dosen_dashboard.dart';
+import '../../models/dosen/matkul_option.dart';
 import '../../routing/lecturer_route_paths.dart';
+import '../../theme/style/lecturer_style.dart';
+import '../../widgets/widgets.dart';
+import 'widgets/attendance_counts_card.dart';
+import 'widgets/content_constraint.dart';
+import 'widgets/load_state.dart';
+import 'widgets/section_card.dart';
 
 const _hari = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
 const _bulan = [
-  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+  'Januari',
+  'Februari',
+  'Maret',
+  'April',
+  'Mei',
+  'Juni',
+  'Juli',
+  'Agustus',
+  'September',
+  'Oktober',
+  'November',
+  'Desember',
 ];
-
 
 String _formatTanggal(DateTime d) =>
     '${_hari[d.weekday - 1]}, ${d.day} ${_bulan[d.month - 1]} ${d.year}';
 
-class CekPresensiPage extends StatefulWidget {
+class CekPresensiPage extends ConsumerStatefulWidget {
   const CekPresensiPage({super.key});
 
   @override
-  State<CekPresensiPage> createState() => _CekPresensiPageState();
+  ConsumerState<CekPresensiPage> createState() => _CekPresensiPageState();
 }
 
-class _CekPresensiPageState extends State<CekPresensiPage> {
+class _CekPresensiPageState extends ConsumerState<CekPresensiPage> {
   String _kelas = lecturerKelasOptions.first;
   String _mataKuliah = lecturerMataKuliahOptions.first;
   DateTime _tanggal = DateTime.now();
+  bool _tanggalDipilih = false;
+  MatkulOption? _selectedMatkul;
+
+  bool _isDemo(DosenDashboard? dashboard) =>
+      dashboard == null || dashboard.isDemo || dashboard.jadwal.isEmpty;
+
+  String _kelasId(DosenDashboard? dashboard) =>
+      _isDemo(dashboard) ? '' : (dashboard!.kelasIdFor(_kelas) ?? '');
+
+  List<MatkulOption> _apiOptions(DosenDashboard? dashboard) {
+    if (_isDemo(dashboard)) return const <MatkulOption>[];
+    return ref
+            .read(
+              dosenMatkulProvider((
+                kelasId: _kelasId(dashboard),
+                tanggal: _tanggal,
+              )),
+            )
+            .value ??
+        const <MatkulOption>[];
+  }
+
+  /// Opsi backend dipakai bila tersedia, opsi demo tetap menjadi fallback.
+  List<String> get _kelasOptions {
+    final backend =
+        ref.watch(dosenDashboardProvider).value?.kelasOptions ??
+        const <String>[];
+    return {...backend, _kelas}.toList();
+  }
+
+  /// Nama mata kuliah dari endpoint `/dosen/matkul`; fallback ke jadwal
+  /// dashboard saat endpoint belum merespons / mode demo.
+  List<String> _courseNames({
+    required DosenDashboard? dashboard,
+    required List<MatkulOption> apiOptions,
+  }) {
+    if (_isDemo(dashboard)) return lecturerMataKuliahOptions;
+    if (apiOptions.isNotEmpty) {
+      return apiOptions.map((m) => m.nama).where((n) => n.isNotEmpty).toList();
+    }
+    return dashboard!.mataKuliahOptionsFor(kelas: _kelas, tanggal: _tanggal);
+  }
+
+  List<String> _mataKuliahItems({
+    required DosenDashboard? dashboard,
+    required List<MatkulOption> apiOptions,
+  }) {
+    final names = _courseNames(dashboard: dashboard, apiOptions: apiOptions);
+    if (names.isEmpty) return [_mataKuliah];
+    return {_mataKuliah, ...names}.toList();
+  }
+
+  void _selectMatkul(String nama, List<MatkulOption> apiOptions) {
+    _mataKuliah = nama;
+    for (final option in apiOptions) {
+      if (option.nama == nama) {
+        _selectedMatkul = option;
+        return;
+      }
+    }
+    _selectedMatkul = null;
+  }
+
+  /// Reset pilihan saat kelas/tanggal berubah.
+  void _syncMataKuliah() {
+    final dashboard = ref.read(dosenDashboardProvider).value;
+    final apiOptions = _apiOptions(dashboard);
+    final names = _courseNames(dashboard: dashboard, apiOptions: apiOptions);
+    if (names.isNotEmpty && !names.contains(_mataKuliah)) {
+      setState(() => _selectMatkul(names.first, apiOptions));
+    }
+  }
 
   void _back() {
     if (context.canPop()) {
@@ -35,6 +127,12 @@ class _CekPresensiPageState extends State<CekPresensiPage> {
     }
   }
 
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
@@ -42,10 +140,54 @@ class _CekPresensiPageState extends State<CekPresensiPage> {
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
     );
-    if (picked != null) setState(() => _tanggal = picked);
+    if (picked != null) {
+      setState(() {
+        _tanggal = picked;
+        _tanggalDipilih = true;
+        _syncMataKuliah();
+      });
+    }
   }
 
   void _tampilkan() {
+    final dashboardAsync = ref.read(dosenDashboardProvider);
+    if (dashboardAsync.isLoading) {
+      _showMessage('Data jadwal masih dimuat.');
+      return;
+    }
+
+    final dashboard = dashboardAsync.value;
+    final apiOptions = _apiOptions(dashboard);
+    var selected = _selectedMatkul;
+    if (selected == null) {
+      for (final option in apiOptions) {
+        if (option.nama == _mataKuliah) {
+          selected = option;
+          break;
+        }
+      }
+    }
+    final jadwal = dashboard?.findJadwal(
+      kelas: _kelas,
+      mataKuliah: _mataKuliah,
+      tanggal: _tanggal,
+    );
+    if (!_isDemo(dashboard) && jadwal == null && selected == null) {
+      _showMessage('Jadwal untuk pilihan ini tidak ditemukan.');
+      return;
+    }
+
+    ref
+        .read(attendanceQueryProvider.notifier)
+        .select(
+          AttendanceQuery(
+            jadwalId: selected?.jadwalId ?? jadwal?.jadwalId ?? 'demo',
+            // Tanpa pilihan tanggal, backend memakai sesi terakhir jadwal.
+            tanggal: _tanggalDipilih ? _tanggal : null,
+          ),
+        );
+    ref.invalidate(attendanceSessionProvider);
+
     context.push(
       LecturerRoutePaths.daftarKehadiran,
       extra: PresensiFilter(
@@ -58,168 +200,256 @@ class _CekPresensiPageState extends State<CekPresensiPage> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final dashboardAsync = ref.watch(dosenDashboardProvider);
+    final dashboard = dashboardAsync.value;
+    final ringkasan = dashboard?.summary;
+    final kelasId = _kelasId(dashboard);
+    final matkulQuery = (kelasId: kelasId, tanggal: _tanggal);
+    final matkulAsync = ref.watch(dosenMatkulProvider(matkulQuery));
+
+    ref.listen(dosenMatkulProvider(matkulQuery), (previous, next) {
+      final items = next.value;
+      if (items == null || items.isEmpty || !mounted) return;
+      if (!items.any((m) => m.nama == _mataKuliah)) {
+        setState(() => _selectMatkul(items.first.nama, items));
+      } else {
+        _selectedMatkul = items.firstWhere((m) => m.nama == _mataKuliah);
+      }
+    });
+
+    final apiOptions = matkulAsync.value ?? const <MatkulOption>[];
+    final mataKuliahItems = _mataKuliahItems(
+      dashboard: dashboard,
+      apiOptions: apiOptions,
+    );
+    final tanggal = _formatTanggal(_tanggal);
 
     return Scaffold(
-      backgroundColor: cs.surfaceContainerHighest,
-      appBar: AppBar(
-        backgroundColor: cs.surface,
-        surfaceTintColor: Colors.transparent,
-        scrolledUnderElevation: 0,
-        centerTitle: true,
-        leadingWidth: 64,
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 16, top: 10, bottom: 10),
-          child: Material(
-            color: cs.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(10),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(10),
-              onTap: _back,
-              child: Icon(Icons.chevron_left_rounded,
-                  size: 24, color: cs.onSurface),
-            ),
-          ),
+      appBar: SkyAppBar(
+        leading: IconButton(
+          tooltip: 'Kembali',
+          onPressed: _back,
+          icon: const Icon(PhosphorIconsRegular.arrowLeft),
         ),
-        title: Text(
-          'Cek Daftar Presensi',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w700,
-            color: cs.onSurface,
-          ),
-        ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Divider(height: 1, thickness: 1, color: cs.outlineVariant),
-        ),
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const _Label('Kelas'),
-                  _SelectBox(
-                    icon: Icons.school_outlined,
-                    value: _kelas,
-                    items: lecturerKelasOptions,
-                    onChanged: (v) => setState(() => _kelas = v!),
-                  ),
-                  const SizedBox(height: 16),
-                  const _Label('Tanggal'),
-                  _DateBox(text: _formatTanggal(_tanggal), onTap: _pickDate),
-                  const SizedBox(height: 16),
-                  const _Label('Mata Kuliah'),
-                  _SelectBox(
-                    icon: Icons.calendar_today_outlined,
-                    value: _mataKuliah,
-                    items: lecturerMataKuliahOptions,
-                    onChanged: (v) => setState(() => _mataKuliah = v!),
-                  ),
-                  const SizedBox(height: 20),
-                  _SummaryCard(
-                    kelas: _kelas,
-                    tanggal: _formatTanggal(_tanggal),
-                    mataKuliah: _mataKuliah,
-                  ),
-                ],
-              ),
-            ),
-          ),
+        title: const WordmarkPill(),
+        actions: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-            child: SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: FilledButton(
-                onPressed: _tampilkan,
-                style: FilledButton.styleFrom(
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                  textStyle: const TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.w700),
+            padding: const EdgeInsets.only(right: AppSpacing.lg),
+            child: IconButton(
+              tooltip: 'Buka profil dosen',
+              onPressed: () => context.go(LecturerRoutePaths.profil),
+              icon: Container(
+                padding: const EdgeInsets.all(2.5),
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  shape: BoxShape.circle,
+                  boxShadow: AppColors.shadowSoft,
                 ),
-                child: const Text('Tampilkan Data'),
+                child: const CircleAvatar(
+                  radius: 16,
+                  backgroundColor: AppColors.brand50,
+                  foregroundColor: AppColors.brand700,
+                  child: Icon(PhosphorIconsRegular.userCircle, size: 20),
+                ),
               ),
             ),
           ),
         ],
       ),
+      body: AuroraBackground(
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: LecturerStyle.pageInsets,
+            child: ContentConstraint(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const AppPageHeading(
+                    title: 'Cek Daftar Presensi',
+                    description: 'Pilih sesi untuk melihat kehadiran mahasiswa.',
+                  ),
+                  SectionCard(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final classField = _Field(
+                              label: 'Kelas',
+                              child: _SelectBox(
+                                value: _kelas,
+                                items: _kelasOptions,
+                                onChanged: (v) => setState(() {
+                                  _kelas = v!;
+                                  _selectedMatkul = null;
+                                  _syncMataKuliah();
+                                }),
+                              ),
+                            );
+                            final dateField = _Field(
+                              label: 'Tanggal',
+                              child: _DateBox(text: tanggal, onTap: _pickDate),
+                            );
+                            if (constraints.maxWidth < 308 ||
+                                MediaQuery.textScalerOf(context).scale(14) >
+                                    18) {
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  classField,
+                                  const SizedBox(height: AppSpacing.md),
+                                  dateField,
+                                ],
+                              );
+                            }
+                            return Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Expanded(flex: 2, child: classField),
+                                const SizedBox(width: AppSpacing.md),
+                                Expanded(flex: 3, child: dateField),
+                              ],
+                            );
+                          },
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        _Field(
+                          label: 'Mata Kuliah',
+                          child: _SelectBox(
+                            value: _mataKuliah,
+                            items: mataKuliahItems,
+                            onChanged: (v) => setState(() {
+                              _selectMatkul(v!, apiOptions);
+                            }),
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.lg),
+                        AppGradientButton(
+                          onPressed: _tampilkan,
+                          label: 'Tampilkan Data',
+                          icon: PhosphorIconsRegular.listMagnifyingGlass,
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  const AppSectionHeader(title: 'Ringkasan Pilihan'),
+                  _SelectionCard(
+                    kelas: _kelas,
+                    tanggal: tanggal,
+                    mataKuliah: _mataKuliah,
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  if (ringkasan != null)
+                    AttendanceCountsCard(summary: ringkasan)
+                  else if (dashboardAsync.showsError)
+                    AppErrorState(
+                      title: 'Ringkasan kehadiran belum bisa dimuat',
+                      message: lecturerErrorMessage(dashboardAsync.error!),
+                      onRetry: () => ref.invalidate(dosenDashboardProvider),
+                    )
+                  else
+                    const _CountsSkeleton(),
+                  if (dashboard?.isDemo ?? false) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    const AppBanner(
+                      tone: StatusTone.neutral,
+                      message:
+                          'Belum ada data jadwal dari server. Menampilkan data '
+                          'contoh.',
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
 
-class _Label extends StatelessWidget {
-  const _Label(this.text);
-  final String text;
+class _Field extends StatelessWidget {
+  const _Field({required this.label, required this.child});
+
+  final String label;
+  final Widget child;
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Text(text,
-          style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              color: cs.onSurface.withValues(alpha: 0.75))),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(label, style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: LecturerStyle.fieldLabelGap),
+        child,
+      ],
     );
   }
 }
 
-BoxDecoration _boxDecoration(ColorScheme cs) => BoxDecoration(
-      color: cs.surface,
-      borderRadius: BorderRadius.circular(14),
-      border: Border.all(color: cs.outlineVariant),
-      boxShadow: const [
-        BoxShadow(
-            color: Color(0x0D000000), blurRadius: 6, offset: Offset(0, 2)),
-      ],
+/// Kotak bergaris setinggi kolom isian tema, untuk pilihan yang bukan
+/// kolom teks.
+class _FieldBox extends StatelessWidget {
+  const _FieldBox({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Material(
+      color: scheme.surface,
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: AppRadius.control,
+        side: BorderSide(color: scheme.outline),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: AppSizes.control),
+        child: child,
+      ),
     );
+  }
+}
 
 class _SelectBox extends StatelessWidget {
   const _SelectBox({
-    required this.icon,
     required this.value,
     required this.items,
     required this.onChanged,
   });
 
-  final IconData icon;
   final String value;
   final List<String> items;
   final ValueChanged<String?> onChanged;
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: _boxDecoration(cs),
+    return _FieldBox(
       child: DropdownButtonHideUnderline(
         child: DropdownButton<String>(
           value: value,
           isExpanded: true,
-          icon: Icon(Icons.keyboard_arrow_down_rounded,
-              color: cs.onSurfaceVariant),
-          borderRadius: BorderRadius.circular(12),
-          dropdownColor: cs.surface,
-          style: TextStyle(
-              fontSize: 14, fontWeight: FontWeight.w500, color: cs.onSurface),
+          // Tinggi mengikuti isi supaya nama panjang dan teks besar muat.
+          itemHeight: null,
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+          icon: const Icon(
+            PhosphorIconsRegular.caretDown,
+            color: AppColors.inkFaint,
+          ),
+          iconSize: 20,
+          borderRadius: AppRadius.control,
+          style: Theme.of(context).textTheme.bodyLarge,
           selectedItemBuilder: (_) => [
-            for (final i in items)
-              Row(children: [
-                Icon(icon, size: 18, color: cs.primary),
-                const SizedBox(width: 12),
-                Text(i),
-              ]),
+            for (final item in items)
+              Text(item, maxLines: 1, overflow: TextOverflow.ellipsis),
           ],
           items: [
-            for (final i in items) DropdownMenuItem(value: i, child: Text(i)),
+            for (final item in items)
+              DropdownMenuItem(value: item, child: Text(item)),
           ],
           onChanged: onChanged,
         ),
@@ -230,91 +460,97 @@ class _SelectBox extends StatelessWidget {
 
 class _DateBox extends StatelessWidget {
   const _DateBox({required this.text, required this.onTap});
+
   final String text;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        height: 48,
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        decoration: _boxDecoration(cs),
-        child: Row(
-          children: [
-            Icon(Icons.calendar_today_outlined, size: 18, color: cs.primary),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(text,
-                  style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: cs.onSurface)),
-            ),
-            Icon(Icons.keyboard_arrow_down_rounded,
-                color: cs.onSurfaceVariant),
-          ],
+    return _FieldBox(
+      // Appium mencari kotak ini lewat teks tanggalnya, jadi isi InkWell
+      // hanya teks tanggal dan ikon tanpa label semantik.
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.lg,
+            vertical: AppSpacing.sm,
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  text,
+                  style: Theme.of(context).textTheme.bodyMedium?.tabular,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              const Icon(
+                PhosphorIconsRegular.calendarBlank,
+                size: 20,
+                color: AppColors.inkFaint,
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({
+class _SelectionCard extends StatelessWidget {
+  const _SelectionCard({
     required this.kelas,
     required this.tanggal,
     required this.mataKuliah,
   });
-  final String kelas, tanggal, mataKuliah;
+
+  final String kelas;
+  final String tanggal;
+  final String mataKuliah;
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
-    Widget row(String k, String v) => Padding(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          child: Row(
-            children: [
-              Text(k,
-                  style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Text(v,
-                    textAlign: TextAlign.right,
-                    style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: cs.onSurface)),
-              ),
-            ],
-          ),
-        );
-
-    final divider = Divider(height: 1, thickness: 1, color: cs.outlineVariant);
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
-      decoration: _boxDecoration(cs),
+    return SectionCard(
+      padding: LecturerStyle.detailCardInsets,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Ringkasan Pilihan',
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: cs.onSurface)),
-          const SizedBox(height: 6),
-          row('Kelas', kelas),
-          divider,
-          row('Tanggal', tanggal),
-          divider,
-          row('Mata Kuliah', mataKuliah),
+          AppKeyValueRow(label: 'Kelas', value: kelas),
+          const Divider(),
+          AppKeyValueRow(
+            label: 'Tanggal',
+            trailing: Text(
+              tanggal,
+              textAlign: TextAlign.right,
+              style: Theme.of(context).textTheme.titleSmall?.tabular,
+            ),
+          ),
+          const Divider(),
+          AppKeyValueRow(label: 'Mata Kuliah', value: mataKuliah),
         ],
+      ),
+    );
+  }
+}
+
+class _CountsSkeleton extends StatelessWidget {
+  const _CountsSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      label: 'Memuat ringkasan kehadiran',
+      child: const SectionCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AppSkeleton(width: 160, height: 16),
+            SizedBox(height: AppSpacing.lg),
+            AppSkeleton(height: 10),
+            SizedBox(height: AppSpacing.md),
+            AppSkeleton(width: 220, height: 12),
+          ],
+        ),
       ),
     );
   }

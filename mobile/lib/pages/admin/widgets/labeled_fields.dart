@@ -1,56 +1,109 @@
-// lib/pages/admin/widgets/labeled_fields.dart
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:flutter/services.dart';
 
-InputDecoration _decoration(BuildContext context, {String? hint}) {
-  final cs = Theme.of(context).colorScheme;
+import '../../../widgets/widgets.dart';
 
-  OutlineInputBorder border(Color c) => OutlineInputBorder(
-    borderRadius: BorderRadius.circular(12),
-    borderSide: BorderSide(color: c),
-  );
+/// Label di atas kolom isian; tanda bintang menandai isian wajib.
+class AdminFieldLabel extends StatelessWidget {
+  const AdminFieldLabel({
+    required this.label,
+    this.required = false,
+    super.key,
+  });
 
-  return InputDecoration(
-    hintText: hint,
-    filled: true,
-    fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.6),
-    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-    border: border(cs.outline),
-    enabledBorder: border(cs.outline),
-    focusedBorder: border(cs.primary),
-    errorBorder: border(cs.error),
-    focusedErrorBorder: border(cs.error),
-    hintStyle: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
-  );
-}
-
-class _FieldLabel extends StatelessWidget {
-  const _FieldLabel(this.label, this.required);
   final String label;
   final bool required;
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 6),
       child: Text.rich(
         TextSpan(
           text: label,
-          style: TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: cs.onSurface,
-          ),
           children: [
             if (required)
               TextSpan(
                 text: ' *',
-                style: TextStyle(color: cs.error),
+                style: TextStyle(color: theme.colorScheme.error),
               ),
           ],
         ),
+        semanticsLabel: required ? '$label, wajib diisi' : null,
+        style: theme.textTheme.titleSmall,
       ),
+    );
+  }
+}
+
+/// Label di atas satu kolom isian.
+class AdminLabeledField extends StatelessWidget {
+  const AdminLabeledField({
+    required this.label,
+    required this.child,
+    this.required = false,
+    super.key,
+  });
+
+  final String label;
+  final bool required;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        AdminFieldLabel(label: label, required: required),
+        child,
+      ],
+    );
+  }
+}
+
+/// Dua kolom isian berdampingan. Keduanya ditumpuk bila layar sempit atau
+/// teks sistem diperbesar, supaya isinya tidak terpotong.
+class AdminFieldPair extends StatelessWidget {
+  const AdminFieldPair({
+    required this.first,
+    required this.second,
+    this.minColumnWidth = 132,
+    super.key,
+  });
+
+  final Widget first;
+  final Widget second;
+
+  /// Lebar terkecil satu kolom pada ukuran teks normal.
+  final double minColumnWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final textScale = MediaQuery.textScalerOf(context).scale(1);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columnWidth = (constraints.maxWidth - AppSpacing.md) / 2;
+        final stacked = columnWidth < minColumnWidth * textScale;
+
+        // Jenis anak tetap sama di kedua susunan agar isian yang sudah
+        // dipilih tidak hilang saat layar diputar.
+        return Flex(
+          direction: stacked ? Axis.vertical : Axis.horizontal,
+          crossAxisAlignment: stacked
+              ? CrossAxisAlignment.stretch
+              : CrossAxisAlignment.start,
+          spacing: stacked ? AppSpacing.lg : AppSpacing.md,
+          children: [
+            Flexible(flex: stacked ? 0 : 1, fit: FlexFit.tight, child: first),
+            Flexible(flex: stacked ? 0 : 1, fit: FlexFit.tight, child: second),
+          ],
+        );
+      },
     );
   }
 }
@@ -75,30 +128,30 @@ class LabeledDropdown extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _FieldLabel(label, required),
-        DropdownButtonFormField<String>(
-          initialValue: value,
-          isExpanded: true,
-          icon: Icon(
-            Icons.keyboard_arrow_down_rounded,
-            color: cs.onSurfaceVariant,
-          ),
-          borderRadius: BorderRadius.circular(12),
-          style: TextStyle(fontSize: 13, color: cs.onSurface),
-          decoration: _decoration(context),
-          items: [
-            for (final i in items)
-              DropdownMenuItem(value: i, child: Text(itemLabels?[i] ?? i)),
-          ],
-          onChanged: (v) {
-            if (v != null) onChanged(v);
-          },
-        ),
-      ],
+    return AdminLabeledField(
+      label: label,
+      required: required,
+      child: DropdownButtonFormField<String>(
+        initialValue: value,
+        isExpanded: true,
+        icon: const Icon(PhosphorIconsRegular.caretDown, color: AppColors.inkFaint),
+        borderRadius: AppRadius.control,
+        style: Theme.of(context).textTheme.bodyLarge,
+        items: [
+          for (final item in items)
+            DropdownMenuItem(
+              value: item,
+              child: Text(
+                itemLabels?[item] ?? item,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+        ],
+        onChanged: (value) {
+          if (value != null) onChanged(value);
+        },
+      ),
     );
   }
 }
@@ -123,30 +176,19 @@ class LabeledTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _FieldLabel(label, required),
-        TextFormField(
-          controller: controller,
-          style: TextStyle(fontSize: 13, color: cs.onSurface),
-          keyboardType: numeric ? TextInputType.number : TextInputType.text,
-          inputFormatters: numeric
-              ? [FilteringTextInputFormatter.digitsOnly]
-              : null,
-          decoration: _decoration(context, hint: hint),
-          validator: validator,
-        ),
-        if (helper != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Text(
-              helper!,
-              style: TextStyle(fontSize: 10, color: cs.onSurfaceVariant),
-            ),
-          ),
-      ],
+    return AdminLabeledField(
+      label: label,
+      required: required,
+      child: TextFormField(
+        controller: controller,
+        style: numeric ? Theme.of(context).textTheme.bodyLarge?.tabular : null,
+        keyboardType: numeric ? TextInputType.number : TextInputType.text,
+        inputFormatters: numeric
+            ? [FilteringTextInputFormatter.digitsOnly]
+            : null,
+        decoration: InputDecoration(hintText: hint, helperText: helper),
+        validator: validator,
+      ),
     );
   }
 }

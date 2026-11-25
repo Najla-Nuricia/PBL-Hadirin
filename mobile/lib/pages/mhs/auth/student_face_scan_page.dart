@@ -1,44 +1,29 @@
 import 'dart:math' as math;
-import 'dart:typed_data';
 
-import 'package:camera/camera.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../data/mhs/dummy_student_auth_repository.dart';
 import '../../../data/mhs/student_account.dart';
+import '../../../features/face_scan/face_guidance.dart';
+import '../../../features/face_scan/face_scan_controller.dart';
+import '../../../features/face_scan/face_scan_stage.dart';
 import '../../../routing/student_route_paths.dart';
-import '../../../theme/style/auth_style.dart';
-import 'widgets/auth_buttons.dart';
-import 'widgets/auth_header.dart';
-import 'widgets/auth_info_banner.dart';
-import 'widgets/auth_scaffold.dart';
+import '../../../widgets/widgets.dart';
 
-const _faceDirections = [
-  'Hadap lurus ke depan',
-  'Hadap ke kiri',
-  'Hadap ke kanan',
-  'Dongakkan sedikit ke atas',
-  'Tundukkan sedikit ke bawah',
+const _poses = [
+  (FacePoseKind.front, 'Hadap lurus ke depan'),
+  (FacePoseKind.turnFirst, 'Hadap ke kiri'),
+  (FacePoseKind.turnSecond, 'Hadap ke kanan'),
+  (FacePoseKind.pitchFirst, 'Dongakkan sedikit ke atas'),
+  (FacePoseKind.pitchSecond, 'Tundukkan sedikit ke bawah'),
 ];
 
-const _cameraPermissionErrorCodes = {
-  'CameraAccessDenied',
-  'CameraAccessDeniedWithoutPrompt',
-  'CameraAccessRestricted',
-  'permissionDenied',
-  'NotAllowedError',
-};
-
-enum _CameraStatus {
-  initializing,
-  ready,
-  permissionDenied,
-  unavailable,
-  failed,
-}
-
+/// Langkah kedua registrasi: lima foto wajah dari arah berbeda. Foto diambil
+/// otomatis saat pose pas, atau manual lewat tombol.
 class StudentFaceScanPage extends StatefulWidget {
   const StudentFaceScanPage({required this.draft, super.key});
 
@@ -48,173 +33,68 @@ class StudentFaceScanPage extends StatefulWidget {
   State<StudentFaceScanPage> createState() => _StudentFaceScanPageState();
 }
 
-class _StudentFaceScanPageState extends State<StudentFaceScanPage>
-    with WidgetsBindingObserver {
-  CameraController? _controller;
-  _CameraStatus _cameraStatus = _CameraStatus.initializing;
-  bool _isInitializingCamera = false;
-  bool _isCapturing = false;
+class _StudentFaceScanPageState extends State<StudentFaceScanPage> {
+  late final FaceScanController _scan = FaceScanController(
+    onAutoCapture: _addCapture,
+  );
+
   bool _isSubmitting = false;
-  final List<XFile> _capturedPhotos = [];
+  final List<String> _photoPaths = [];
   final List<Uint8List> _capturedBytes = [];
   final List<String> _capturedNames = [];
 
-  bool get _isScanComplete => _capturedBytes.length >= _faceDirections.length;
+  bool get _isScanComplete => _capturedBytes.length >= _poses.length;
 
   bool get _canCapture =>
-      _cameraStatus == _CameraStatus.ready &&
-      _controller != null &&
-      !_isCapturing &&
-      !_isSubmitting &&
-      !_isScanComplete;
+      _scan.canCapture && !_isSubmitting && !_isScanComplete;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _initializeCamera();
+    _scan.start();
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _controller?.dispose();
+    _scan.dispose();
     super.dispose();
   }
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.inactive) {
-      final controller = _controller;
-      if (controller == null) return;
-      setState(() {
-        _controller = null;
-        _cameraStatus = _CameraStatus.initializing;
-      });
-      controller.dispose();
-    } else if (state == AppLifecycleState.resumed && _controller == null) {
-      _initializeCamera();
+  void _addCapture(CapturedFace face) {
+    if (!mounted) return;
+    setState(() {
+      final path = face.path;
+      if (path != null) _photoPaths.add(path);
+      _capturedBytes.add(face.bytes);
+      _capturedNames.add(face.name);
+    });
+    HapticFeedback.selectionClick();
+    if (_isScanComplete) {
+      _completeRegistration();
+    } else {
+      _scan.setPose(_poses[_capturedBytes.length].$1);
+      _scan.resume();
     }
-  }
-
-  Future<void> _initializeCamera() async {
-    if (_isInitializingCamera) return;
-    _isInitializingCamera = true;
-    setState(() => _cameraStatus = _CameraStatus.initializing);
-
-    CameraController? controller;
-    try {
-      final cameras = await availableCameras();
-      if (cameras.isEmpty) {
-        _setCameraStatus(_CameraStatus.unavailable);
-        return;
-      }
-
-      final preferred = cameras
-          .where((c) => c.lensDirection == CameraLensDirection.front)
-          .toList();
-      final candidates = [
-        ...preferred,
-        ...cameras.where((c) => !preferred.contains(c)),
-      ];
-
-      CameraException? lastCameraError;
-      for (final candidate in candidates) {
-        CameraController? candidateController;
-        try {
-          candidateController = CameraController(
-            candidate,
-            ResolutionPreset.medium,
-            enableAudio: false,
-          );
-          await candidateController.initialize();
-          if (!mounted) {
-            await candidateController.dispose();
-            return;
-          }
-          controller = candidateController;
-          setState(() {
-            _controller = candidateController;
-            _cameraStatus = _CameraStatus.ready;
-          });
-          return;
-        } on CameraException catch (e) {
-          lastCameraError = e;
-          await candidateController?.dispose();
-        }
-      }
-
-      if (lastCameraError != null) {
-        throw lastCameraError;
-      }
-    } on CameraException catch (error) {
-      await controller?.dispose();
-      debugPrint('Camera initialization failed: ${error.code}');
-      _setCameraStatus(
-        _cameraPermissionErrorCodes.contains(error.code)
-            ? _CameraStatus.permissionDenied
-            : (error.code == 'cameraNotFound'
-                ? _CameraStatus.unavailable
-                : _CameraStatus.failed),
-      );
-    } catch (error) {
-      // Platforms without a camera implementation (e.g. desktop) throw
-      // plugin errors instead of CameraException.
-      await controller?.dispose();
-      debugPrint('Camera unavailable: $error');
-      _setCameraStatus(_CameraStatus.unavailable);
-    } finally {
-      _isInitializingCamera = false;
-    }
-  }
-
-  void _setCameraStatus(_CameraStatus status) {
-    if (mounted) setState(() => _cameraStatus = status);
   }
 
   Future<void> _capturePhoto() async {
-    final controller = _controller;
-    if (!_canCapture ||
-        controller == null ||
-        controller.value.isTakingPicture) {
+    if (!_canCapture) return;
+    final face = await _scan.capture();
+    if (!mounted) return;
+    if (face == null) {
+      await _scan.resume();
+      _showMessage('Gagal mengambil foto. Coba lagi.');
       return;
     }
-
-    setState(() => _isCapturing = true);
-    XFile? photo;
-    Uint8List? bytes;
-    try {
-      photo = await controller.takePicture();
-      bytes = await photo.readAsBytes();
-    } catch (error) {
-      debugPrint('Taking face photo failed: $error');
-    }
-    if (!mounted) return;
-
-    setState(() {
-      _isCapturing = false;
-      if (photo != null && bytes != null && bytes.isNotEmpty) {
-        _capturedPhotos.add(photo);
-        _capturedBytes.add(bytes);
-        _capturedNames.add(photo.name);
-      }
-    });
-
-    if (photo == null || bytes == null || bytes.isEmpty) {
-      _showMessage('Gagal mengambil foto. Coba lagi.');
-    } else if (_isScanComplete) {
-      await _completeRegistration();
-    }
+    _addCapture(face);
   }
 
   Future<void> _pickPhotosFromFiles() async {
-    if (_isCapturing || _isSubmitting) return;
-    final remaining = _faceDirections.length - _capturedBytes.length;
+    if (_scan.isCapturing || _isSubmitting) return;
+    final remaining = _poses.length - _capturedBytes.length;
     if (remaining <= 0) return;
 
-    final result = await FilePicker.pickFiles(
-      type: FileType.image,
-    );
+    final result = await FilePicker.pickFiles(type: FileType.image);
     if (!mounted || result.isEmpty) return;
 
     final addedBytes = <Uint8List>[];
@@ -236,21 +116,23 @@ class _StudentFaceScanPageState extends State<StudentFaceScanPage>
       _capturedBytes.addAll(addedBytes);
       _capturedNames.addAll(addedNames);
     });
-
-    if (_isScanComplete) {
-      await _completeRegistration();
-    }
+    if (_isScanComplete) await _completeRegistration();
   }
 
   Future<void> _completeRegistration() async {
     setState(() => _isSubmitting = true);
+    _scan.setOverride(
+      FaceScanOverride.busy,
+      title: 'Menyimpan data registrasi…',
+      hint: 'Sebentar, ya.',
+    );
     final messenger = ScaffoldMessenger.of(context);
 
     try {
       await studentAuthRepository.register(
         widget.draft,
-        facePhotoPaths: _capturedPhotos.isNotEmpty
-            ? [for (final photo in _capturedPhotos) photo.path]
+        facePhotoPaths: _photoPaths.isNotEmpty
+            ? List<String>.unmodifiable(_photoPaths)
             : List<String>.unmodifiable(_capturedNames),
         facePhotoBytes: _capturedBytes.isNotEmpty
             ? List<Uint8List>.unmodifiable(_capturedBytes)
@@ -261,10 +143,16 @@ class _StudentFaceScanPageState extends State<StudentFaceScanPage>
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
-            content: Text('Registrasi berhasil. Silakan login dengan NIM kamu.'),
+            content: Text(
+              'Registrasi berhasil. Silakan login dengan NIM kamu.',
+            ),
           ),
         );
       context.go(StudentRoutePaths.login);
+    } on NimNotWhitelistedException {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      _showMessage('NIM belum terdaftar dalam whitelist admin.');
     } on NimAlreadyRegisteredException {
       if (!mounted) return;
       messenger
@@ -279,26 +167,27 @@ class _StudentFaceScanPageState extends State<StudentFaceScanPage>
       context.go(StudentRoutePaths.login);
     } on RemoteApiException catch (error) {
       if (!mounted) return;
-      setState(() {
-        _isSubmitting = false;
-        _capturedPhotos.clear();
-        _capturedBytes.clear();
-        _capturedNames.clear();
-      });
+      // Server menolak fotonya; scan diulang dari awal.
+      setState(() => _isSubmitting = false);
+      _restartScan();
       _showMessage(error.message);
     } catch (_) {
       if (!mounted) return;
+      // Foto tetap tersimpan supaya bisa dikirim ulang tanpa memindai lagi.
       setState(() => _isSubmitting = false);
+      _scan.setOverride(FaceScanOverride.none);
       _showMessage('Registrasi gagal. Periksa koneksi server dan coba lagi.');
     }
   }
 
   void _restartScan() {
     setState(() {
-      _capturedPhotos.clear();
+      _photoPaths.clear();
       _capturedBytes.clear();
       _capturedNames.clear();
     });
+    _scan.setPose(_poses.first.$1);
+    _scan.resume(clearPoseMemory: true);
   }
 
   void _goBack() {
@@ -318,278 +207,166 @@ class _StudentFaceScanPageState extends State<StudentFaceScanPage>
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final capturedCount = _capturedBytes.length;
-    final totalDirections = _faceDirections.length;
-    final currentDirection = _isScanComplete
-        ? 'Scan wajah selesai'
-        : _faceDirections[capturedCount];
+    final text = Theme.of(context).textTheme;
+    final count = _capturedBytes.length;
+    final total = _poses.length;
 
-    return AuthScaffold(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          AuthHeader(
-            title: 'Registrasi Mahasiswa',
-            subtitle: 'Scan wajah',
-            activeSteps: 2,
-            onBack: _goBack,
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
-                AuthStyle.contentHorizontalPadding,
-                24,
-                AuthStyle.contentHorizontalPadding,
-                32,
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+    return PopScope(
+      canPop: !_isSubmitting,
+      child: Scaffold(
+        backgroundColor: AppColors.scrim,
+        body: Column(
+          children: [
+            Expanded(
+              child: Stack(
                 children: [
-                  Center(
-                    child: _CameraFrame(
-                      status: _cameraStatus,
-                      controller: _controller,
-                      onRetry: _initializeCamera,
-                      onPickFiles: _cameraStatus != _CameraStatus.initializing
-                          ? _pickPhotosFromFiles
-                          : null,
+                  Positioned.fill(
+                    child: FaceScanStage(
+                      controller: _scan,
+                      title: _isScanComplete
+                          ? 'Scan wajah selesai'
+                          : _poses[count].$2,
+                      hint: 'Foto ${math.min(count + 1, total)} dari $total',
+                      segments: total,
+                      completedSegments: count,
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    currentDirection,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: colorScheme.onSurface,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _isSubmitting
-                        ? 'Menyimpan data registrasi...'
-                        : 'Foto ${math.min(capturedCount + 1, totalDirections)} '
-                              'dari $totalDirections',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: colorScheme.onSurfaceVariant,
-                      fontSize: AuthStyle.captionSize,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  const AuthInfoBanner(
-                    message:
-                        'Arahkan kamera ke wajah dengan pencahayaan yang cukup',
-                  ),
-                  const SizedBox(height: 16),
-                  AuthPrimaryButton(
-                    label: 'Ambil Foto',
-                    onPressed: _canCapture ? _capturePhoto : null,
-                    isLoading: _isCapturing || _isSubmitting,
-                  ),
-                  if (capturedCount > 0 && !_isSubmitting) ...[
-                    const SizedBox(height: 8),
-                    if (!_isScanComplete)
-                      OutlinedButton(
-                        onPressed: _isCapturing ? null : _completeRegistration,
-                        child: Text('Kirim $capturedCount Foto & Daftar'),
+                  SafeArea(
+                    bottom: false,
+                    child: SizedBox(
+                      height: FaceScanStage.topBarHeight,
+                      child: Row(
+                        children: [
+                          const SizedBox(width: AppSpacing.xs),
+                          IconButton(
+                            onPressed: _isSubmitting ? null : _goBack,
+                            tooltip: 'Kembali',
+                            icon: const Icon(PhosphorIconsRegular.arrowLeft),
+                            style: _scrimIconStyle,
+                          ),
+                          Expanded(
+                            child: Text(
+                              'Scan wajah',
+                              textAlign: TextAlign.center,
+                              style: text.titleSmall?.copyWith(
+                                color: AppColors.onScrimMuted,
+                              ),
+                            ),
+                          ),
+                          ListenableBuilder(
+                            listenable: _scan,
+                            builder: (context, _) =>
+                                _scan.canSwitchLens && !_isSubmitting
+                                ? IconButton(
+                                    onPressed: _scan.switchLens,
+                                    tooltip: 'Ganti kamera',
+                                    icon: const Icon(
+                                      PhosphorIconsRegular.cameraRotate,
+                                    ),
+                                    style: _scrimIconStyle,
+                                  )
+                                : const SizedBox(width: AppSizes.touch),
+                          ),
+                          const SizedBox(width: AppSpacing.xs),
+                        ],
                       ),
-                    TextButton(
-                      onPressed: _isCapturing ? null : _restartScan,
-                      child: const Text('Ulangi Scan'),
                     ),
-                  ],
+                  ),
                 ],
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CameraFrame extends StatelessWidget {
-  const _CameraFrame({
-    required this.status,
-    required this.controller,
-    required this.onRetry,
-    this.onPickFiles,
-  });
-
-  final _CameraStatus status;
-  final CameraController? controller;
-  final VoidCallback onRetry;
-  final VoidCallback? onPickFiles;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final readyController = status == _CameraStatus.ready ? controller : null;
-
-    return ConstrainedBox(
-      constraints: const BoxConstraints(
-        maxWidth: AuthStyle.cameraFrameMaxWidth,
-      ),
-      child: AspectRatio(
-        aspectRatio: AuthStyle.cameraFrameAspectRatio,
-        child: Container(
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            color: colorScheme.outline,
-            borderRadius: BorderRadius.circular(AuthStyle.cameraFrameRadius),
-            border: Border.all(
-              color: colorScheme.onSurface.withValues(alpha: 0.1),
-            ),
-          ),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              if (readyController != null)
-                FittedBox(
-                  fit: BoxFit.cover,
-                  clipBehavior: Clip.hardEdge,
-                  child: SizedBox(
-                    width: 100,
-                    height: 100 * readyController.value.aspectRatio,
-                    child: CameraPreview(readyController),
-                  ),
-                ),
-              CustomPaint(
-                painter: _FaceFrameCornersPainter(
-                  color: readyController != null
-                      ? colorScheme.surface
-                      : colorScheme.onSurfaceVariant,
-                ),
-              ),
-              if (readyController == null)
-                Center(child: _buildStatusContent(colorScheme)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatusContent(ColorScheme colorScheme) {
-    if (status == _CameraStatus.initializing) {
-      return Container(
-        width: 125,
-        height: 125,
-        decoration: BoxDecoration(
-          color: colorScheme.onSurfaceVariant.withValues(alpha: 0.25),
-          borderRadius: BorderRadius.circular(AuthStyle.cameraFrameRadius),
-          border: Border.all(color: colorScheme.onSurfaceVariant),
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.person, size: 24, color: colorScheme.primary),
-            const SizedBox(height: 6),
-            Text(
-              'Membuka kamera...',
-              style: TextStyle(
-                color: colorScheme.onSurface,
-                fontSize: AuthStyle.captionSize,
-                fontWeight: FontWeight.w300,
+            SafeArea(
+              top: false,
+              child: ListenableBuilder(
+                listenable: _scan,
+                builder: (context, _) => _buildControls(text, count),
               ),
             ),
           ],
         ),
-      );
-    }
+      ),
+    );
+  }
 
-    final (icon, message) = switch (status) {
-      _CameraStatus.permissionDenied => (
-        Icons.no_photography_outlined,
-        'Izin kamera ditolak. Aktifkan izin kamera di pengaturan, '
-            'lalu coba lagi.',
-      ),
-      _CameraStatus.unavailable => (
-        Icons.videocam_off_outlined,
-        'Kamera tidak tersedia di perangkat ini.',
-      ),
-      _ => (Icons.error_outline, 'Kamera gagal dibuka.'),
-    };
+  static final _scrimIconStyle = IconButton.styleFrom(
+    foregroundColor: Colors.white,
+    disabledForegroundColor: Colors.white.withValues(alpha: 0.4),
+    backgroundColor: AppColors.scrim.withValues(alpha: 0.45),
+  );
+
+  Widget _buildControls(TextTheme text, int count) {
+    final status = _scan.status;
+    final cameraProblem =
+        status != FaceCameraStatus.ready &&
+        status != FaceCameraStatus.initializing;
+    final onScrimOutline = OutlinedButton.styleFrom(
+      foregroundColor: Colors.white,
+      side: BorderSide(color: Colors.white.withValues(alpha: 0.5)),
+    );
 
     return Padding(
-      padding: const EdgeInsets.all(32),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.page,
+        AppSpacing.md,
+        AppSpacing.page,
+        AppSpacing.lg,
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Icon(icon, size: 32, color: colorScheme.onSurfaceVariant),
-          const SizedBox(height: 8),
-          Text(
-            message,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: colorScheme.onSurface,
-              fontSize: AuthStyle.captionSize,
+          if (cameraProblem) ...[
+            FilledButton.tonal(
+              onPressed: _scan.retryCamera,
+              child: const Text('Coba Lagi'),
             ),
-          ),
-          const SizedBox(height: 8),
-          TextButton(onPressed: onRetry, child: const Text('Coba Lagi')),
-          if (onPickFiles != null)
-            TextButton(
-              onPressed: onPickFiles,
+            const SizedBox(height: AppSpacing.sm),
+            OutlinedButton(
+              style: onScrimOutline,
+              onPressed: _isSubmitting ? null : _pickPhotosFromFiles,
               child: const Text('Pilih Foto Wajah'),
             ),
+            const SizedBox(height: AppSpacing.sm),
+          ] else if (_scan.autoMode && !_isScanComplete) ...[
+            Text(
+              'Foto diambil otomatis saat posisi pas.',
+              textAlign: TextAlign.center,
+              style: text.bodySmall?.copyWith(color: AppColors.onScrimMuted),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+          ],
+          FilledButton(
+            style: FilledButton.styleFrom(
+              disabledBackgroundColor: Colors.white.withValues(alpha: 0.12),
+              disabledForegroundColor: Colors.white.withValues(alpha: 0.45),
+            ),
+            onPressed: _canCapture ? _capturePhoto : null,
+            child: _scan.isCapturing || _isSubmitting
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Text('Ambil Foto'),
+          ),
+          if (count > 0 && !_isSubmitting) ...[
+            const SizedBox(height: AppSpacing.sm),
+            OutlinedButton(
+              style: onScrimOutline,
+              onPressed: _scan.isCapturing ? null : _completeRegistration,
+              child: Text('Kirim $count Foto & Daftar'),
+            ),
+            TextButton(
+              style: TextButton.styleFrom(foregroundColor: Colors.white),
+              onPressed: _scan.isCapturing ? null : _restartScan,
+              child: const Text('Ulangi Scan'),
+            ),
+          ],
         ],
       ),
     );
-  }
-}
-
-class _FaceFrameCornersPainter extends CustomPainter {
-  const _FaceFrameCornersPainter({required this.color});
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final horizontalInset = size.width * 26 / AuthStyle.cameraFrameMaxWidth;
-    final frame = Rect.fromLTRB(
-      horizontalInset,
-      horizontalInset,
-      size.width - horizontalInset,
-      size.height - horizontalInset,
-    );
-    final cornerLength = frame.shortestSide * 0.3;
-    const radius = Radius.circular(AuthStyle.cameraFrameRadius);
-    final r = radius.x;
-
-    final path = Path()
-      ..moveTo(frame.left, frame.top + cornerLength)
-      ..lineTo(frame.left, frame.top + r)
-      ..arcToPoint(Offset(frame.left + r, frame.top), radius: radius)
-      ..lineTo(frame.left + cornerLength, frame.top)
-      ..moveTo(frame.right - cornerLength, frame.top)
-      ..lineTo(frame.right - r, frame.top)
-      ..arcToPoint(Offset(frame.right, frame.top + r), radius: radius)
-      ..lineTo(frame.right, frame.top + cornerLength)
-      ..moveTo(frame.right, frame.bottom - cornerLength)
-      ..lineTo(frame.right, frame.bottom - r)
-      ..arcToPoint(Offset(frame.right - r, frame.bottom), radius: radius)
-      ..lineTo(frame.right - cornerLength, frame.bottom)
-      ..moveTo(frame.left + cornerLength, frame.bottom)
-      ..lineTo(frame.left + r, frame.bottom)
-      ..arcToPoint(Offset(frame.left, frame.bottom - r), radius: radius)
-      ..lineTo(frame.left, frame.bottom - cornerLength);
-
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2
-        ..strokeCap = StrokeCap.round,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _FaceFrameCornersPainter oldDelegate) {
-    return color != oldDelegate.color;
   }
 }

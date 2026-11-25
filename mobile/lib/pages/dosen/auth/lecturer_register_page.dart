@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
@@ -6,6 +6,7 @@ import '../../../data/dosen/dummy_lecturer_auth_repository.dart';
 import '../../../data/dosen/lecturer_account.dart';
 import '../../../routing/lecturer_route_paths.dart';
 import '../../../theme/style/auth_style.dart';
+import '../../../widgets/widgets.dart';
 import '../../mhs/auth/widgets/auth_buttons.dart';
 import '../../mhs/auth/widgets/auth_header.dart';
 import '../../mhs/auth/widgets/auth_info_banner.dart';
@@ -121,22 +122,20 @@ class _LecturerRegisterPageState extends State<LecturerRegisterPage> {
   @override
   Widget build(BuildContext context) {
     return AuthScaffold(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          AuthHeader(
-            title: 'Registrasi Dosen',
-            subtitle: 'Isi data diri kamu',
-            activeSteps: 1,
-            onBack: _goBack,
-          ),
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(
-                AuthStyle.contentHorizontalPadding,
-                0,
-                AuthStyle.contentHorizontalPadding,
-                32,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.only(bottom: AppSpacing.xxl),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AuthHeader(
+              title: 'Registrasi Dosen',
+              subtitle: 'Isi data diri kamu',
+              activeSteps: 1,
+              onBack: _goBack,
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AuthStyle.contentHorizontalPadding,
               ),
               child: AutofillGroup(
                 child: Form(
@@ -155,7 +154,7 @@ class _LecturerRegisterPageState extends State<LecturerRegisterPage> {
                         validator: (value) =>
                             _validateRequired(value, 'Nama dosen'),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AuthStyle.fieldGap),
                       AuthTextField(
                         label: 'NIP',
                         hintText: 'Nomor Induk Pegawai',
@@ -168,7 +167,7 @@ class _LecturerRegisterPageState extends State<LecturerRegisterPage> {
                         autofillHints: const [AutofillHints.username],
                         validator: (value) => _validateRequired(value, 'NIP'),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AuthStyle.fieldGap),
                       AuthTextField(
                         label: 'Email',
                         hintText: 'nama@univ.ac.id',
@@ -177,10 +176,11 @@ class _LecturerRegisterPageState extends State<LecturerRegisterPage> {
                         keyboardType: TextInputType.emailAddress,
                         validator: _validateEmail,
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AuthStyle.fieldGap),
                       AuthTextField(
                         label: 'Kata Sandi',
                         hintText: 'Masukkan kata sandi',
+                        helperText: 'Minimal $_minimumPasswordLength karakter.',
                         controller: _passwordController,
                         enabled: !_isSubmitting,
                         isPassword: true,
@@ -188,7 +188,7 @@ class _LecturerRegisterPageState extends State<LecturerRegisterPage> {
                         autofillHints: const [AutofillHints.newPassword],
                         validator: _validatePassword,
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AuthStyle.fieldGap),
                       AuthTextField(
                         label: 'Konfirmasi Kata Sandi',
                         hintText: 'Ulangi kata sandi',
@@ -200,13 +200,13 @@ class _LecturerRegisterPageState extends State<LecturerRegisterPage> {
                         onFieldSubmitted: (_) => _submit(),
                         validator: _validatePasswordConfirmation,
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AppSpacing.xl),
                       const AuthInfoBanner(
                         message:
                             'Data yang kamu isi dipakai untuk login ke akun '
                             'dosen. Cek kembali sebelum mendaftar.',
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AppSpacing.lg),
                       AuthPrimaryButton(
                         label: 'Daftar',
                         onPressed: _submit,
@@ -217,8 +217,8 @@ class _LecturerRegisterPageState extends State<LecturerRegisterPage> {
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

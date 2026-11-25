@@ -141,6 +141,94 @@ class JadwalKuliah {
     required this.sesiSelesai,
   });
 
+  factory JadwalKuliah.fromAdminApiJson(Map<String, dynamic> json) {
+    final semester = _parseSemester(json['semester']);
+    final tingkat = _asInt(json['kelas_tingkat']);
+    final kurikulumSemester = tingkat > 0
+        ? (semester == SemesterPeriode.ganjil ? tingkat * 2 - 1 : tingkat * 2)
+        : (semester == SemesterPeriode.ganjil ? 1 : 2);
+    final sesiMulaiNomor = _asInt(json['sesi_mulai']);
+    final sesiSelesaiNomor = _asInt(json['sesi_selesai']);
+    final fallbackMulai = _fallbackSesi(sesiMulaiNomor);
+    final fallbackSelesai = _fallbackSesi(sesiSelesaiNomor);
+    final jamMulai = _asString(json['jam_mulai']);
+    final jamSelesai = _asString(json['jam_selesai']);
+    final programStudiKode = _asString(json['program_studi_kode']);
+    final ruanganKode = _asString(json['ruangan_kode']);
+    final ruanganNama = _asString(json['ruangan_nama']);
+
+    return JadwalKuliah(
+      id: _asString(json['id']),
+      tahunAjaran: _asString(json['tahun_ajaran']),
+      mataKuliah: MataKuliah(
+        kode: _asString(json['mata_kuliah_kode']),
+        nama: _asString(json['matkul_nama']),
+        semester: kurikulumSemester,
+        sks: _asInt(json['sks']),
+        programStudiKode: programStudiKode,
+      ),
+      dosen: Dosen(
+        nip: _asString(json['dosen_nip']),
+        nama: _asString(json['dosen_nama']),
+      ),
+      programStudi: ProgramStudi(
+        kode: programStudiKode,
+        nama: _asString(json['prodi_nama']),
+      ),
+      kelas: KelasKuliah(
+        nama: _asString(json['kelas_nama']),
+        tingkat: tingkat,
+        programStudiKode: programStudiKode,
+      ),
+      ruangan: Ruangan(
+        kode: ruanganKode,
+        nama: ruanganNama.isEmpty ? ruanganKode : ruanganNama,
+      ),
+      hari: _parseHari(json['hari']),
+      sesiMulai: SesiKuliah(
+        nomor: sesiMulaiNomor,
+        jamMulai: jamMulai.isEmpty ? fallbackMulai.jamMulai : jamMulai,
+        jamSelesai: fallbackMulai.jamSelesai,
+      ),
+      sesiSelesai: SesiKuliah(
+        nomor: sesiSelesaiNomor,
+        jamMulai: fallbackSelesai.jamMulai,
+        jamSelesai: jamSelesai.isEmpty
+            ? fallbackSelesai.jamSelesai
+            : jamSelesai,
+      ),
+    );
+  }
+
+  static String _asString(Object? value) => value?.toString().trim() ?? '';
+
+  static int _asInt(Object? value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(_asString(value)) ?? 0;
+  }
+
+  static SemesterPeriode _parseSemester(Object? value) =>
+      _asString(value).toLowerCase() == 'genap'
+      ? SemesterPeriode.genap
+      : SemesterPeriode.ganjil;
+
+  static HariKuliah _parseHari(Object? value) {
+    final normalized = _asString(value).toLowerCase();
+    for (final hari in HariKuliah.values) {
+      if (hari.name == normalized) return hari;
+    }
+    return HariKuliah.senin;
+  }
+
+  static SesiKuliah _fallbackSesi(int nomor) {
+    final index = nomor - 1;
+    if (index >= 0 && index < JadwalMasterData.sesi.length) {
+      return JadwalMasterData.sesi[index];
+    }
+    return SesiKuliah(nomor: nomor, jamMulai: '', jamSelesai: '');
+  }
+
   final String id;
 
   /// Format: "2026/2027"

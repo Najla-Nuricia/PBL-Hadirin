@@ -7,6 +7,9 @@ import 'package:mobile/data/mhs/student_data_service.dart';
 import 'package:mobile/routing/student_router.dart';
 import 'package:mobile/theme/app_theme.dart';
 
+Finder _navigationTab(String label) =>
+    find.descendant(of: find.byType(NavigationBar), matching: find.text(label));
+
 void main() {
   LiveTestWidgetsFlutterBinding.ensureInitialized();
   HttpOverrides.global = null;
@@ -33,10 +36,7 @@ void main() {
       addTearDown(router.dispose);
 
       await tester.pumpWidget(
-        MaterialApp.router(
-          theme: AppTheme.light,
-          routerConfig: router,
-        ),
+        MaterialApp.router(theme: AppTheme.light, routerConfig: router),
       );
       await tester.pumpAndSettle();
 
@@ -58,10 +58,10 @@ void main() {
         router.routeInformationProvider.value.uri.path,
         StudentRoutePaths.beranda,
       );
-      expect(find.textContaining('Mahasiswa Demo'), findsWidgets);
+      expect(find.text('Halo, Mahasiswa.'), findsWidgets);
 
       // 3. Navigate to Riwayat -> verify live summary & history load cleanly.
-      await tester.tap(find.byIcon(Icons.attach_money));
+      await tester.tap(_navigationTab('Riwayat'));
       await tester.pumpAndSettle(const Duration(seconds: 2));
       expect(
         router.routeInformationProvider.value.uri.path,
@@ -70,7 +70,7 @@ void main() {
       expect(find.text('Hadir'), findsWidgets);
 
       // 4. Navigate to Absensi -> Step 1 & Step 2 (without timer leaks or errors).
-      await tester.tap(find.byIcon(Icons.videocam_outlined));
+      await tester.tap(_navigationTab('Absensi'));
       await tester.pumpAndSettle(const Duration(seconds: 1));
       expect(
         router.routeInformationProvider.value.uri.path,
@@ -81,11 +81,13 @@ void main() {
       await tester.tap(find.text('Lanjutkan ke Scan Wajah'));
       await tester.pumpAndSettle();
       expect(find.text('Kirim Verifikasi Wajah'), findsOneWidget);
+      await tester.tap(find.byTooltip('Kembali').last);
+      await tester.pumpAndSettle();
 
       // 5. Navigate to Surat -> test dynamic schedule dropdown + live submit + DB cleanup.
       String? createdPengajuanId;
       try {
-        await tester.tap(find.byIcon(Icons.description_outlined));
+        await tester.tap(_navigationTab('Surat'));
         await tester.pumpAndSettle(const Duration(seconds: 2));
         expect(
           router.routeInformationProvider.value.uri.path,
@@ -104,10 +106,7 @@ void main() {
         expect(popupMenuItems, findsWidgets);
         await tester.tap(
           find
-              .descendant(
-                of: popupMenuItems.first,
-                matching: find.byType(Text),
-              )
+              .descendant(of: popupMenuItems.first, matching: find.byType(Text))
               .first,
         );
         await tester.pumpAndSettle();
@@ -135,7 +134,7 @@ void main() {
       }
 
       // 6. Navigate to Profil -> verify real profile data, live edit+restore, Ubah Kata Sandi route & Keluar.
-      await tester.tap(find.byIcon(Icons.person_outline));
+      await tester.tap(_navigationTab('Profil'));
       await tester.pumpAndSettle(const Duration(seconds: 2));
       expect(
         router.routeInformationProvider.value.uri.path,
@@ -178,7 +177,7 @@ void main() {
       // Re-open Profil tab to log out cleanly (wait for profile SnackBar to dismiss).
       await tester.pump(const Duration(seconds: 4));
       await tester.pumpAndSettle();
-      await tester.tap(find.byIcon(Icons.person_outline));
+      await tester.tap(_navigationTab('Profil'));
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.text('Keluar'));
       await tester.tap(find.text('Keluar'));

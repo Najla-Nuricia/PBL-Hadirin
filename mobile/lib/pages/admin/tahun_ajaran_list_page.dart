@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
+import '../../data/admin/admin_auth_repository.dart';
+import '../../data/admin/admin_master_data_service.dart';
 import '../../data/admin/tahun_ajaran.dart';
 import '../../routing/admin_route_paths.dart';
+import '../../widgets/widgets.dart';
 import 'tambah_tahun_ajaran_page.dart';
 
 class TahunAjaranListPage extends StatefulWidget {
@@ -14,13 +18,16 @@ class TahunAjaranListPage extends StatefulWidget {
 
 class _TahunAjaranListPageState extends State<TahunAjaranListPage> {
   final _searchController = TextEditingController();
+  List<TahunAjaran> _items = [];
   List<TahunAjaran> _displayed = [];
+  bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _displayed = tahunAjaranRepository.getAll();
     _searchController.addListener(_onSearch);
+    _load();
   }
 
   @override
@@ -31,15 +38,38 @@ class _TahunAjaranListPageState extends State<TahunAjaranListPage> {
   }
 
   void _onSearch() {
+    final query = _searchController.text.trim().toLowerCase();
     setState(() {
-      _displayed = tahunAjaranRepository.search(_searchController.text);
+      _displayed = query.isEmpty
+          ? List.unmodifiable(_items)
+          : _items
+                .where((item) => item.tahun.toLowerCase().contains(query))
+                .toList(growable: false);
     });
   }
 
-  void _refresh() {
-    setState(() {
-      _displayed = tahunAjaranRepository.search(_searchController.text);
-    });
+  Future<void> _load() async {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
+    try {
+      final items = await adminMasterDataService.listTahunAjaran();
+      if (!mounted) return;
+      setState(() {
+        _items = items;
+        _displayed = items;
+        _isLoading = false;
+      });
+    } on AdminRemoteApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = error.message;
+      });
+    }
   }
 
   void _back() {
@@ -54,7 +84,7 @@ class _TahunAjaranListPageState extends State<TahunAjaranListPage> {
     final added = await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (_) => const TambahTahunAjaranPage()),
     );
-    if (added == true) _refresh();
+    if (added == true) await _load();
   }
 
   Future<void> _openEdit(TahunAjaran item) async {
@@ -63,7 +93,7 @@ class _TahunAjaranListPageState extends State<TahunAjaranListPage> {
         builder: (_) => TambahTahunAjaranPage(initialItem: item),
       ),
     );
-    if (updated == true) _refresh();
+    if (updated == true) await _load();
   }
 
   Future<void> _delete(TahunAjaran item) async {
@@ -94,8 +124,12 @@ class _TahunAjaranListPageState extends State<TahunAjaranListPage> {
       },
     );
     if (confirmed != true || !mounted) return;
-    tahunAjaranRepository.delete(item.id);
-    _refresh();
+    try {
+      await adminMasterDataService.deleteTahunAjaran(item.id);
+      if (mounted) await _load();
+    } on AdminRemoteApiException catch (error) {
+      if (mounted) _showError(error.message);
+    }
   }
 
   @override
@@ -112,7 +146,11 @@ class _TahunAjaranListPageState extends State<TahunAjaranListPage> {
             _buildSearchBar(colorScheme),
             const SizedBox(height: 8),
             Expanded(
-              child: _displayed.isEmpty
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _errorMessage != null
+                  ? _buildError(colorScheme)
+                  : _displayed.isEmpty
                   ? _buildEmpty(colorScheme)
                   : ListView.separated(
                       padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
@@ -135,43 +173,34 @@ class _TahunAjaranListPageState extends State<TahunAjaranListPage> {
   }
 
   Widget _buildHeader(ColorScheme colorScheme) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 12, 16, 12),
+    return SkyHeader(
+      includeStatusBar: false,
       child: Row(
         children: [
           IconButton(
             onPressed: _back,
-            icon: Icon(
-              Icons.arrow_back_ios_new_rounded,
-              size: 20,
-              color: colorScheme.primary,
-            ),
+            icon: const Icon(PhosphorIconsRegular.arrowLeft, size: 20),
+            color: AppColors.gownNavy,
             tooltip: 'Kembali',
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: AppSpacing.xs),
           Expanded(
             child: Text(
               'Tahun Ajaran',
-              style: TextStyle(
-                color: colorScheme.onSurface,
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-              ),
+              style: Theme.of(context).textTheme.titleLarge
+                  ?.copyWith(color: AppColors.gownNavy),
             ),
           ),
           FilledButton.icon(
             onPressed: _openTambah,
-            icon: const Icon(Icons.add, size: 18),
-            label: const Text(
-              'Tambah',
-              style: TextStyle(fontWeight: FontWeight.w600),
-            ),
+            icon: const Icon(PhosphorIconsRegular.plus, size: 18),
+            label: const Text('Tambah'),
             style: FilledButton.styleFrom(
               backgroundColor: colorScheme.primary,
               foregroundColor: colorScheme.onPrimary,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+              shape: const RoundedRectangleBorder(
+                borderRadius: AppRadius.control,
               ),
             ),
           ),
@@ -192,14 +221,14 @@ class _TahunAjaranListPageState extends State<TahunAjaranListPage> {
             fontSize: 13,
           ),
           prefixIcon: Icon(
-            Icons.search,
+            PhosphorIconsRegular.magnifyingGlass,
             color: colorScheme.onSurfaceVariant,
             size: 20,
           ),
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
                   icon: Icon(
-                    Icons.close,
+                    PhosphorIconsRegular.x,
                     color: colorScheme.onSurfaceVariant,
                     size: 18,
                   ),
@@ -235,7 +264,7 @@ class _TahunAjaranListPageState extends State<TahunAjaranListPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            Icons.calendar_today_outlined,
+            PhosphorIconsRegular.calendarBlank,
             size: 48,
             color: colorScheme.onSurfaceVariant,
           ),
@@ -247,6 +276,38 @@ class _TahunAjaranListPageState extends State<TahunAjaranListPage> {
         ],
       ),
     );
+  }
+
+  Widget _buildError(ColorScheme colorScheme) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              PhosphorIconsRegular.cloudSlash,
+              size: 48,
+              color: colorScheme.error,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              _errorMessage!,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton(onPressed: _load, child: const Text('Coba lagi')),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 }
 
@@ -289,7 +350,7 @@ class _TahunAjaranCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
-                Icons.calendar_month_outlined,
+                PhosphorIconsRegular.calendarBlank,
                 color: colorScheme.primary,
                 size: 20,
               ),
@@ -336,7 +397,10 @@ class _TahunAjaranCard extends StatelessWidget {
               constraints: const BoxConstraints.tightFor(width: 32, height: 32),
               padding: EdgeInsets.zero,
               visualDensity: VisualDensity.compact,
-              icon: Icon(Icons.edit_outlined, color: colorScheme.primary),
+              icon: Icon(
+                PhosphorIconsRegular.pencilSimple,
+                color: colorScheme.primary,
+              ),
             ),
             IconButton(
               onPressed: onDelete,
@@ -344,7 +408,7 @@ class _TahunAjaranCard extends StatelessWidget {
               constraints: const BoxConstraints.tightFor(width: 32, height: 32),
               padding: EdgeInsets.zero,
               visualDensity: VisualDensity.compact,
-              icon: Icon(Icons.delete_outline, color: colorScheme.error),
+              icon: Icon(PhosphorIconsRegular.trash, color: colorScheme.error),
             ),
           ],
         ),

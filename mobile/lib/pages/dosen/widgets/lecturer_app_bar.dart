@@ -1,38 +1,39 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
-import '../../../theme/style/lecturer_style.dart';
+import '../../../widgets/widgets.dart';
 
 class LecturerAppBar extends StatelessWidget implements PreferredSizeWidget {
   const LecturerAppBar({
     super.key,
     required this.title,
-    this.leading,
-    this.titleSize = LecturerStyle.appBarTitleSize,
+    this.onBack,
+    this.actions,
   });
 
   final String title;
-  final Widget? leading;
-  final double titleSize;
+
+  /// Bila diisi, tombol kembali tampil di kiri judul.
+  final VoidCallback? onBack;
+  final List<Widget>? actions;
 
   @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+  Size get preferredSize =>
+      const Size.fromHeight(kToolbarHeight + SkyAppBar.cloudEdgeHeight);
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return AppBar(
-      leading: leading,
-      centerTitle: true,
-      backgroundColor: scheme.surface,
-      foregroundColor: scheme.onSurface,
-      elevation: 0,
-      scrolledUnderElevation: 0,
-      surfaceTintColor: Colors.transparent,
-      shape: Border(bottom: BorderSide(color: scheme.outline)),
-      title: Text(
-        title,
-        style: TextStyle(fontSize: titleSize, fontWeight: FontWeight.w700),
-      ),
+    return SkyAppBar(
+      automaticallyImplyLeading: false,
+      leading: onBack == null
+          ? null
+          : IconButton(
+              tooltip: 'Kembali',
+              onPressed: onBack,
+              icon: const Icon(PhosphorIconsRegular.arrowLeft),
+            ),
+      title: Text(title),
+      actions: actions,
     );
   }
 }

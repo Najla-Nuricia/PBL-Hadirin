@@ -235,8 +235,19 @@ class StudentDataService {
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body) as Map<String, dynamic>;
         final list = decoded['data'] as List<dynamic>? ?? const [];
+
+        // Surat izin diambil dari pengajuan dan dicocokkan lewat kehadiran_id.
+        final pengajuan = await loadPengajuanList();
+        final dokumenByKehadiran = <String, Map<String, dynamic>>{
+          for (final item in pengajuan)
+            if (item['kehadiran_id'] != null)
+              item['kehadiran_id'].toString(): item,
+        };
+
         return list.map((item) {
           final m = item as Map<String, dynamic>;
+          final kehadiranId = m['kehadiran_id']?.toString();
+          final dokumen = dokumenByKehadiran[kehadiranId];
           final rawDate =
               (m['tanggal'] as String?) ?? (m['date'] as String?) ?? '-';
           final parsedDay = rawDate.contains('-') && rawDate.length >= 10
@@ -250,6 +261,19 @@ class StudentDataService {
                 '-',
             time: (m['time'] as String?) ?? (m['jam_masuk'] as String?) ?? '-',
             status: _parseStatus((m['status'] as String?) ?? 'alfa'),
+            kehadiranId: kehadiranId,
+            dokumenUrl:
+                (dokumen?['dokumen_url'] as String?) ??
+                (m['dokumen_url'] as String?),
+            dokumenPath:
+                (dokumen?['dokumen_path'] as String?) ??
+                (m['dokumen_path'] as String?),
+            jenisPengajuan:
+                (dokumen?['jenis'] as String?) ??
+                (m['jenis_pengajuan'] as String?),
+            statusPengajuan:
+                (dokumen?['status_pengajuan'] as String?) ??
+                (m['status_pengajuan'] as String?),
           );
         }).toList();
       }

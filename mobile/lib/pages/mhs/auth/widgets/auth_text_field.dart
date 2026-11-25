@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:flutter/services.dart';
 
 import '../../../../theme/style/auth_style.dart';
+import '../../../../widgets/widgets.dart';
 
+/// Kolom isian berlabel: label di atas, lalu kolomnya. Galat dan teks bantuan
+/// tampil di bawah kolom.
 class AuthTextField extends StatefulWidget {
   const AuthTextField({
     required this.label,
@@ -18,6 +22,9 @@ class AuthTextField extends StatefulWidget {
     this.isPassword = false,
     this.showVisibilityToggle = false,
     this.enabled = true,
+    this.helperText,
+    this.autovalidateMode,
+    this.fieldKey,
     super.key,
   });
 
@@ -35,11 +42,19 @@ class AuthTextField extends StatefulWidget {
   final bool showVisibilityToggle;
   final bool enabled;
 
+  /// Syarat atau petunjuk singkat di bawah kolom.
+  final String? helperText;
+  final AutovalidateMode? autovalidateMode;
+
+  /// Key untuk [TextFormField] di dalamnya.
+  final Key? fieldKey;
+
   @override
   State<AuthTextField> createState() => _AuthTextFieldState();
 }
 
 class _AuthTextFieldState extends State<AuthTextField> {
+  // Tombol mata dilewati saat pindah fokus dengan tombol "next" di keyboard.
   final _visibilityToggleFocusNode = FocusNode(skipTraversal: true);
   bool _isObscured = true;
 
@@ -51,23 +66,20 @@ class _AuthTextFieldState extends State<AuthTextField> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final text = theme.textTheme;
+    final isNumeric = widget.keyboardType == TextInputType.number;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          widget.label,
-          style: TextStyle(
-            color: colorScheme.onSurface,
-            fontSize: AuthStyle.bodySize,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 6),
+        Text(widget.label, style: text.titleSmall),
+        const SizedBox(height: AuthStyle.labelGap),
         TextFormField(
+          key: widget.fieldKey,
           controller: widget.controller,
           validator: widget.validator,
+          autovalidateMode: widget.autovalidateMode,
           enabled: widget.enabled,
           keyboardType: widget.keyboardType,
           textInputAction: widget.textInputAction,
@@ -78,52 +90,35 @@ class _AuthTextFieldState extends State<AuthTextField> {
           obscureText: widget.isPassword && _isObscured,
           enableSuggestions: !widget.isPassword,
           autocorrect: !widget.isPassword,
-          style: TextStyle(
-            color: colorScheme.onSurface,
-            fontSize: AuthStyle.bodySize,
-          ),
+          style: isNumeric ? text.bodyLarge?.tabular : text.bodyLarge,
           decoration: InputDecoration(
             hintText: widget.hintText,
-            hintStyle: TextStyle(
-              color: colorScheme.onSurfaceVariant,
-              fontSize: AuthStyle.bodySize,
+            helperText: widget.helperText,
+            helperStyle: text.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
             ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 14,
-            ),
+            helperMaxLines: 3,
+            errorMaxLines: 3,
             suffixIcon: widget.isPassword && widget.showVisibilityToggle
                 ? IconButton(
                     focusNode: _visibilityToggleFocusNode,
-                    onPressed: () => setState(() => _isObscured = !_isObscured),
-                    icon: Icon(
-                      _isObscured
-                          ? Icons.visibility_outlined
-                          : Icons.visibility_off_outlined,
-                      size: 18,
-                    ),
-                    color: colorScheme.onSurfaceVariant,
+                    onPressed: widget.enabled
+                        ? () => setState(() => _isObscured = !_isObscured)
+                        : null,
                     tooltip: _isObscured
                         ? 'Tampilkan kata sandi'
                         : 'Sembunyikan kata sandi',
+                    icon: Icon(
+                      _isObscured
+                          ? PhosphorIconsRegular.eye
+                          : PhosphorIconsRegular.eyeSlash,
+                      size: 20,
+                    ),
                   )
                 : null,
-            border: _border(colorScheme.outline),
-            enabledBorder: _border(colorScheme.outline),
-            disabledBorder: _border(colorScheme.outlineVariant),
-            focusedBorder: _border(colorScheme.primary),
-            errorBorder: _border(colorScheme.error),
-            focusedErrorBorder: _border(colorScheme.error),
           ),
         ),
       ],
-    );
-  }
-
-  OutlineInputBorder _border(Color color) {
-    return OutlineInputBorder(
-      borderRadius: BorderRadius.circular(AuthStyle.fieldRadius),
-      borderSide: BorderSide(color: color),
     );
   }
 }

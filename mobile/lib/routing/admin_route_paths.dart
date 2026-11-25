@@ -10,6 +10,9 @@ abstract final class AdminRoutePaths {
   static const ruangan = '/admin/ruangan';
   static const tambahRuangan = '/admin/ruangan/tambah';
   static const mataKuliah = '/admin/mata-kuliah';
+  static const whitelistNim = '/admin/whitelist-nim';
   static const tambahMataKuliah = '/admin/mata-kuliah/tambah';
   static const tambahDosen = '/admin/dosen/tambah';
+  static const akun = '/admin/akun';
+  static const changePassword = '/admin/akun/ubah-kata-sandi';
 }

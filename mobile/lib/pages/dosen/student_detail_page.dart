@@ -2,16 +2,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../data/dosen/lecturer_providers.dart';
+import '../../models/dosen/student_attendance.dart';
 import '../../routing/lecturer_route_paths.dart';
 import '../../theme/style/lecturer_style.dart';
+import '../../widgets/widgets.dart';
 import 'widgets/content_constraint.dart';
 import 'widgets/decision_action_bar.dart';
 import 'widgets/initials_avatar.dart';
 import 'widgets/lecturer_app_bar.dart';
+import 'widgets/load_state.dart';
 import 'widgets/presence_info_card.dart';
-import 'widgets/rounded_back_button.dart';
+import 'widgets/section_card.dart';
 import 'widgets/supporting_document_card.dart';
 
 class StudentDetailPage extends ConsumerWidget {
@@ -21,65 +25,47 @@ class StudentDetailPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final scheme = Theme.of(context).colorScheme;
     final student = ref.watch(studentByIdProvider(studentId));
-    final session = ref.watch(attendanceSessionProvider);
+    final sessionAsync = ref.watch(attendanceSessionProvider);
     final decision = ref.watch(leaveDecisionProvider)[studentId];
 
+    final Widget body;
+    if (student != null) {
+      body = _StudentDetail(
+        student: student,
+        date: sessionAsync.value?.date ?? DateTime.now(),
+      );
+    } else if (sessionAsync.showsError) {
+      body = Center(
+        child: SingleChildScrollView(
+          child: AppErrorState(
+            message: lecturerErrorMessage(sessionAsync.error!),
+            onRetry: () => ref.invalidate(attendanceSessionProvider),
+          ),
+        ),
+      );
+    } else if (sessionAsync.isLoading) {
+      body = const _LoadingBody();
+    } else {
+      body = const Center(
+        child: SingleChildScrollView(
+          child: AppEmptyState(
+            icon: PhosphorIconsRegular.userFocus,
+            title: 'Data mahasiswa tidak ditemukan.',
+            message: 'Kembali ke daftar kehadiran, lalu pilih mahasiswa lagi.',
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
-      backgroundColor: scheme.surfaceContainerHighest,
       appBar: LecturerAppBar(
         title: 'Detail Mahasiswa',
-        leading: RoundedBackButton(
-          onPressed: () => context.canPop()
-              ? context.pop()
-              : context.go(LecturerRoutePaths.beranda),
-        ),
+        onBack: () => context.canPop()
+            ? context.pop()
+            : context.go(LecturerRoutePaths.beranda),
       ),
-      body: student == null
-          ? const Center(child: Text('Data mahasiswa tidak ditemukan.'))
-          : ContentConstraint(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(LecturerStyle.pagePadding),
-                child: Column(
-                  children: [
-                    const SizedBox(height: 8),
-                    InitialsAvatar(
-                      initials: student.initials,
-                      size: 80,
-                      fontSize: 26,
-                      bordered: true,
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      student.name,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'NIM ${student.nim} · Kelas ${student.className}',
-                      style: TextStyle(
-                        fontSize: LecturerStyle.captionSize,
-                        color: scheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    PresenceInfoCard(student: student, date: session.date),
-                    if (student.document != null) ...[
-                      const SizedBox(height: 12),
-                      SupportingDocumentCard(
-                        document: student.document!,
-                        onView: () {},
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-            ),
+      body: SafeArea(top: false, child: body),
       bottomNavigationBar: (student != null && student.status.needsReview)
           ? DecisionActionBar(
               decision: decision,
@@ -99,6 +85,141 @@ class StudentDetailPage extends ConsumerWidget {
           d == LeaveDecision.accepted
               ? 'Pengajuan diterima.'
               : 'Pengajuan ditolak.',
+        ),
+      ),
+    );
+  }
+}
+
+class _StudentDetail extends StatelessWidget {
+  const _StudentDetail({required this.student, required this.date});
+
+  final StudentAttendance student;
+  final DateTime date;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = Theme.of(context).textTheme;
+    final document = student.document;
+    final needsReview = student.status.needsReview;
+    final hasRequest = needsReview || student.note != null || document != null;
+    final identity = [
+      'NIM ${student.nim}',
+      if (student.className.isNotEmpty) 'Kelas ${student.className}',
+    ].join(' · ');
+
+    return SingleChildScrollView(
+      padding: LecturerStyle.pageInsets,
+      child: ContentConstraint(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              children: [
+                InitialsAvatar(
+                  initials: student.initials,
+                  size: LecturerStyle.headerAvatarSize,
+                ),
+                const SizedBox(width: AppSpacing.lg),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        student.name,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: text.titleLarge,
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        identity,
+                        style: text.bodyMedium?.tabular.copyWith(
+                          color: AppColors.inkMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            const AppSectionHeader(title: 'Informasi Presensi'),
+            PresenceInfoCard(student: student, date: date),
+            if (hasRequest) ...[
+              // Catatan tanpa pengajuan tetap tampil, hanya tanpa judul.
+              if (needsReview) ...[
+                const SizedBox(height: AppSpacing.sm),
+                const AppSectionHeader(title: 'Pengajuan'),
+              ] else
+                const SizedBox(height: AppSpacing.md),
+              SectionCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'Keterangan',
+                      style: text.bodySmall?.copyWith(
+                        color: AppColors.inkFaint,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(student.note ?? '-', style: text.bodyMedium),
+                    if (document != null) ...[
+                      const SizedBox(height: AppSpacing.md),
+                      // Pratinjau dokumen belum tersedia, jadi tombol
+                      // lihatnya tampil nonaktif.
+                      SupportingDocumentCard(document: document),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LoadingBody extends StatelessWidget {
+  const _LoadingBody();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SingleChildScrollView(
+      physics: NeverScrollableScrollPhysics(),
+      padding: LecturerStyle.pageInsets,
+      child: ContentConstraint(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            SizedBox(height: AppSpacing.sm),
+            Row(
+              children: [
+                AppSkeleton(
+                  width: LecturerStyle.headerAvatarSize,
+                  height: LecturerStyle.headerAvatarSize,
+                  radius: LecturerStyle.headerAvatarSize / 2,
+                ),
+                SizedBox(width: AppSpacing.lg),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      AppSkeleton(width: 180, height: 20),
+                      SizedBox(height: AppSpacing.sm),
+                      AppSkeleton(width: 140),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            SizedBox(height: AppSpacing.xxl),
+            AppSkeletonList(),
+          ],
         ),
       ),
     );

@@ -1,32 +1,48 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/dosen/dummy_lecturer_auth_repository.dart';
 import '../../data/dosen/lecturer_profile_preview.dart';
+import '../../data/dosen/lecturer_providers.dart';
 import '../../routing/lecturer_route_paths.dart';
+import '../../theme/style/auth_style.dart';
+import '../../theme/style/lecturer_style.dart';
+import '../../widgets/widgets.dart';
+import '../mhs/auth/widgets/auth_text_field.dart';
+import 'widgets/content_constraint.dart';
+import 'widgets/lecturer_app_bar.dart';
+import 'widgets/lecturer_bottom_bar.dart';
 
 const _minimumPasswordLength = 8;
 
-class LecturerChangePasswordPage extends StatefulWidget {
+class LecturerChangePasswordPage extends ConsumerStatefulWidget {
   const LecturerChangePasswordPage({super.key, this.email});
 
   /// Akun yang kata sandinya diubah. Default ke akun dosen yang sedang login.
   final String? email;
 
   @override
-  State<LecturerChangePasswordPage> createState() =>
+  ConsumerState<LecturerChangePasswordPage> createState() =>
       _LecturerChangePasswordPageState();
 }
 
 class _LecturerChangePasswordPageState
-    extends State<LecturerChangePasswordPage> {
+    extends ConsumerState<LecturerChangePasswordPage> {
   final _formKey = GlobalKey<FormState>();
+  // Pesan galat tampil lewat messenger milik layar ini supaya muncul di atas
+  // tombol Simpan, bukan menutupinya. Pesan berhasil memakai messenger
+  // aplikasi karena harus tetap terlihat setelah kembali ke profil.
+  final _messengerKey = GlobalKey<ScaffoldMessengerState>();
   final _currentController = TextEditingController();
   final _newController = TextEditingController();
   final _confirmationController = TextEditingController();
   bool _isSubmitting = false;
 
-  String get _email => widget.email ?? lecturerProfilePreview.email;
+  String get _email =>
+      widget.email ??
+      ref.read(dosenDashboardProvider).value?.dosen.email ??
+      currentLecturerProfile().email;
 
   @override
   void dispose() {
@@ -58,8 +74,8 @@ class _LecturerChangePasswordPageState
     } on WrongPasswordException {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
+      _messengerKey.currentState
+        ?..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(content: Text('Kata sandi saat ini salah.')),
         );
@@ -93,210 +109,92 @@ class _LecturerChangePasswordPageState
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    return ScaffoldMessenger(key: _messengerKey, child: _buildPage());
+  }
 
+  Widget _buildPage() {
     return Scaffold(
-      backgroundColor: colorScheme.surfaceContainerHighest,
+      appBar: LecturerAppBar(
+        title: 'Ubah Kata Sandi',
+        onBack: () => context.go(LecturerRoutePaths.profil),
+      ),
       body: SafeArea(
-        child: Column(
-          children: [
-            Container(
-              color: colorScheme.surface,
-              height: 52,
-              child: Stack(
-                alignment: Alignment.center,
+        top: false,
+        child: SingleChildScrollView(
+          padding: LecturerStyle.pageInsets,
+          child: ContentConstraint(
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: IconButton(
-                      onPressed: () => context.go(LecturerRoutePaths.profil),
-                      icon: const Icon(Icons.arrow_back_ios_new),
-                      iconSize: 19,
-                      color: colorScheme.primary,
-                      tooltip: 'Kembali',
-                    ),
+                  const SizedBox(height: AppSpacing.sm),
+                  AuthTextField(
+                    label: 'Kata Sandi Saat Ini',
+                    hintText: 'Masukkan kata sandi saat ini',
+                    controller: _currentController,
+                    enabled: !_isSubmitting,
+                    isPassword: true,
+                    showVisibilityToggle: true,
+                    validator: _validateCurrent,
                   ),
-                  Text(
-                    'Ubah Kata Sandi',
-                    style: TextStyle(
-                      color: colorScheme.onSurface,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  const SizedBox(height: AuthStyle.fieldGap),
+                  AuthTextField(
+                    label: 'Kata Sandi Baru',
+                    hintText: 'Masukkan kata sandi',
+                    helperText: 'Minimal $_minimumPasswordLength karakter.',
+                    controller: _newController,
+                    enabled: !_isSubmitting,
+                    isPassword: true,
+                    showVisibilityToggle: true,
+                    validator: _validateNew,
+                  ),
+                  const SizedBox(height: AuthStyle.fieldGap),
+                  AuthTextField(
+                    label: 'Konfirmasi Kata Sandi Baru',
+                    hintText: 'Masukkan ulang kata sandi',
+                    controller: _confirmationController,
+                    enabled: !_isSubmitting,
+                    isPassword: true,
+                    showVisibilityToggle: true,
+                    textInputAction: TextInputAction.done,
+                    onFieldSubmitted: (_) => _submit(),
+                    validator: _validateConfirmation,
                   ),
                 ],
               ),
             ),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(18, 20, 18, 48),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _LecturerPasswordField(
-                        label: 'Kata Sandi Saat Ini',
-                        hint: 'Masukkan kata sandi saat ini',
-                        controller: _currentController,
-                        enabled: !_isSubmitting,
-                        validator: _validateCurrent,
-                      ),
-                      const SizedBox(height: 12),
-                      _LecturerPasswordField(
-                        label: 'Kata Sandi Baru',
-                        hint: 'Masukkan kata sandi',
-                        controller: _newController,
-                        enabled: !_isSubmitting,
-                        validator: _validateNew,
-                      ),
-                      const SizedBox(height: 12),
-                      _LecturerPasswordField(
-                        label: 'Konfirmasi Kata Sandi Baru',
-                        hint: 'Masukkan ulang kata sandi',
-                        controller: _confirmationController,
-                        enabled: !_isSubmitting,
-                        textInputAction: TextInputAction.done,
-                        onSubmitted: (_) => _submit(),
-                        validator: _validateConfirmation,
-                      ),
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 42,
-                        child: FilledButton(
-                          onPressed: _isSubmitting ? null : _submit,
-                          style: FilledButton.styleFrom(
-                            backgroundColor: colorScheme.primary,
-                            foregroundColor: colorScheme.onPrimary,
-                            disabledBackgroundColor: colorScheme.primary
-                                .withValues(alpha: 0.4),
-                            disabledForegroundColor: colorScheme.onPrimary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: _isSubmitting
-                              ? SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                      colorScheme.onPrimary,
-                                    ),
-                                  ),
-                                )
-                              : const Text(
-                                  'Simpan',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
+          ),
+        ),
+      ),
+      bottomNavigationBar: LecturerBottomBar(
+        child: FilledButton(
+          onPressed: _isSubmitting ? null : _submit,
+          child: _isSubmitting ? const _SavingLabel() : const Text('Simpan'),
         ),
       ),
     );
   }
 }
 
-class _LecturerPasswordField extends StatefulWidget {
-  const _LecturerPasswordField({
-    required this.label,
-    required this.hint,
-    required this.controller,
-    required this.validator,
-    this.enabled = true,
-    this.textInputAction = TextInputAction.next,
-    this.onSubmitted,
-  });
-
-  final String label;
-  final String hint;
-  final TextEditingController controller;
-  final FormFieldValidator<String> validator;
-  final bool enabled;
-  final TextInputAction textInputAction;
-  final ValueChanged<String>? onSubmitted;
-
-  @override
-  State<_LecturerPasswordField> createState() => _LecturerPasswordFieldState();
-}
-
-class _LecturerPasswordFieldState extends State<_LecturerPasswordField> {
-  bool _isVisible = false;
+class _SavingLabel extends StatelessWidget {
+  const _SavingLabel();
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final border = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(10),
-      borderSide: BorderSide(color: colorScheme.outline),
-    );
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Text(
-          widget.label,
-          style: TextStyle(
-            color: colorScheme.onSurface,
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
+        SizedBox.square(
+          dimension: 18,
+          child: CircularProgressIndicator(
+            strokeWidth: 2,
+            // Mengikuti warna teks tombol yang sedang nonaktif.
+            color: DefaultTextStyle.of(context).style.color,
           ),
         ),
-        const SizedBox(height: 7),
-        TextFormField(
-          controller: widget.controller,
-          enabled: widget.enabled,
-          obscureText: !_isVisible,
-          textInputAction: widget.textInputAction,
-          onFieldSubmitted: widget.onSubmitted,
-          validator: widget.validator,
-          style: TextStyle(color: colorScheme.onSurface, fontSize: 12),
-          decoration: InputDecoration(
-            isDense: true,
-            hintText: widget.hint,
-            hintStyle: TextStyle(
-              color: colorScheme.onSurfaceVariant,
-              fontSize: 12,
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 12,
-              vertical: 11,
-            ),
-            errorStyle: const TextStyle(fontSize: 11),
-            suffixIconConstraints: const BoxConstraints(
-              minWidth: 38,
-              minHeight: 38,
-            ),
-            suffixIcon: IconButton(
-              onPressed: () => setState(() => _isVisible = !_isVisible),
-              padding: EdgeInsets.zero,
-              icon: Icon(
-                _isVisible ? Icons.visibility_outlined : Icons.visibility_off,
-                size: 15,
-                color: colorScheme.onSurfaceVariant,
-              ),
-              tooltip: _isVisible
-                  ? 'Sembunyikan kata sandi'
-                  : 'Tampilkan kata sandi',
-            ),
-            border: border,
-            enabledBorder: border,
-            focusedBorder: border.copyWith(
-              borderSide: BorderSide(color: colorScheme.primary),
-            ),
-          ),
-        ),
+        const SizedBox(width: AppSpacing.md),
+        const Text('Menyimpan…'),
       ],
     );
   }

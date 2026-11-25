@@ -1,44 +1,57 @@
-﻿import 'dart:typed_data';
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../data/dosen/dummy_lecturer_auth_repository.dart';
+import '../../data/dosen/lecturer_profile_preview.dart';
+import '../../data/dosen/lecturer_providers.dart';
 import '../../models/dosen/lecturer_profile.dart';
 import '../../routing/lecturer_route_paths.dart';
+import '../../theme/style/lecturer_style.dart';
+import '../../widgets/widgets.dart';
+import 'widgets/content_constraint.dart';
+import 'widgets/lecturer_app_bar.dart';
 import 'widgets/logout_confirmation_dialog.dart';
+import 'widgets/section_card.dart';
 
 const _maxPhotoSizeInBytes = 5 * 1024 * 1024;
 
-class LecturerProfilePage extends StatefulWidget {
-  const LecturerProfilePage({
-    required this.profile,
-    super.key,
-  });
+class LecturerProfilePage extends ConsumerStatefulWidget {
+  const LecturerProfilePage({this.profile, super.key});
 
-  final LecturerProfile profile;
+  /// Data lokal sebagai fallback saat backend belum merespons.
+  final LecturerProfile? profile;
 
   @override
-  State<LecturerProfilePage> createState() => _LecturerProfilePageState();
+  ConsumerState<LecturerProfilePage> createState() =>
+      _LecturerProfilePageState();
 }
 
-class _LecturerProfilePageState extends State<LecturerProfilePage> {
+class _LecturerProfilePageState extends ConsumerState<LecturerProfilePage> {
   Uint8List? _photoBytes;
   bool _isUpdatingPhoto = false;
+  LecturerProfile _profile = currentLecturerProfile();
 
   @override
   void initState() {
     super.initState();
-    _photoBytes = widget.profile.photoBytes;
+    _photoBytes = widget.profile?.photoBytes;
   }
 
   Future<void> _confirmLogout() async {
     final shouldLogout = await showLecturerLogoutDialog(
       context,
-      fullName: widget.profile.fullName,
-      email: widget.profile.email,
+      fullName: _profile.fullName,
+      email: _profile.email,
     );
     if (!shouldLogout || !mounted) return;
+    lecturerAuthRepository.logout();
+    ref.invalidate(dosenDashboardProvider);
+    ref.read(attendanceQueryProvider.notifier).clear();
     context.go(LecturerRoutePaths.login);
   }
 
@@ -82,38 +95,83 @@ class _LecturerProfilePageState extends State<LecturerProfilePage> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final scheme = Theme.of(context).colorScheme;
+    final dashboardAsync = ref.watch(dosenDashboardProvider);
+    _profile =
+        dashboardAsync.value?.dosen ??
+        widget.profile ??
+        currentLecturerProfile();
 
     return Scaffold(
-      backgroundColor: colorScheme.surfaceContainerHighest,
+      appBar: LecturerAppBar(
+        title: 'Informasi Akun',
+        onBack: () => context.go(LecturerRoutePaths.beranda),
+        actions: [
+          IconButton(
+            tooltip: 'Muat ulang data akun',
+            onPressed: () => ref.invalidate(dosenDashboardProvider),
+            icon: dashboardAsync.isLoading
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(PhosphorIconsRegular.arrowsClockwise),
+          ),
+        ],
+      ),
       body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            _LecturerProfileHeader(
-              profile: widget.profile,
-              photoBytes: _photoBytes,
-              isUpdatingPhoto: _isUpdatingPhoto,
-              onPickPhoto: _pickPhoto,
-            ),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(14, 14, 14, 20),
-                child: Column(
-                  children: [
-                    _LecturerInformationCard(profile: widget.profile),
-                    const SizedBox(height: 14),
-                    _LecturerActionsCard(
-                      onPickPhoto: _pickPhoto,
-                      onChangePassword: () =>
-                          context.push(LecturerRoutePaths.changePassword),
-                      onLogout: _confirmLogout,
+        top: false,
+        child: SingleChildScrollView(
+          padding: LecturerStyle.pageInsets,
+          child: ContentConstraint(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (dashboardAsync.hasError) ...[
+                  AppBanner(
+                    tone: StatusTone.danger,
+                    message:
+                        'Gagal memuat data akun dari server. Menampilkan '
+                        'data tersimpan.',
+                    action: TextButton(
+                      style: TextButton.styleFrom(
+                        foregroundColor: StatusTone.danger.ink,
+                      ),
+                      onPressed: () => ref.invalidate(dosenDashboardProvider),
+                      child: const Text('Coba lagi'),
                     ),
-                  ],
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                ],
+                const SizedBox(height: AppSpacing.sm),
+                _LecturerProfileHeader(
+                  profile: _profile,
+                  photoBytes: _photoBytes,
+                  isUpdatingPhoto: _isUpdatingPhoto,
+                  onPickPhoto: _pickPhoto,
                 ),
-              ),
+                const SizedBox(height: AppSpacing.xl),
+                _LecturerInformationCard(profile: _profile),
+                const SizedBox(height: AppSpacing.lg),
+                _LecturerActionsCard(
+                  onPickPhoto: _pickPhoto,
+                  onChangePassword: () =>
+                      context.push(LecturerRoutePaths.changePassword),
+                ),
+                const SizedBox(height: AppSpacing.xxl),
+                OutlinedButton.icon(
+                  key: const ValueKey('lecturer-logout'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: scheme.error,
+                    side: BorderSide(color: scheme.error),
+                  ),
+                  onPressed: _confirmLogout,
+                  icon: const Icon(PhosphorIconsRegular.signOut, size: 20),
+                  label: const Text('Keluar'),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -135,74 +193,60 @@ class _LecturerProfileHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
 
     return Container(
-      color: colorScheme.surface,
-      child: Column(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        gradient: AppColors.heroGradient,
+        borderRadius: AppRadius.hero,
+        boxShadow: AppColors.shadowLifted,
+      ),
+      child: Row(
         children: [
-          SizedBox(
-            height: 52,
-            child: Stack(
-              alignment: Alignment.center,
+          Container(
+            padding: const EdgeInsets.all(2.5),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.45),
+                width: 2,
+              ),
+            ),
+            child: _LecturerAvatar(
+              photoBytes: photoBytes,
+              isUpdating: isUpdatingPhoto,
+              onTap: onPickPhoto,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.lg),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: IconButton(
-                    onPressed: () => context.go(LecturerRoutePaths.beranda),
-                    icon: const Icon(Icons.arrow_back_ios_new),
-                    iconSize: 19,
-                    color: colorScheme.primary,
-                    tooltip: 'Kembali',
+                Text(
+                  profile.fullName,
+                  // Nama dosen dengan gelar bisa panjang.
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: text.titleLarge?.copyWith(
+                    color: Colors.white,
+                    height: 1.22,
                   ),
                 ),
+                const SizedBox(height: AppSpacing.xs),
                 Text(
-                  'Informasi Akun',
-                  style: TextStyle(
-                    color: colorScheme.onSurface,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
+                  profile.role,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: text.bodyMedium?.copyWith(
+                    color: AppColors.onBrandMuted,
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 10),
-          _LecturerAvatar(
-            photoBytes: photoBytes,
-            isUpdating: isUpdatingPhoto,
-            onTap: onPickPhoto,
-          ),
-          const SizedBox(height: 10),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Text(
-              profile.fullName,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: colorScheme.onSurface,
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          const SizedBox(height: 6),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 4),
-            decoration: BoxDecoration(
-              color: colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              profile.role.toUpperCase(),
-              style: TextStyle(
-                color: colorScheme.primary,
-                fontSize: 9,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
         ],
       ),
     );
@@ -216,8 +260,8 @@ class _LecturerAvatar extends StatelessWidget {
     required this.onTap,
   });
 
-  static const _avatarSize = 76.0;
-  static const _badgeSize = 26.0;
+  static const _avatarSize = LecturerStyle.headerAvatarSize;
+  static const _badgeSize = 24.0;
 
   final Uint8List? photoBytes;
   final bool isUpdating;
@@ -225,19 +269,20 @@ class _LecturerAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final photo = photoBytes;
 
     return Semantics(
       button: true,
       label: 'Ubah foto profil',
       child: SizedBox(
-        width: _avatarSize + _badgeSize / 2,
-        height: _avatarSize + _badgeSize / 2,
+        width: _avatarSize + AppSpacing.xs,
+        height: _avatarSize + AppSpacing.xs,
         child: Stack(
           children: [
             Material(
-              color: colorScheme.primaryContainer,
+              color: AppColors.brand100,
               shape: const CircleBorder(),
               clipBehavior: Clip.antiAlias,
               child: InkWell(
@@ -246,10 +291,10 @@ class _LecturerAvatar extends StatelessWidget {
                   width: _avatarSize,
                   height: _avatarSize,
                   child: photo == null
-                      ? Icon(
-                          Icons.person,
-                          size: 48,
-                          color: colorScheme.primary.withValues(alpha: 0.35),
+                      ? const Icon(
+                          PhosphorIconsRegular.user,
+                          size: 40,
+                          color: AppColors.brand800,
                         )
                       : Image.memory(
                           photo,
@@ -260,21 +305,22 @@ class _LecturerAvatar extends StatelessWidget {
               ),
             ),
             if (isUpdating)
-              Positioned.fill(
+              Positioned(
+                left: 0,
+                top: 0,
+                width: _avatarSize,
+                height: _avatarSize,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: colorScheme.onSurface.withValues(alpha: 0.28),
+                    color: scheme.scrim.withValues(alpha: 0.45),
                     shape: BoxShape.circle,
                   ),
-                  child: Center(
-                    child: SizedBox(
-                      width: 22,
-                      height: 22,
+                  child: const Center(
+                    child: SizedBox.square(
+                      dimension: 22,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          colorScheme.onPrimary,
-                        ),
+                        color: Colors.white,
                       ),
                     ),
                   ),
@@ -283,18 +329,24 @@ class _LecturerAvatar extends StatelessWidget {
             Positioned(
               right: 0,
               bottom: 0,
-              child: Container(
-                width: _badgeSize,
-                height: _badgeSize,
-                decoration: BoxDecoration(
-                  color: colorScheme.primary,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: colorScheme.surface, width: 2),
-                ),
-                child: Icon(
-                  Icons.photo_camera_outlined,
-                  size: 13,
-                  color: colorScheme.onPrimary,
+              // Lencana hanya penanda; ketukan diteruskan ke avatar.
+              child: IgnorePointer(
+                child: Container(
+                  width: _badgeSize,
+                  height: _badgeSize,
+                  decoration: BoxDecoration(
+                    color: scheme.primary,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: theme.scaffoldBackgroundColor,
+                      width: 2,
+                    ),
+                  ),
+                  child: Icon(
+                    PhosphorIconsRegular.camera,
+                    size: 12,
+                    color: scheme.onPrimary,
+                  ),
                 ),
               ),
             ),
@@ -312,109 +364,53 @@ class _LecturerInformationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
+    return SectionCard(
+      padding: LecturerStyle.detailCardInsets,
       child: Column(
         children: [
-          _LecturerInformationRow(
-            icon: Icons.credit_card_outlined,
+          _InformationRow(
             label: 'NIP/NIDN',
             value: profile.staffId,
+            tabular: true,
           ),
-          _LecturerInformationRow(
-            icon: Icons.mail_outline,
-            label: 'Email',
-            value: profile.email,
-          ),
-          _LecturerInformationRow(
-            icon: Icons.call_outlined,
+          const Divider(),
+          _InformationRow(label: 'Email', value: profile.email),
+          const Divider(),
+          _InformationRow(
             label: 'Nomor HP',
             value: profile.phoneNumber,
+            tabular: true,
           ),
-          _LecturerInformationRow(
-            icon: Icons.person_outline,
-            label: 'Role',
-            value: profile.role,
-            showDivider: false,
-          ),
+          const Divider(),
+          _InformationRow(label: 'Peran', value: profile.role),
         ],
       ),
     );
   }
 }
 
-class _LecturerInformationRow extends StatelessWidget {
-  const _LecturerInformationRow({
-    required this.icon,
+class _InformationRow extends StatelessWidget {
+  const _InformationRow({
     required this.label,
     required this.value,
-    this.showDivider = true,
+    this.tabular = false,
   });
 
-  final IconData icon;
   final String label;
   final String value;
-  final bool showDivider;
+  final bool tabular;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final style = Theme.of(context).textTheme.titleSmall;
 
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-          child: Row(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  icon,
-                  size: 16,
-                  color: colorScheme.primary,
-                ),
-              ),
-              const SizedBox(width: 11),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      label,
-                      style: TextStyle(
-                        color: colorScheme.onSurfaceVariant,
-                        fontSize: 10,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      value,
-                      style: TextStyle(
-                        color: colorScheme.onSurface,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        if (showDivider)
-          Divider(height: 1, thickness: 1, color: colorScheme.outlineVariant),
-      ],
+    return AppKeyValueRow(
+      label: label,
+      trailing: Text(
+        value.trim().isEmpty ? '-' : value,
+        textAlign: TextAlign.right,
+        style: tabular ? style?.tabular : style,
+      ),
     );
   }
 }
@@ -423,52 +419,29 @@ class _LecturerActionsCard extends StatelessWidget {
   const _LecturerActionsCard({
     required this.onPickPhoto,
     required this.onChangePassword,
-    required this.onLogout,
   });
 
   final VoidCallback onPickPhoto;
   final VoidCallback onChangePassword;
-  final VoidCallback onLogout;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    const neutralIconBackground = Color(0xFFEEEEEE);
-
-    return Container(
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
+    return SectionCard(
+      padding: EdgeInsets.zero,
       child: Column(
         children: [
           _LecturerActionRow(
             key: const ValueKey('lecturer-change-photo'),
-            icon: Icons.photo_camera_outlined,
+            icon: PhosphorIconsRegular.camera,
             label: 'Ubah Foto Profil',
-            iconBackground: neutralIconBackground,
-            iconColor: colorScheme.primary,
             onTap: onPickPhoto,
           ),
-          Divider(height: 1, thickness: 1, color: colorScheme.outlineVariant),
+          const Divider(),
           _LecturerActionRow(
             key: const ValueKey('lecturer-change-password'),
-            icon: Icons.key_outlined,
+            icon: PhosphorIconsRegular.key,
             label: 'Ubah Kata Sandi',
-            iconBackground: neutralIconBackground,
-            iconColor: colorScheme.primary,
             onTap: onChangePassword,
-          ),
-          Divider(height: 1, thickness: 1, color: colorScheme.outlineVariant),
-          _LecturerActionRow(
-            key: const ValueKey('lecturer-logout'),
-            icon: Icons.logout,
-            label: 'Keluar',
-            iconBackground: colorScheme.errorContainer,
-            iconColor: colorScheme.error,
-            labelColor: colorScheme.error,
-            onTap: onLogout,
           ),
         ],
       ),
@@ -481,57 +454,49 @@ class _LecturerActionRow extends StatelessWidget {
     super.key,
     required this.icon,
     required this.label,
-    required this.iconBackground,
-    required this.iconColor,
-    this.labelColor,
-    this.onTap,
+    required this.onTap,
   });
 
   final IconData icon;
   final String label;
-  final Color iconBackground;
-  final Color iconColor;
-  final Color? labelColor;
-  final VoidCallback? onTap;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return InkWell(
-      onTap: onTap,
-      child: SizedBox(
-        height: 52,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          child: Row(
-            children: [
-              Container(
-                width: 30,
-                height: 30,
-                decoration: BoxDecoration(
-                  color: iconBackground,
-                  borderRadius: BorderRadius.circular(10),
+    return Semantics(
+      button: true,
+      child: InkWell(
+        onTap: onTap,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(
+            minHeight: LecturerStyle.rowMinHeight,
+          ),
+          child: Padding(
+            padding: LecturerStyle.rowInsets,
+            child: Row(
+              children: [
+                Container(
+                  width: LecturerStyle.rowLeadingSize,
+                  height: LecturerStyle.rowLeadingSize,
+                  decoration: const BoxDecoration(
+                    color: AppColors.brand50,
+                    borderRadius: AppRadius.control,
+                  ),
+                  child: Icon(icon, size: 22, color: AppColors.brand700),
                 ),
-                child: Icon(icon, size: 16, color: iconColor),
-              ),
-              const SizedBox(width: 11),
-              Expanded(
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    color: labelColor ?? colorScheme.onSurface,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Text(
+                    label,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall,
                   ),
                 ),
-              ),
-              Icon(
-                Icons.chevron_right,
-                color: colorScheme.onSurfaceVariant,
-                size: 18,
-              ),
-            ],
+                const SizedBox(width: AppSpacing.sm),
+                const Icon(PhosphorIconsRegular.caretRight, color: AppColors.inkFaint),
+              ],
+            ),
           ),
         ),
       ),

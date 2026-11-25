@@ -1,16 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../data/admin/admin_auth_repository.dart';
+import '../../data/admin/admin_master_data_service.dart';
 import '../../data/admin/jadwal.dart';
-import '../../data/admin/mata_kuliah.dart';
 import '../../routing/admin_route_paths.dart';
 import 'widgets/labeled_fields.dart';
 
-const _programStudi = {
-  'D4-TI': 'D4 Teknik Informatika',
-  'D4-SIB': 'D4 Sistem Informasi Bisnis',
-  'D2-PPLS': 'D2 Pengembangan Perangkat Lunak Situs',
-};
 const _sksOptions = ['1', '2', '3', '4'];
 const _semesterOptions = ['1', '2', '3', '4', '5', '6', '7', '8'];
 
@@ -29,9 +26,8 @@ class _TambahMataKuliahPageState extends State<TambahMataKuliahPage> {
   final _namaController = TextEditingController();
 
   String _sks = '3';
-  String _prodi = _programStudi.keys.first;
   String _semester = '3';
-  MataKuliahStatus _status = MataKuliahStatus.aktif;
+  bool _isSubmitting = false;
 
   @override
   void initState() {
@@ -41,11 +37,7 @@ class _TambahMataKuliahPageState extends State<TambahMataKuliahPage> {
       _kodeController.text = item.kode;
       _namaController.text = item.nama;
       _sks = item.sks.toString();
-      _prodi = _programStudi.containsKey(item.programStudiKode)
-          ? item.programStudiKode
-          : _programStudi.keys.first;
       _semester = item.semester.toString();
-      _status = item.status;
     }
   }
 
@@ -56,34 +48,36 @@ class _TambahMataKuliahPageState extends State<TambahMataKuliahPage> {
     super.dispose();
   }
 
-  void _save() {
+  Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final kode = _kodeController.text.trim();
-    if (mataKuliahRepository.codeExists(
-      kode,
-      excludingId: widget.initialItem?.id,
-    )) {
-      _showError('Kode mata kuliah tersebut sudah terdaftar.');
+    setState(() => _isSubmitting = true);
+    try {
+      if (widget.initialItem == null) {
+        await adminMasterDataService.createMataKuliah(
+          kode: _kodeController.text,
+          nama: _namaController.text,
+          semester: int.parse(_semester),
+          sks: int.parse(_sks),
+        );
+      } else {
+        await adminMasterDataService.updateMataKuliah(
+          originalKode: widget.initialItem!.kode,
+          kode: _kodeController.text,
+          nama: _namaController.text,
+          semester: int.parse(_semester),
+          sks: int.parse(_sks),
+        );
+      }
+    } on AdminRemoteApiException catch (error) {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        _showError(error.message);
+      }
       return;
     }
 
-    final item = MataKuliah(
-      id: widget.initialItem?.id ?? mataKuliahRepository.generateId(),
-      kode: kode,
-      nama: _namaController.text.trim(),
-      sks: int.parse(_sks),
-      programStudiKode: _prodi,
-      semester: int.parse(_semester),
-      status: _status,
-    );
-
-    if (widget.initialItem == null) {
-      mataKuliahRepository.add(item);
-    } else {
-      mataKuliahRepository.update(item);
-    }
-
+    if (!mounted) return;
     if (context.canPop()) {
       context.pop(true);
     } else {
@@ -133,37 +127,16 @@ class _TambahMataKuliahPageState extends State<TambahMataKuliahPage> {
             ),
             const SizedBox(height: 16),
             LabeledDropdown(
-              label: 'Program Studi',
-              required: true,
-              value: _prodi,
-              items: _programStudi.keys.toList(),
-              itemLabels: _programStudi,
-              onChanged: (value) => setState(() => _prodi = value),
-            ),
-            const SizedBox(height: 16),
-            LabeledDropdown(
               label: 'Semester',
               required: true,
               value: _semester,
               items: _semesterOptions,
               onChanged: (value) => setState(() => _semester = value),
             ),
-            const SizedBox(height: 16),
-            LabeledDropdown(
-              label: 'Status',
-              required: true,
-              value: _status.name == 'aktif' ? 'Aktif' : 'Non-Aktif',
-              items: const ['Aktif', 'Non-Aktif'],
-              onChanged: (value) => setState(
-                () => _status = value == 'Aktif'
-                    ? MataKuliahStatus.aktif
-                    : MataKuliahStatus.nonAktif,
-              ),
-            ),
           ],
         ),
       ),
-      onSave: _save,
+      onSave: _isSubmitting ? null : _save,
     );
   }
 
@@ -183,7 +156,7 @@ class AdminFormScaffold extends StatelessWidget {
 
   final String title;
   final Widget form;
-  final VoidCallback onSave;
+  final VoidCallback? onSave;
 
   @override
   Widget build(BuildContext context) {
@@ -198,7 +171,7 @@ class AdminFormScaffold extends StatelessWidget {
           onPressed: () => context.canPop()
               ? context.pop()
               : context.go(AdminRoutePaths.mataKuliah),
-          icon: Icon(Icons.arrow_back_ios_new_rounded, color: cs.primary),
+          icon: Icon(PhosphorIconsRegular.arrowLeft, color: cs.primary),
           tooltip: 'Kembali',
         ),
         title: Text(

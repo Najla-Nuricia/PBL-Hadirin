@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../theme/style/auth_style.dart';
+import '../../../../widgets/widgets.dart';
 
+/// Kerangka layar auth: langit [AuthHeader] sampai ke balik status bar,
+/// isi dibatasi lebarnya di layar lebar.
 class AuthScaffold extends StatelessWidget {
   const AuthScaffold({required this.child, super.key});
 
@@ -9,26 +13,22 @@ class AuthScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Scaffold(
-      backgroundColor: colorScheme.surfaceContainerHighest,
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(
-            maxWidth: AuthStyle.maxContentWidth,
-          ),
-          child: SizedBox.expand(
-            child: ColoredBox(
-              color: colorScheme.surface,
-              child: Column(
-                children: [
-                  Expanded(child: SafeArea(bottom: false, child: child)),
-                  Container(
-                    height: AuthStyle.bottomAccentHeight,
-                    color: colorScheme.primary,
-                  ),
-                ],
+    // Layar ini tidak memakai AppBar, jadi warna ikon status bar diatur di
+    // sini: gelap di atas langit.
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: skyStatusBar,
+      child: Scaffold(
+        backgroundColor: AppColors.canvas,
+        body: AuroraBackground(
+          child: SafeArea(
+            // Langit di AuthHeader sudah memberi jarak status bar sendiri.
+            top: false,
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: AuthStyle.maxContentWidth,
+                ),
+                child: SizedBox.expand(child: child),
               ),
             ),
           ),

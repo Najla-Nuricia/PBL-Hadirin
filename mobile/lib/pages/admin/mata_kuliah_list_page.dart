@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
+import '../../data/admin/admin_auth_repository.dart';
+import '../../data/admin/admin_master_data_service.dart';
 import '../../data/admin/jadwal.dart';
-import '../../data/admin/mata_kuliah.dart';
 import '../../routing/admin_route_paths.dart';
+import '../../widgets/widgets.dart';
 import 'tambah_mata_kuliah_page.dart';
 
 class MataKuliahListPage extends StatefulWidget {
@@ -15,11 +18,16 @@ class MataKuliahListPage extends StatefulWidget {
 
 class _MataKuliahListPageState extends State<MataKuliahListPage> {
   final _searchController = TextEditingController();
+  List<MataKuliah> _items = [];
+  List<MataKuliah> _displayed = [];
+  bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
     super.initState();
     _searchController.addListener(_refreshSearch);
+    _load();
   }
 
   @override
@@ -29,7 +37,44 @@ class _MataKuliahListPageState extends State<MataKuliahListPage> {
     super.dispose();
   }
 
-  void _refreshSearch() => setState(() {});
+  void _refreshSearch() {
+    final query = _searchController.text.trim().toLowerCase();
+    setState(() {
+      _displayed = query.isEmpty
+          ? List.unmodifiable(_items)
+          : _items
+                .where(
+                  (item) =>
+                      item.kode.toLowerCase().contains(query) ||
+                      item.nama.toLowerCase().contains(query),
+                )
+                .toList(growable: false);
+    });
+  }
+
+  Future<void> _load() async {
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+        _errorMessage = null;
+      });
+    }
+    try {
+      final items = await adminMasterDataService.listMataKuliah();
+      if (!mounted) return;
+      setState(() {
+        _items = items;
+        _displayed = items;
+        _isLoading = false;
+      });
+    } on AdminRemoteApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = error.message;
+      });
+    }
+  }
 
   void _back() {
     if (context.canPop()) {
@@ -45,7 +90,7 @@ class _MataKuliahListPageState extends State<MataKuliahListPage> {
         builder: (_) => TambahMataKuliahPage(initialItem: item),
       ),
     );
-    if (saved == true && mounted) setState(() {});
+    if (saved == true && mounted) await _load();
   }
 
   Future<void> _delete(MataKuliah item) async {
@@ -76,8 +121,12 @@ class _MataKuliahListPageState extends State<MataKuliahListPage> {
       },
     );
     if (confirmed != true || !mounted) return;
-    mataKuliahRepository.delete(item.id);
-    setState(() {});
+    try {
+      await adminMasterDataService.deleteMataKuliah(item.kode);
+      if (mounted) await _load();
+    } on AdminRemoteApiException catch (error) {
+      if (mounted) _showError(error.message);
+    }
   }
 
   @override
@@ -94,28 +143,25 @@ class _MataKuliahListPageState extends State<MataKuliahListPage> {
             _buildSearchBar(colorScheme),
             const SizedBox(height: 8),
             Expanded(
-              child: ListenableBuilder(
-                listenable: mataKuliahRepository,
-                builder: (context, _) {
-                  final displayed = mataKuliahRepository.search(
-                    _searchController.text,
-                  );
-                  if (displayed.isEmpty) return _buildEmpty(colorScheme);
-                  return ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-                    itemCount: displayed.length,
-                    separatorBuilder: (_, index) => const SizedBox(height: 8),
-                    itemBuilder: (context, index) {
-                      final item = displayed[index];
-                      return _MataKuliahCard(
-                        item: item,
-                        onEdit: () => _openForm(item: item),
-                        onDelete: () => _delete(item),
-                      );
-                    },
-                  );
-                },
-              ),
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _errorMessage != null
+                  ? _buildError(colorScheme)
+                  : _displayed.isEmpty
+                  ? _buildEmpty(colorScheme)
+                  : ListView.separated(
+                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                      itemCount: _displayed.length,
+                      separatorBuilder: (_, index) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final item = _displayed[index];
+                        return _MataKuliahCard(
+                          item: item,
+                          onEdit: () => _openForm(item: item),
+                          onDelete: () => _delete(item),
+                        );
+                      },
+                    ),
             ),
           ],
         ),
@@ -124,40 +170,34 @@ class _MataKuliahListPageState extends State<MataKuliahListPage> {
   }
 
   Widget _buildHeader(ColorScheme colorScheme) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 12, 16, 12),
+    return SkyHeader(
+      includeStatusBar: false,
       child: Row(
         children: [
           IconButton(
             onPressed: _back,
-            icon: Icon(
-              Icons.arrow_back_ios_new_rounded,
-              size: 20,
-              color: colorScheme.primary,
-            ),
+            icon: const Icon(PhosphorIconsRegular.arrowLeft, size: 20),
+            color: AppColors.gownNavy,
             tooltip: 'Kembali',
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: AppSpacing.xs),
           Expanded(
             child: Text(
               'Mata Kuliah',
-              style: TextStyle(
-                color: colorScheme.onSurface,
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-              ),
+              style: Theme.of(context).textTheme.titleLarge
+                  ?.copyWith(color: AppColors.gownNavy),
             ),
           ),
           FilledButton.icon(
             onPressed: () => _openForm(),
-            icon: const Icon(Icons.add, size: 18),
+            icon: const Icon(PhosphorIconsRegular.plus, size: 18),
             label: const Text('Tambah'),
             style: FilledButton.styleFrom(
               backgroundColor: colorScheme.primary,
               foregroundColor: colorScheme.onPrimary,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
+              shape: const RoundedRectangleBorder(
+                borderRadius: AppRadius.control,
               ),
             ),
           ),
@@ -178,7 +218,7 @@ class _MataKuliahListPageState extends State<MataKuliahListPage> {
             fontSize: 13,
           ),
           prefixIcon: Icon(
-            Icons.search,
+            PhosphorIconsRegular.magnifyingGlass,
             color: colorScheme.onSurfaceVariant,
             size: 20,
           ),
@@ -186,7 +226,7 @@ class _MataKuliahListPageState extends State<MataKuliahListPage> {
               ? IconButton(
                   onPressed: _searchController.clear,
                   icon: Icon(
-                    Icons.close,
+                    PhosphorIconsRegular.x,
                     color: colorScheme.onSurfaceVariant,
                     size: 18,
                   ),
@@ -219,7 +259,7 @@ class _MataKuliahListPageState extends State<MataKuliahListPage> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(
-            Icons.menu_book_outlined,
+            PhosphorIconsRegular.bookOpen,
             size: 48,
             color: colorScheme.onSurfaceVariant,
           ),
@@ -231,6 +271,38 @@ class _MataKuliahListPageState extends State<MataKuliahListPage> {
         ],
       ),
     );
+  }
+
+  Widget _buildError(ColorScheme colorScheme) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              PhosphorIconsRegular.cloudSlash,
+              size: 48,
+              color: colorScheme.error,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              _errorMessage!,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton(onPressed: _load, child: const Text('Coba lagi')),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 }
 
@@ -248,8 +320,6 @@ class _MataKuliahCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final isActive = item.status == MataKuliahStatus.aktif;
-
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 13, 6, 13),
       decoration: BoxDecoration(
@@ -267,7 +337,7 @@ class _MataKuliahCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
-              Icons.menu_book_outlined,
+              PhosphorIconsRegular.bookOpen,
               color: colorScheme.primary,
               size: 20,
             ),
@@ -295,29 +365,6 @@ class _MataKuliahCard extends StatelessWidget {
                     fontSize: 11,
                   ),
                 ),
-                const SizedBox(height: 5),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 7,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isActive
-                        ? colorScheme.secondaryContainer
-                        : colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    item.status.label,
-                    style: TextStyle(
-                      color: isActive
-                          ? colorScheme.onSecondaryContainer
-                          : colorScheme.onSurfaceVariant,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
               ],
             ),
           ),
@@ -327,7 +374,10 @@ class _MataKuliahCard extends StatelessWidget {
             constraints: const BoxConstraints.tightFor(width: 32, height: 32),
             padding: EdgeInsets.zero,
             visualDensity: VisualDensity.compact,
-            icon: Icon(Icons.edit_outlined, color: colorScheme.primary),
+            icon: Icon(
+              PhosphorIconsRegular.pencilSimple,
+              color: colorScheme.primary,
+            ),
           ),
           IconButton(
             onPressed: onDelete,
@@ -335,7 +385,7 @@ class _MataKuliahCard extends StatelessWidget {
             constraints: const BoxConstraints.tightFor(width: 32, height: 32),
             padding: EdgeInsets.zero,
             visualDensity: VisualDensity.compact,
-            icon: Icon(Icons.delete_outline, color: colorScheme.error),
+            icon: Icon(PhosphorIconsRegular.trash, color: colorScheme.error),
           ),
         ],
       ),

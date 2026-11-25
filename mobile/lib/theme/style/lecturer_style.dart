@@ -1,13 +1,46 @@
+import 'package:flutter/widgets.dart';
+
+import '../app_tokens.dart';
+
+/// Ukuran tata letak layar dosen, semuanya diturunkan dari token pusat.
 abstract final class LecturerStyle {
-  static const double maxContentWidth = 600;
-  static const double pagePadding = 16;
-  static const double cardRadius = 16;
-  static const double tileRadius = 14;
-  static const double controlRadius = 12;
-  static const double buttonHeight = 48;
-  static const double listGap = 8;
-  static const double appBarTitleSize = 16;
-  static const double bodySize = 14;
-  static const double captionSize = 12;
-  static const double badgeSize = 11;
+  /// Jarak isi layar yang bisa digulir.
+  static const pageInsets = EdgeInsets.fromLTRB(
+    AppSpacing.page,
+    AppSpacing.xs,
+    AppSpacing.page,
+    AppSpacing.xxl,
+  );
+
+  /// Jarak batang aksi di dasar layar.
+  static const bottomBarInsets = EdgeInsets.fromLTRB(
+    AppSpacing.page,
+    AppSpacing.md,
+    AppSpacing.page,
+    AppSpacing.lg,
+  );
+
+  static const cardInsets = EdgeInsets.all(AppSpacing.lg);
+
+  /// Kartu rincian: baris label dan nilai sudah punya jarak vertikal sendiri.
+  static const detailCardInsets = EdgeInsets.symmetric(
+    horizontal: AppSpacing.lg,
+    vertical: AppSpacing.xs,
+  );
+
+  /// Isi satu baris daftar di dalam kartu.
+  static const rowInsets = EdgeInsets.symmetric(
+    horizontal: AppSpacing.lg,
+    vertical: AppSpacing.md,
+  );
+
+  static const double rowMinHeight = 64;
+
+  /// Avatar atau kotak ikon di awal baris daftar.
+  static const double rowLeadingSize = 40;
+
+  /// Avatar di kepala layar profil dan detail mahasiswa.
+  static const double headerAvatarSize = 64;
+
+  static const double fieldLabelGap = 6;
 }

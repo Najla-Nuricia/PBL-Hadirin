@@ -1,112 +1,96 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 
 import '../../../models/dosen/student_attendance.dart';
-import '../../../theme/style/lecturer_style.dart';
-import 'section_card.dart';
+import '../../../widgets/widgets.dart';
 
+/// Baris dokumen pendukung, dipasang di dalam kartu pengajuan.
 class SupportingDocumentCard extends StatelessWidget {
   const SupportingDocumentCard({
     super.key,
     required this.document,
-    required this.onView,
+    this.onView,
   });
 
   final SupportingDocument document;
-  final VoidCallback onView;
+
+  /// Membuka dokumen. Tanpa aksi, tombol lihat tampil nonaktif.
+  final VoidCallback? onView;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return SectionCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Dokumen Pendukung',
-            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+    final text = Theme.of(context).textTheme;
+    final fileName = document.fileName.trim();
+    final caption = [
+      if (fileName.isNotEmpty) 'Dokumen Pendukung',
+      if (document.sizeLabel.isNotEmpty) document.sizeLabel,
+    ].join(' · ');
+    final previewUrl = document.previewUrl;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md,
+            AppSpacing.xs,
+            AppSpacing.xs,
+            AppSpacing.xs,
           ),
-          const SizedBox(height: 12),
-          Row(
+          decoration: const BoxDecoration(
+            color: AppColors.surfaceInset,
+            borderRadius: AppRadius.control,
+          ),
+          child: Row(
             children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: scheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(Icons.insert_drive_file_outlined,
-                    size: 20, color: scheme.primary),
-              ),
-              const SizedBox(width: 12),
+              const Icon(PhosphorIconsRegular.fileText, color: AppColors.inkMuted),
+              const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      document.fileName,
+                      fileName.isEmpty ? 'Dokumen Pendukung' : fileName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                      style: text.titleSmall,
                     ),
-                    Text(
-                      document.sizeLabel,
-                      style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
-                    ),
+                    if (caption.isNotEmpty)
+                      Text(
+                        caption,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: text.bodySmall?.tabular.copyWith(
+                          color: AppColors.inkFaint,
+                        ),
+                      ),
                   ],
                 ),
               ),
               IconButton(
                 tooltip: 'Lihat dokumen',
                 onPressed: onView,
-                icon: Icon(Icons.visibility_outlined, color: scheme.primary),
+                color: scheme.primary,
+                icon: const Icon(PhosphorIconsRegular.eye),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          _Preview(url: document.previewUrl),
-        ],
-      ),
-    );
-  }
-}
-
-class _Preview extends StatelessWidget {
-  const _Preview({this.url});
-
-  final String? url;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final placeholder = Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(Icons.image_outlined, color: scheme.onSurfaceVariant),
-        const SizedBox(height: 6),
-        Text(
-          'Preview Dokumen',
-          style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
         ),
-      ],
-    );
-
-    return Container(
-      height: 160,
-      width: double.infinity,
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(LecturerStyle.controlRadius),
-        border: Border.all(color: scheme.outline),
-      ),
-      child: url == null
-          ? placeholder
-          : Image.network(
-              url!,
+        if (previewUrl != null) ...[
+          const SizedBox(height: AppSpacing.sm),
+          ClipRRect(
+            borderRadius: AppRadius.control,
+            child: Image.network(
+              previewUrl,
+              height: 160,
               fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => placeholder,
+              errorBuilder: (_, _, _) => const SizedBox.shrink(),
             ),
+          ),
+        ],
+      ],
     );
   }
 }
