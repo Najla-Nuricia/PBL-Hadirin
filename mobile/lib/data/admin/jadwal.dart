@@ -80,10 +80,68 @@ class MataKuliah {
 }
 
 class Dosen {
-  const Dosen({required this.nip, required this.nama});
+  const Dosen({
+    required this.nip,
+    required this.nama,
+    this.email,
+    this.noHp,
+    this.authUserId,
+    this.createdAt,
+    this.updatedAt,
+  });
+
+  /// Model dari response backend `GET /admin/dosen`.
+  ///
+  /// Backend memakai `response_model_exclude_none=True`, sehingga field
+  /// opsional yang null (email, no_hp, auth_user_id) tidak dikirim sama sekali.
+  factory Dosen.fromAdminApiJson(Map<String, dynamic> json) => Dosen(
+    nip: _jsonString(json['nip']),
+    nama: _jsonString(json['nama']),
+    email: _jsonOptionalString(json['email']),
+    noHp: _jsonOptionalString(json['no_hp']),
+    authUserId: _jsonOptionalString(json['auth_user_id']),
+    createdAt: _jsonDateTime(json['created_at']),
+    updatedAt: _jsonDateTime(json['updated_at']),
+  );
+
+  factory Dosen.fromJson(Map<String, dynamic> json) =>
+      Dosen.fromAdminApiJson(json);
 
   final String nip;
   final String nama;
+  final String? email;
+  final String? noHp;
+  final String? authUserId;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+
+  /// Payload POST/PUT: tidak pernah menyertakan `created_at`/`updated_at`.
+  Map<String, dynamic> toAdminApiJson() => {
+    'nip': nip,
+    'nama': nama,
+    if (email != null && email!.trim().isNotEmpty) 'email': email!.trim(),
+    if (noHp != null && noHp!.trim().isNotEmpty) 'no_hp': noHp!.trim(),
+  };
+
+  Map<String, dynamic> toJson() => toAdminApiJson();
+
+  Dosen copyWith({
+    String? nip,
+    String? nama,
+    String? email,
+    String? noHp,
+    String? authUserId,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => Dosen(
+    nip: nip ?? this.nip,
+    nama: nama ?? this.nama,
+    email: email ?? this.email,
+    noHp: noHp ?? this.noHp,
+    authUserId: authUserId ?? this.authUserId,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
 }
 
 class ProgramStudi {
@@ -107,11 +165,58 @@ class KelasKuliah {
 }
 
 class Ruangan {
-  const Ruangan({required this.kode, required this.nama});
+  const Ruangan({
+    required this.kode,
+    required this.nama,
+    this.createdAt,
+    this.updatedAt,
+  });
+
+  /// Model dari response backend `GET /admin/ruangan`.
+  factory Ruangan.fromAdminApiJson(Map<String, dynamic> json) => Ruangan(
+    kode: _jsonString(json['kode']),
+    nama: _jsonString(json['nama']),
+    createdAt: _jsonDateTime(json['created_at']),
+    updatedAt: _jsonDateTime(json['updated_at']),
+  );
+
+  factory Ruangan.fromJson(Map<String, dynamic> json) =>
+      Ruangan.fromAdminApiJson(json);
 
   final String kode;
   final String nama;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+
+  /// Payload POST/PUT tanpa field timestamp yang dikelola backend.
+  Map<String, dynamic> toAdminApiJson() => {
+    'kode': kode.trim(),
+    'nama': nama.trim(),
+  };
+
+  Map<String, dynamic> toJson() => toAdminApiJson();
+
+  Ruangan copyWith({String? kode, String? nama}) => Ruangan(
+    kode: kode ?? this.kode,
+    nama: nama ?? this.nama,
+    createdAt: createdAt,
+    updatedAt: updatedAt,
+  );
 }
+
+// ─────────────────────────────────────────────────────────
+// Parser null-safe untuk response backend (exclude_none=True).
+// ─────────────────────────────────────────────────────────
+String _jsonString(Object? value) => value?.toString() ?? '';
+
+String? _jsonOptionalString(Object? value) {
+  if (value == null) return null;
+  final text = value.toString();
+  return text.isEmpty ? null : text;
+}
+
+DateTime? _jsonDateTime(Object? value) =>
+    value == null ? null : DateTime.tryParse(value.toString());
 
 class SesiKuliah {
   const SesiKuliah({
