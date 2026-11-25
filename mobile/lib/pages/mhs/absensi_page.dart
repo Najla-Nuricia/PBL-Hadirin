@@ -60,6 +60,14 @@ class _AbsensiPageState extends State<AbsensiPage>
   String? _selectedSessionId;
   bool _faceRegistered = true;
 
+  bool _isRoomVerified = false;
+  String? _verifiedRoomToken;
+  String? _verifiedRoomKode;
+  String? _verifiedRoomName;
+  String? _verifiedCourseName;
+  final _manualTokenController = TextEditingController();
+  bool _showManualToken = false;
+
   Uint8List? _probeImageBytes;
   String? _probeImageName;
   String? _statusMessage;
@@ -134,6 +142,7 @@ class _AbsensiPageState extends State<AbsensiPage>
     _qrScanner?.dispose();
     _qrScanner = null;
     _pulseController.dispose();
+    _manualTokenController.dispose();
     super.dispose();
   }
 
@@ -391,14 +400,14 @@ class _AbsensiPageState extends State<AbsensiPage>
   }
 
   void _onQrDetected(BarcodeCapture capture) {
-    if (_isSubmitting || _attendanceDone) return;
+    if (_isSubmitting || _attendanceDone || _isRoomVerified) return;
     for (final barcode in capture.barcodes) {
       final raw = barcode.rawValue?.trim();
       if (raw == null || raw.isEmpty) continue;
       final token = _extractQrToken(raw);
       if (token.isEmpty || token == _handledQrToken) continue;
       _handledQrToken = token;
-      _submitQrAttendance(token);
+      _validateDoorQr(token);
       return;
     }
   }
@@ -429,46 +438,56 @@ class _AbsensiPageState extends State<AbsensiPage>
     return trimmed;
   }
 
-  Future<void> _submitQrAttendance(String qrToken) async {
-    if (!studentAuthRepository.hasRemoteSession) {
-      _handledQrToken = null;
-      _showSnackBar('Login terlebih dahulu untuk mencatat presensi QR.');
-      return;
-    }
+  Future<void> _validateDoorQr(String qrToken) async {
     final location = _location;
-    if (location == null) {
-      _handledQrToken = null;
-      setState(
-        () => _errorMessage = 'Lokasi belum terdeteksi. Aktifkan GPS lalu tekan Muat Ulang Lokasi.',
-      );
-      return;
-    }
-
     setState(() {
       _errorMessage = null;
     });
     _setSubmitting(true);
     try {
-      final res = await studentDataService.submitQrAttendance(
+      final res = await studentDataService.validateRoomQr(
         qrToken: qrToken,
-        latitude: location.latitude,
-        longitude: location.longitude,
-        accuracy: location.accuracy,
+        latitude: location?.latitude,
+        longitude: location?.longitude,
+        accuracy: location?.accuracy,
       );
       if (!mounted) return;
       await _stopQrScanner();
       if (!mounted) return;
+
+      final roomKode = (res['ruangan_kode'] as String?) ?? '';
+      final roomNama = (res['ruangan_nama'] as String?) ?? roomKode;
+      final courseNama = (res['matkul_nama'] as String?) ?? '';
+      final sessionId = res['sesi_presensi_id'] as String?;
+      final msg = (res['message'] as String?) ?? 'Pintu ruangan berhasil diverifikasi!';
+
       setState(() {
-        _attendanceDone = true;
-        _statusMessage =
-            (res['message'] as String?) ?? 'Presensi QR berhasil dicatat!';
+        _isRoomVerified = true;
+        _verifiedRoomToken = qrToken;
+        _verifiedRoomKode = roomKode;
+        _verifiedRoomName = roomNama;
+        _verifiedCourseName = courseNama;
+        if (sessionId != null && sessionId.isNotEmpty) {
+          _selectedSessionId = sessionId;
+        }
+        _statusMessage = msg;
+        _errorMessage = null;
       });
-      _showSnackBar(_statusMessage!);
+      _showSnackBar(msg);
+
+      Future.delayed(const Duration(milliseconds: 1000), () {
+        if (mounted && _currentStep == 0 && _isRoomVerified) {
+          _proceedToFaceStep();
+        }
+      });
     } catch (e) {
       if (!mounted) return;
       final msg = _cleanError(e);
       _handledQrToken = null;
-      setState(() => _errorMessage = msg);
+      setState(() {
+        _isRoomVerified = false;
+        _errorMessage = msg;
+      });
       _showSnackBar(msg);
     } finally {
       if (mounted) _setSubmitting(false);
@@ -476,6 +495,12 @@ class _AbsensiPageState extends State<AbsensiPage>
   }
 
   void _proceedToFaceStep() {
+    if (!_isRoomVerified && !_isFlutterTest) {
+      const msg = 'Pindai QR di pintu ruangan kelas Anda terlebih dahulu untuk membuka verifikasi wajah.';
+      _showSnackBar(msg);
+      setState(() => _errorMessage = msg);
+      return;
+    }
     _stopQrScanner();
     setState(() {
       _currentStep = 1;
@@ -513,6 +538,7 @@ class _AbsensiPageState extends State<AbsensiPage>
         imageBytes: _probeImageBytes!,
         filename: _probeImageName ?? 'probe.jpg',
         sesiPresensiId: effectiveSessionId,
+        qrToken: _verifiedRoomToken,
         latitude: location.latitude,
         longitude: location.longitude,
         accuracy: location.accuracy,
@@ -566,6 +592,10 @@ class _AbsensiPageState extends State<AbsensiPage>
 
                       if (_currentStep == 0) ...[
                         const SizedBox(height: 16),
+                        _buildRoomStatusCard(colorScheme),
+                        const SizedBox(height: 12),
+                        _buildManualTokenSection(colorScheme),
+                        const SizedBox(height: 12),
                         _buildSessionSelector(colorScheme),
                         if (_qrScannerError != null) ...[
                           const SizedBox(height: 12),
@@ -587,6 +617,8 @@ class _AbsensiPageState extends State<AbsensiPage>
                         ],
                       ] else if (!_attendanceDone) ...[
                         const SizedBox(height: 16),
+                        _buildVerifiedRoomBadge(colorScheme),
+                        const SizedBox(height: 14),
                         _buildFacePreviewCard(colorScheme),
                       ],
                       const SizedBox(height: 16),
@@ -673,15 +705,15 @@ class _AbsensiPageState extends State<AbsensiPage>
         children: [
           _StepIndicatorItem(
             stepNumber: 1,
-            label: 'Scan QR',
+            label: '1. QR Pintu',
             isActive: _currentStep == 0,
-            isDone: _currentStep > 0 || _attendanceDone,
+            isDone: _isRoomVerified || _currentStep > 0 || _attendanceDone,
             colorScheme: colorScheme,
           ),
           Expanded(
             child: Container(
               height: 1.5,
-              color: _currentStep > 0 || _attendanceDone
+              color: _isRoomVerified || _currentStep > 0 || _attendanceDone
                   ? colorScheme.primary
                   : colorScheme.outlineVariant,
               margin: const EdgeInsets.symmetric(horizontal: 8),
@@ -689,7 +721,7 @@ class _AbsensiPageState extends State<AbsensiPage>
           ),
           _StepIndicatorItem(
             stepNumber: 2,
-            label: 'Scan Wajah',
+            label: '2. Scan Wajah',
             isActive: _currentStep == 1,
             isDone: _currentStep == 1 && _attendanceDone,
             colorScheme: colorScheme,
@@ -929,9 +961,11 @@ class _AbsensiPageState extends State<AbsensiPage>
         _errorMessage ??
         _statusMessage ??
         (_currentStep == 0
-            ? (_qrScanner == null
-                  ? 'Pemindai QR tidak aktif. Tekan Coba Buka Pemindai QR.'
-                  : 'Arahkan kamera ke QR presensi')
+            ? (_isRoomVerified
+                  ? 'Pintu Ruangan Terverifikasi! Kunci presensi wajah telah terbuka.'
+                  : (_qrScanner == null
+                        ? 'Pemindai QR tidak aktif. Pindai QR di pintu kelas atau gunakan input kode manual.'
+                        : 'Arahkan kamera ke QR Code di pintu ruangan kelas Anda'))
             : cameraHint);
     final isError = _errorMessage != null;
     final isSuccess = !isError && _attendanceDone;
@@ -947,6 +981,196 @@ class _AbsensiPageState extends State<AbsensiPage>
                   : colorScheme.onSurfaceVariant),
         fontSize: 13,
         fontWeight: (isError || isSuccess) ? FontWeight.w600 : FontWeight.w400,
+      ),
+    );
+  }
+
+  Widget _buildRoomStatusCard(ColorScheme colorScheme) {
+    if (_isRoomVerified) {
+      return Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: colorScheme.secondaryContainer.withValues(alpha: 0.6),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: colorScheme.secondary),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.check_circle, color: colorScheme.secondary, size: 30),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'PINTU RUANGAN TERVERIFIKASI',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w800,
+                      color: colorScheme.onSecondaryContainer,
+                      letterSpacing: 0.8,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${_verifiedRoomName ?? 'Ruangan'} (${_verifiedRoomKode ?? '-'})',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: colorScheme.onSecondaryContainer,
+                    ),
+                  ),
+                  if (_verifiedCourseName != null && _verifiedCourseName!.isNotEmpty)
+                    Text(
+                      'Mata Kuliah: $_verifiedCourseName',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colorScheme.onSecondaryContainer.withValues(alpha: 0.85),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.meeting_room_outlined, color: colorScheme.primary, size: 28),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Langkah 1: Pindai QR Pintu Kelas',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Pindai QR Code statis pada pintu kelas ruangan Anda. Fitur verifikasi wajah selfie akan terbuka setelah pintu ruangan sesuai.',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: colorScheme.onSurfaceVariant,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildManualTokenSection(ColorScheme colorScheme) {
+    if (_isRoomVerified) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        InkWell(
+          onTap: () => setState(() => _showManualToken = !_showManualToken),
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  _showManualToken ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                  size: 18,
+                  color: colorScheme.primary,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  _showManualToken
+                      ? 'Tutup Input Manual Kode Ruangan'
+                      : 'Kamera bermasalah? Masukkan kode ruangan manual',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: colorScheme.primary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_showManualToken) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _manualTokenController,
+                  decoration: InputDecoration(
+                    hintText: 'Contoh: RT01 atau RPL1',
+                    labelText: 'Kode / Token Ruangan',
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              FilledButton(
+                onPressed: _isSubmitting
+                    ? null
+                    : () {
+                        final text = _manualTokenController.text.trim();
+                        if (text.isEmpty) {
+                          _showSnackBar('Masukkan kode atau token ruangan.');
+                          return;
+                        }
+                        _validateDoorQr(text);
+                      },
+                child: const Text('Validasi'),
+              ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildVerifiedRoomBadge(ColorScheme colorScheme) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: colorScheme.secondaryContainer.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: colorScheme.secondary.withValues(alpha: 0.5)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.check_circle_outline, color: colorScheme.secondary, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Ruangan: ${_verifiedRoomName ?? 'Kelas'} (${_verifiedRoomKode ?? '-'})'
+              '${_verifiedCourseName != null && _verifiedCourseName!.isNotEmpty ? ' • $_verifiedCourseName' : ''}',
+              style: TextStyle(
+                fontSize: 12.5,
+                fontWeight: FontWeight.w700,
+                color: colorScheme.onSecondaryContainer,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1194,20 +1418,30 @@ class _AbsensiPageState extends State<AbsensiPage>
     }
 
     if (_currentStep == 0) {
+      final canProceed = _isRoomVerified || _isFlutterTest;
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           SizedBox(
             height: 52,
-            child: FilledButton(
+            child: FilledButton.icon(
               onPressed: _isSubmitting ? null : _proceedToFaceStep,
+              icon: Icon(
+                canProceed ? Icons.arrow_forward : Icons.lock_outline,
+                size: 18,
+              ),
               style: FilledButton.styleFrom(
-                backgroundColor: colorScheme.primary,
+                backgroundColor: canProceed
+                    ? colorScheme.primary
+                    : colorScheme.surfaceContainerHighest,
+                foregroundColor: canProceed
+                    ? colorScheme.onPrimary
+                    : colorScheme.onSurfaceVariant,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
                 ),
               ),
-              child: const Text(
+              label: const Text(
                 'Lanjutkan ke Scan Wajah',
                 style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
               ),

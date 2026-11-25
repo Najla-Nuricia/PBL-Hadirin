@@ -355,6 +355,39 @@ class StudentDataService {
     throw Exception(_extractError(res, 'Presensi QR gagal'));
   }
 
+  /// Validasi QR statis pintu ruangan sebelum membuka kamera verifikasi wajah.
+  Future<Map<String, dynamic>> validateRoomQr({
+    required String qrToken,
+    double? latitude,
+    double? longitude,
+    double? accuracy,
+  }) async {
+    await _ensureSession();
+    if (!_hasRemoteSession && studentAuthRepository.useRemoteApi) {
+      throw Exception(
+        'Sesi login server belum aktif. Pastikan backend aktif di ${ApiConfig.baseUrl} lalu masuk ulang.',
+      );
+    }
+    final uri = Uri.parse('${ApiConfig.baseUrl}/attendance/room-qr/validate');
+    final res = await _client
+        .post(
+          uri,
+          headers: _headers,
+          body: jsonEncode({
+            'qr_token': qrToken,
+            'latitude': ?latitude,
+            'longitude': ?longitude,
+            'accuracy': ?accuracy,
+          }),
+        )
+        .timeout(_timeout);
+
+    if (res.statusCode == 200) {
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    }
+    throw Exception(_extractError(res, 'Validasi QR ruangan gagal'));
+  }
+
   Future<Map<String, dynamic>> submitFaceAttendance({
     required Uint8List imageBytes,
     String filename = 'probe.jpg',
