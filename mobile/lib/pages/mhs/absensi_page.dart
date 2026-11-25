@@ -3,6 +3,7 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
@@ -16,7 +17,9 @@ import '../../widgets/widgets.dart';
 import 'absensi_parts.dart';
 import 'face_verification_page.dart';
 
-/// Presensi: pindai QR kelas atau masukkan token, lalu verifikasi wajah.
+/// Halaman presensi mahasiswa:
+/// 1. Pindai kode QR statis pada pintu ruangan kelas untuk verifikasi lokasi/ruangan.
+/// 2. Buka kamera verifikasi wajah live untuk mencatat presensi resmi.
 class AbsensiPage extends StatefulWidget {
   const AbsensiPage({super.key});
 
@@ -32,6 +35,9 @@ class _AbsensiPageState extends State<AbsensiPage> with WidgetsBindingObserver {
   List<Map<String, dynamic>> _activeSessions = const [];
   String? _selectedSessionId;
   bool _faceRegistered = true;
+
+  Map<String, dynamic>? _verifiedRoomData;
+  String? _verifiedDoorQrToken;
 
   PresensiFailure? _failure;
   String? _tokenError;
@@ -154,7 +160,6 @@ class _AbsensiPageState extends State<AbsensiPage> with WidgetsBindingObserver {
       });
     }
     try {
-      // Tunggu widget MobileScanner ter-mount & attach ke controller.
       await WidgetsBinding.instance.endOfFrame;
       await scanner.start();
       if (mounted) setState(() => _qrScannerError = null);
@@ -163,7 +168,7 @@ class _AbsensiPageState extends State<AbsensiPage> with WidgetsBindingObserver {
       setState(() {
         _qrScannerError =
             'Pemindai QR tidak bisa dibuka. Izinkan Kamera di pengaturan '
-            'aplikasi, atau masukkan token secara manual.';
+            'aplikasi, atau masukkan kode pintu secara manual.';
         _qrScanner = null;
       });
       await Future<void>.delayed(Duration.zero);
@@ -178,7 +183,6 @@ class _AbsensiPageState extends State<AbsensiPage> with WidgetsBindingObserver {
     if (scanner == null) return;
     if (mounted) {
       setState(() => _qrScanner = null);
-      // Beri satu frame agar widget MobileScanner lepas dari controller.
       await Future<void>.delayed(Duration.zero);
     } else {
       _qrScanner = null;
@@ -194,17 +198,16 @@ class _AbsensiPageState extends State<AbsensiPage> with WidgetsBindingObserver {
       final token = _extractQrToken(raw);
       if (token.isEmpty || token == _handledQrToken) continue;
       _handledQrToken = token;
-      _submitQrAttendance(token);
+      _handleDetectedToken(token);
       return;
     }
   }
 
-  /// QR bisa berisi token mentah, URL (`?token=...`), atau JSON (`qr_token`).
   String _extractQrToken(String raw) {
     final trimmed = raw.trim();
     final uri = Uri.tryParse(trimmed);
     if (uri != null && uri.hasQuery) {
-      for (final key in const ['qr_token', 'token', 'code']) {
+      for (final key in const ['qr_token', 'token', 'code', 'room', 'ruangan']) {
         final value = uri.queryParameters[key]?.trim();
         if (value != null && value.isNotEmpty) return value;
       }
@@ -213,7 +216,7 @@ class _AbsensiPageState extends State<AbsensiPage> with WidgetsBindingObserver {
       try {
         final decoded = jsonDecode(trimmed);
         if (decoded is Map) {
-          for (final key in const ['qr_token', 'token', 'code']) {
+          for (final key in const ['qr_token', 'token', 'code', 'room_code', 'ruangan_kode']) {
             final value = decoded[key];
             if (value is String && value.trim().isNotEmpty) {
               return value.trim();
@@ -231,25 +234,26 @@ class _AbsensiPageState extends State<AbsensiPage> with WidgetsBindingObserver {
     FocusScope.of(context).unfocus();
     if (token.isEmpty) {
       setState(
-        () => _tokenError = 'Token belum diisi. Ketik token dari dosen.',
+        () => _tokenError = 'Kode belum diisi. Masukkan kode pintu ruangan.',
       );
       return;
     }
-    _submitQrAttendance(token);
+    _handleDetectedToken(token);
   }
 
-  Future<void> _submitQrAttendance(String qrToken) async {
+  Future<void> _handleDetectedToken(String token) async {
     if (!studentAuthRepository.hasRemoteSession) {
       _handledQrToken = null;
       ScaffoldMessenger.of(context)
         ..hideCurrentSnackBar()
         ..showSnackBar(
           const SnackBar(
-            content: Text('Masuk dulu untuk mencatat presensi lewat QR.'),
+            content: Text('Masuk terlebih dahulu untuk melakukan presensi.'),
           ),
         );
       return;
     }
+
     final location = _location;
     if (location == null) {
       _handledQrToken = null;
@@ -261,20 +265,58 @@ class _AbsensiPageState extends State<AbsensiPage> with WidgetsBindingObserver {
       _failure = null;
       _isSubmitting = true;
     });
+
     try {
-      final result = await studentDataService.submitQrAttendance(
-        qrToken: qrToken,
+      // 1. Coba validasi sebagai QR statis pintu ruangan
+      final roomResult = await studentDataService.validateRoomQr(
+        qrToken: token,
         latitude: location.latitude,
         longitude: location.longitude,
         accuracy: location.accuracy,
       );
+
       if (!mounted) return;
-      await _stopQrScanner();
-      if (mounted) setState(() => _receipt = result);
-    } catch (error) {
-      if (!mounted) return;
-      _handledQrToken = null;
-      setState(() => _failure = PresensiFailure.from(error));
+      setState(() {
+        _verifiedRoomData = roomResult;
+        _verifiedDoorQrToken = token;
+        final sesiId = roomResult['sesi_presensi_id'] as String?;
+        if (sesiId != null && sesiId.isNotEmpty) {
+          _selectedSessionId = sesiId;
+        }
+      });
+      HapticFeedback.mediumImpact();
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          SnackBar(
+            backgroundColor: AppColors.hadir,
+            content: Text(
+              roomResult['message'] as String? ??
+                  'Pintu ruangan terverifikasi! Silakan lanjut ke verifikasi wajah.',
+            ),
+          ),
+        );
+
+      // Otomatis buka scan wajah setelah jeda konfirmasi singkat
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+      if (mounted) await _openFaceScan();
+    } catch (doorError) {
+      // 2. Bila bukan format pintu, coba sebagai token presensi langsung dari dosen
+      try {
+        final result = await studentDataService.submitQrAttendance(
+          qrToken: token,
+          latitude: location.latitude,
+          longitude: location.longitude,
+          accuracy: location.accuracy,
+        );
+        if (!mounted) return;
+        await _stopQrScanner();
+        if (mounted) setState(() => _receipt = result);
+      } catch (_) {
+        if (!mounted) return;
+        _handledQrToken = null;
+        setState(() => _failure = PresensiFailure.from(doorError));
+      }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -287,25 +329,49 @@ class _AbsensiPageState extends State<AbsensiPage> with WidgetsBindingObserver {
     return _activeSessions.isNotEmpty ? _activeSessions.first : null;
   }
 
-  /// Kamera hanya boleh dipakai satu pemakai, jadi pemindai QR dilepas dulu.
   Future<void> _openFaceScan() async {
+    // Di mode live, pastikan mahasiswa sudah memindai QR pintu terlebih dahulu
+    if (_verifiedRoomData == null && studentAuthRepository.hasRemoteSession) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Pindai QR pada pintu ruangan kelas terlebih dahulu untuk membuka verifikasi wajah.',
+            ),
+          ),
+        );
+      return;
+    }
+
     FocusScope.of(context).unfocus();
     _faceScanOpen = true;
     await _stopQrScanner();
     if (!mounted) return;
+
     final session = _selectedSession;
+    final course = (_verifiedRoomData?['matkul_nama'] as String?) ??
+        (session?['matkul_nama'] as String?);
+    final room = (_verifiedRoomData?['ruangan_nama'] as String?) ??
+        (session?['ruangan_nama'] as String?);
+    final sessionId = (_verifiedRoomData?['sesi_presensi_id'] as String?) ??
+        (session?['sesi_presensi_id'] as String?);
+
     final result = await Navigator.of(context, rootNavigator: true)
         .push<Map<String, dynamic>>(
           MaterialPageRoute(
             builder: (_) => FaceVerificationPage(
-              sessionId: session?['sesi_presensi_id'] as String?,
-              courseName: session?['matkul_nama'] as String?,
+              sessionId: sessionId,
+              qrToken: _verifiedDoorQrToken,
+              courseName: course,
+              roomName: room,
               initialLocation: _location,
               faceRegistered:
                   _faceRegistered || !studentAuthRepository.hasRemoteSession,
             ),
           ),
         );
+
     _faceScanOpen = false;
     if (!mounted) return;
     if (result != null) {
@@ -344,7 +410,8 @@ class _AbsensiPageState extends State<AbsensiPage> with WidgetsBindingObserver {
           child: receipt != null
               ? PresensiReceipt(
                   data: receipt,
-                  fallbackCourse: _selectedSession?['matkul_nama'] as String?,
+                  fallbackCourse: (_verifiedRoomData?['matkul_nama'] as String?) ??
+                      (_selectedSession?['matkul_nama'] as String?),
                   onDone: () => context.go(StudentRoutePaths.beranda),
                   onHistory: () => context.go(StudentRoutePaths.riwayat),
                 )
@@ -387,7 +454,10 @@ class _AbsensiPageState extends State<AbsensiPage> with WidgetsBindingObserver {
                       ),
                       child: AppGradientButton(
                         onPressed: _isSubmitting ? null : _openFaceScan,
-                        icon: PhosphorIconsDuotone.userFocus,
+                        icon: _verifiedRoomData != null ||
+                                !studentAuthRepository.hasRemoteSession
+                            ? PhosphorIconsDuotone.userFocus
+                            : PhosphorIconsRegular.lock,
                         label: 'Lanjutkan ke Scan Wajah',
                         isBusy: _isSubmitting,
                       ),
@@ -403,22 +473,36 @@ class _AbsensiPageState extends State<AbsensiPage> with WidgetsBindingObserver {
     final text = Theme.of(context).textTheme;
     final failure = _failure;
     final scannerError = _qrScannerError;
+    final verifiedRoom = _verifiedRoomData;
 
     return [
       const AppPageHeading(
-        title: 'Pindai kode QR',
-        description: 'Gunakan kode dari dosen atau presensi dengan wajah.',
+        title: 'Presensi Perkuliahan',
+        description: 'Pindai QR pintu kelas terlebih dahulu, lalu lakukan scan wajah.',
       ),
       _buildSessionInfo(context),
+      if (verifiedRoom != null) ...[
+        const SizedBox(height: AppSpacing.md),
+        AppBanner(
+          tone: StatusTone.success,
+          icon: PhosphorIconsRegular.doorOpen,
+          title: 'Pintu Ruangan Terverifikasi',
+          message:
+              '${verifiedRoom['ruangan_nama'] ?? 'Ruangan'} terverifikasi untuk '
+              '${verifiedRoom['matkul_nama'] ?? 'perkuliahan'}. Silakan lanjutkan ke scan wajah.',
+        ),
+      ],
       const SizedBox(height: AppSpacing.md),
       QrScannerFrame(
         scanner: _qrScanner,
         onDetect: _onQrDetected,
         label: _isSubmitting
-            ? 'Mengirim ke server…'
+            ? 'Memvalidasi kode pintu…'
+            : verifiedRoom != null
+            ? 'Pintu terverifikasi ✓'
             : _qrScanner == null
             ? 'Pemindai belum aktif'
-            : 'Arahkan kamera ke kode QR',
+            : 'Arahkan kamera ke QR pintu ruangan',
         busy: _isSubmitting,
       ),
       if (scannerError != null) ...[
@@ -434,7 +518,7 @@ class _AbsensiPageState extends State<AbsensiPage> with WidgetsBindingObserver {
         ),
       ],
       const SizedBox(height: AppSpacing.lg),
-      Text('Atau masukkan token', style: text.titleSmall),
+      Text('Atau masukkan kode pintu ruangan', style: text.titleSmall),
       const SizedBox(height: 6),
       Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -452,8 +536,8 @@ class _AbsensiPageState extends State<AbsensiPage> with WidgetsBindingObserver {
               },
               onSubmitted: (_) => _submitManualToken(),
               decoration: InputDecoration(
-                hintText: 'Token dari dosen',
-                prefixIcon: const Icon(PhosphorIconsRegular.key),
+                hintText: 'Kode pintu (contoh: RPL-1)',
+                prefixIcon: const Icon(PhosphorIconsRegular.door),
                 errorText: _tokenError,
               ),
             ),

@@ -434,6 +434,7 @@ abstract final class JadwalMasterData {
     Ruangan(kode: 'LPR1', nama: 'LPR1'),
     Ruangan(kode: 'LPR2', nama: 'LPR2'),
     Ruangan(kode: 'LPR3', nama: 'LPR3'),
+    Ruangan(kode: 'RPL1', nama: 'Ruang RPL 1'),
   ];
 
   static const sesi = [

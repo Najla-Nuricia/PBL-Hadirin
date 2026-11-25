@@ -17,6 +17,8 @@ class FaceVerificationPage extends StatefulWidget {
   const FaceVerificationPage({
     this.sessionId,
     this.courseName,
+    this.roomName,
+    this.qrToken,
     this.initialLocation,
     this.faceRegistered = true,
     super.key,
@@ -24,6 +26,8 @@ class FaceVerificationPage extends StatefulWidget {
 
   final String? sessionId;
   final String? courseName;
+  final String? roomName;
+  final String? qrToken;
   final DeviceLocation? initialLocation;
   final bool faceRegistered;
 
@@ -127,6 +131,7 @@ class _FaceVerificationPageState extends State<FaceVerificationPage> {
         imageBytes: photo.bytes,
         filename: photo.name,
         sesiPresensiId: widget.sessionId,
+        qrToken: widget.qrToken,
         latitude: location.latitude,
         longitude: location.longitude,
         accuracy: location.accuracy,
@@ -258,6 +263,7 @@ class _FaceVerificationPageState extends State<FaceVerificationPage> {
   Widget _buildChips() {
     final location = _location;
     final course = widget.courseName;
+    final room = widget.roomName;
     final (icon, color, label) = _locating
         ? (PhosphorIconsRegular.crosshair, Colors.white, 'Mencari lokasi…')
         : location != null
@@ -278,6 +284,12 @@ class _FaceVerificationPageState extends State<FaceVerificationPage> {
       runSpacing: AppSpacing.sm,
       children: [
         _ScanChip(icon: icon, iconColor: color, label: label),
+        if (room != null && room.isNotEmpty)
+          _ScanChip(
+            icon: PhosphorIconsRegular.door,
+            iconColor: Colors.white,
+            label: room,
+          ),
         if (course != null && course.isNotEmpty)
           _ScanChip(
             icon: PhosphorIconsRegular.bookOpen,
