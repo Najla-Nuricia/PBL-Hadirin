@@ -5,9 +5,11 @@ import 'package:go_router/go_router.dart';
 import '../../data/admin/admin_account.dart';
 import '../../data/admin/admin_auth_repository.dart';
 import '../../routing/admin_route_paths.dart';
+import '../../widgets/widgets.dart';
 
-/// Halaman Akun Admin — mengikuti pola halaman profil mahasiswa/dosen.
-/// Tidak ada fitur ganti foto profil.
+/// Halaman Akun Admin dengan tata letak yang sama seperti profil
+/// mahasiswa/dosen: AppBar langit, kartu hero gradien, bagian "Informasi Akun",
+/// kartu aksi, dan tombol keluar di bawah. Tidak ada fitur ganti foto profil.
 class AdminProfilePage extends StatefulWidget {
   const AdminProfilePage({super.key});
 
@@ -17,6 +19,7 @@ class AdminProfilePage extends StatefulWidget {
 
 class _AdminProfilePageState extends State<AdminProfilePage> {
   bool _isRefreshing = false;
+  bool _refreshFailed = false;
 
   AdminAccount? get _account => adminAuthRepository.currentAccount;
 
@@ -25,8 +28,11 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
     setState(() => _isRefreshing = true);
     try {
       await adminAuthRepository.loadProfile();
-    } catch (e) {
-      if (mounted) _showMessage('$e');
+      if (!mounted) return;
+      setState(() => _refreshFailed = false);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _refreshFailed = true);
     } finally {
       if (mounted) setState(() => _isRefreshing = false);
     }
@@ -74,6 +80,7 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
     final account =
         _account ??
         const AdminAccount(
@@ -83,234 +90,227 @@ class _AdminProfilePageState extends State<AdminProfilePage> {
         );
 
     return Scaffold(
-      backgroundColor: colorScheme.surfaceContainerHighest,
-      body: SafeArea(
-        bottom: false,
-        child: Column(
-          children: [
-            Container(
-              color: colorScheme.surface,
-              child: Column(
-                children: [
-                  SizedBox(
-                    height: 52,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        Text(
-                          'Informasi Akun',
-                          style: TextStyle(
-                            color: colorScheme.onSurface,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: IconButton(
-                            tooltip: 'Muat ulang data akun',
-                            onPressed: _isRefreshing ? null : _refresh,
-                            icon: _isRefreshing
-                                ? SizedBox(
-                                    width: 18,
-                                    height: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: colorScheme.primary,
-                                    ),
-                                  )
-                                : Icon(
-                                    PhosphorIconsRegular.arrowsClockwise,
-                                    color: colorScheme.primary,
-                                    size: 19,
-                                  ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Container(
-                    width: 76,
-                    height: 76,
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: colorScheme.outlineVariant,
-                        width: 1.5,
-                      ),
-                    ),
-                    child: Icon(
-                      PhosphorIconsRegular.user,
-                      size: 42,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text(
-                      account.name,
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: colorScheme.onSurface,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: colorScheme.primaryContainer,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      account.role.toUpperCase(),
-                      style: TextStyle(
-                        color: colorScheme.primary,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 0.8,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                ],
-              ),
+      appBar: SkyAppBar(
+        title: const Text('Profil'),
+        titleSpacing: AppSpacing.page,
+        actions: [
+          IconButton(
+            tooltip: 'Muat ulang data akun',
+            onPressed: _isRefreshing ? null : _refresh,
+            icon: _isRefreshing
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(PhosphorIconsRegular.arrowsClockwise),
+          ),
+        ],
+      ),
+      body: AuroraBackground(
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.page,
+              AppSpacing.md,
+              AppSpacing.page,
+              AppSpacing.xxl,
             ),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(
+                  maxWidth: AppSizes.contentMaxWidth,
+                ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Container(
-                      decoration: BoxDecoration(
-                        color: colorScheme.surface,
-                        borderRadius: BorderRadius.circular(14),
+                    if (_refreshFailed) ...[
+                      AppBanner(
+                        tone: StatusTone.warning,
+                        message:
+                            'Profil terbaru belum bisa dimuat. Menampilkan '
+                            'data tersimpan.',
+                        action: TextButton(
+                          onPressed: _refresh,
+                          style: TextButton.styleFrom(
+                            foregroundColor: StatusTone.warning.ink,
+                            padding: EdgeInsets.zero,
+                            alignment: Alignment.centerLeft,
+                          ),
+                          child: const Text('Coba lagi'),
+                        ),
                       ),
-                      child: Column(
-                        children: [
-                          _AdminInfoRow(
-                            icon: PhosphorIconsRegular.at,
-                            label: 'Username',
-                            value: account.username,
-                          ),
-                          _AdminDivider(colorScheme: colorScheme),
-                          _AdminInfoRow(
-                            icon: PhosphorIconsRegular.envelopeSimple,
-                            label: 'Email',
-                            value: account.email.isEmpty
-                                ? 'Belum diisi'
-                                : account.email,
-                          ),
-                          _AdminDivider(colorScheme: colorScheme),
-                          _AdminInfoRow(
-                            icon: PhosphorIconsRegular.user,
-                            label: 'Role',
-                            value: account.role,
-                            isLast: true,
-                          ),
-                        ],
+                      const SizedBox(height: AppSpacing.lg),
+                    ],
+                    _AdminProfileHeader(account: account),
+                    const SizedBox(height: AppSpacing.lg),
+                    const AppSectionHeader(title: 'Informasi Akun'),
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.lg,
+                          vertical: AppSpacing.xs,
+                        ),
+                        child: Column(
+                          children: [
+                            _AdminInfoRow(
+                              label: 'Username',
+                              value: account.username,
+                              tabular: true,
+                            ),
+                            const Divider(),
+                            _AdminInfoRow(
+                              label: 'Email',
+                              value: account.email.isEmpty
+                                  ? 'Belum diisi'
+                                  : account.email,
+                              muted: account.email.isEmpty,
+                            ),
+                            const Divider(),
+                            _AdminInfoRow(
+                              label: 'Role',
+                              value: account.role,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 10),
-                    Container(
-                      decoration: BoxDecoration(
-                        color: colorScheme.surface,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
+                    const SizedBox(height: AppSpacing.lg),
+                    Card(
                       child: Column(
                         children: [
-                          _AdminActionRow(
-                            icon: PhosphorIconsRegular.envelope,
-                            iconColor: colorScheme.primary,
-                            iconBg: colorScheme.primaryContainer,
-                            label: 'Ubah Email',
-                            onTap: _changeEmail,
-                            valueKey: const ValueKey('admin-change-email'),
-                          ),
-                          _AdminDivider(colorScheme: colorScheme),
-                          _AdminActionRow(
-                            icon: PhosphorIconsRegular.key,
-                            iconColor: const Color(0xFFF5A623),
-                            iconBg: const Color(0xFFFEF3C7),
-                            label: 'Ubah Kata Sandi',
+                          ListTile(
+                            key: const ValueKey('admin-change-password'),
+                            leading: Container(
+                              width: 38,
+                              height: 38,
+                              decoration: const BoxDecoration(
+                                color: AppColors.brand50,
+                                borderRadius: AppRadius.control,
+                              ),
+                              child: const Icon(
+                                PhosphorIconsRegular.key,
+                                size: 19,
+                                color: AppColors.brand700,
+                              ),
+                            ),
+                            title: Text(
+                              'Ubah Kata Sandi',
+                              style: text.titleSmall,
+                            ),
+                            trailing: const Icon(
+                              PhosphorIconsRegular.caretRight,
+                              color: AppColors.inkFaint,
+                            ),
                             onTap: () =>
                                 context.push(AdminRoutePaths.changePassword),
-                            valueKey: const ValueKey('admin-change-password'),
                           ),
-                          _AdminDivider(colorScheme: colorScheme),
-                          _AdminActionRow(
-                            icon: PhosphorIconsRegular.signOut,
-                            iconColor: colorScheme.error,
-                            iconBg: colorScheme.errorContainer,
-                            label: 'Keluar',
-                            labelColor: colorScheme.error,
-                            onTap: _confirmLogout,
-                            showChevron: false,
-                            isLast: true,
-                            valueKey: const ValueKey('admin-logout'),
+                          const Divider(),
+                          ListTile(
+                            key: const ValueKey('admin-change-email'),
+                            leading: Container(
+                              width: 38,
+                              height: 38,
+                              decoration: const BoxDecoration(
+                                color: AppColors.brand50,
+                                borderRadius: AppRadius.control,
+                              ),
+                              child: const Icon(
+                                PhosphorIconsRegular.envelope,
+                                size: 19,
+                                color: AppColors.brand700,
+                              ),
+                            ),
+                            title: Text(
+                              'Ubah Email',
+                              style: text.titleSmall,
+                            ),
+                            trailing: const Icon(
+                              PhosphorIconsRegular.caretRight,
+                              color: AppColors.inkFaint,
+                            ),
+                            onTap: _changeEmail,
                           ),
                         ],
                       ),
+                    ),
+                    const SizedBox(height: AppSpacing.lg),
+                    OutlinedButton.icon(
+                      key: const ValueKey('admin-logout'),
+                      onPressed: _confirmLogout,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: colorScheme.error,
+                        backgroundColor: Colors.white.withValues(alpha: 0.6),
+                        side: BorderSide(
+                          color: colorScheme.error.withValues(alpha: 0.45),
+                        ),
+                      ),
+                      icon: const Icon(PhosphorIconsRegular.signOut, size: 20),
+                      label: const Text('Keluar'),
                     ),
                   ],
                 ),
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _AdminInfoRow extends StatelessWidget {
-  const _AdminInfoRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-    this.isLast = false,
-  });
+/// Kartu hero profil admin, memakai gradien dan inisial seperti profil
+/// mahasiswa/dosen. Admin tidak memiliki foto profil, jadi tidak ada tombol
+/// kamera maupun aksi mengganti foto.
+class _AdminProfileHeader extends StatelessWidget {
+  const _AdminProfileHeader({required this.account});
 
-  final IconData icon;
-  final String label;
-  final String value;
-  final bool isLast;
+  final AdminAccount account;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(16, 14, 16, isLast ? 14 : 8),
+    final text = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        gradient: AppColors.heroGradient,
+        borderRadius: AppRadius.hero,
+        boxShadow: AppColors.shadowLifted,
+      ),
       child: Row(
         children: [
-          Icon(icon, color: colorScheme.onSurfaceVariant, size: 20),
-          const SizedBox(width: 14),
+          Container(
+            padding: const EdgeInsets.all(2.5),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.45),
+                width: 2,
+              ),
+            ),
+            child: _AdminAvatar(name: account.name),
+          ),
+          const SizedBox(width: AppSpacing.lg),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  label,
-                  style: TextStyle(
-                    color: colorScheme.onSurfaceVariant,
-                    fontSize: 11,
-                  ),
+                  account.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: text.titleLarge?.copyWith(color: Colors.white),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: AppSpacing.xs),
                 Text(
-                  value,
-                  style: TextStyle(
-                    color: colorScheme.onSurface,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                  account.role,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: text.bodyMedium?.copyWith(
+                    color: AppColors.onBrandMuted,
                   ),
                 ),
               ],
@@ -322,85 +322,80 @@ class _AdminInfoRow extends StatelessWidget {
   }
 }
 
-class _AdminActionRow extends StatelessWidget {
-  const _AdminActionRow({
-    required this.icon,
-    required this.iconColor,
-    required this.iconBg,
-    required this.label,
-    required this.onTap,
-    this.labelColor,
-    this.showChevron = true,
-    this.isLast = false,
-    this.valueKey,
-  });
+class _AdminAvatar extends StatelessWidget {
+  const _AdminAvatar({required this.name});
 
-  final IconData icon;
-  final Color iconColor;
-  final Color iconBg;
-  final String label;
-  final VoidCallback onTap;
-  final Color? labelColor;
-  final bool showChevron;
-  final bool isLast;
-  final ValueKey<String>? valueKey;
+  static const double _size = 64;
+
+  final String name;
+
+  String get _initials => name
+      .trim()
+      .split(RegExp(r'\s+'))
+      .where((word) => word.isNotEmpty)
+      .take(2)
+      .map((word) => word.characters.first.toUpperCase())
+      .join();
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return InkWell(
-      key: valueKey,
-      onTap: onTap,
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(14, 10, 14, isLast ? 10 : 6),
-        child: Row(
-          children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: iconBg,
-                borderRadius: BorderRadius.circular(11),
-              ),
-              child: Icon(icon, size: 19, color: iconColor),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  color: labelColor ?? colorScheme.onSurface,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-            if (showChevron)
-              Icon(
-                PhosphorIconsRegular.caretRight,
-                size: 20,
-                color: colorScheme.onSurfaceVariant,
-              ),
-          ],
+    final text = Theme.of(context).textTheme;
+    final initials = _initials;
+
+    return ClipOval(
+      child: SizedBox.square(
+        dimension: _size,
+        child: ColoredBox(
+          color: AppColors.brand100,
+          child: Center(
+            child: initials.isEmpty
+                ? const Icon(
+                    PhosphorIconsRegular.userCircle,
+                    size: 28,
+                    color: AppColors.brand800,
+                  )
+                : Text(
+                    initials,
+                    textScaler: TextScaler.noScaling,
+                    style: text.titleLarge?.copyWith(
+                      color: AppColors.brand800,
+                    ),
+                  ),
+          ),
         ),
       ),
     );
   }
 }
 
-class _AdminDivider extends StatelessWidget {
-  const _AdminDivider({required this.colorScheme});
+/// Satu baris "Informasi Akun": label di kiri, nilai di kanan (seperti halaman
+/// profil mahasiswa dan dosen). Nilai kosong tampil lebih redup.
+class _AdminInfoRow extends StatelessWidget {
+  const _AdminInfoRow({
+    required this.label,
+    required this.value,
+    this.muted = false,
+    this.tabular = false,
+  });
 
-  final ColorScheme colorScheme;
+  final String label;
+  final String value;
+  final bool muted;
+  final bool tabular;
 
   @override
   Widget build(BuildContext context) {
-    return Divider(
-      height: 1,
-      thickness: 1,
-      color: colorScheme.outlineVariant,
-      indent: 14,
-      endIndent: 14,
+    final theme = Theme.of(context);
+    final text = theme.textTheme;
+    final style = muted
+        ? text.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)
+        : tabular
+        ? text.titleSmall?.tabular
+        : text.titleSmall;
+
+    return AppKeyValueRow(
+      label: label,
+      trailing: Text(value, textAlign: TextAlign.right, style: style),
     );
   }
 }

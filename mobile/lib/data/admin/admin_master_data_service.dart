@@ -5,7 +5,39 @@ import 'package:http/http.dart' as http;
 import '../api_config.dart';
 import 'admin_auth_repository.dart';
 import 'jadwal.dart';
+import 'kelas.dart';
 import 'tahun_ajaran.dart';
+
+/// Hasil create dosen. `initialPassword` hanya dikirim backend sekali pada
+/// response 201 dan wajib ditampilkan ke admin sebelum dialog ditutup.
+class DosenCreateResult {
+  const DosenCreateResult({required this.dosen, this.initialPassword});
+
+  factory DosenCreateResult.fromAdminApiJson(Map<String, dynamic> json) {
+    final data = json['data'];
+    if (data is! Map<String, dynamic>) {
+      throw const AdminRemoteApiException(
+        'Respons backend tidak berisi data dosen.',
+      );
+    }
+    return DosenCreateResult(
+      dosen: Dosen.fromAdminApiJson(data),
+      initialPassword: _optionalString(json['initial_password']),
+    );
+  }
+
+  factory DosenCreateResult.fromJson(Map<String, dynamic> json) =>
+      DosenCreateResult.fromAdminApiJson(json);
+
+  final Dosen dosen;
+  final String? initialPassword;
+
+  static String? _optionalString(Object? value) {
+    if (value == null) return null;
+    final text = value.toString();
+    return text.isEmpty ? null : text;
+  }
+}
 
 /// Client API untuk CRUD master data admin.
 ///
@@ -168,7 +200,8 @@ class AdminMasterDataService {
     );
   }
 
-  /// Pilihan dosen pengampu untuk form jadwal.
+  /// Daftar dosen. Dipakai baik oleh master data admin maupun pilihan dosen
+  /// pada form jadwal.
   Future<List<Dosen>> listDosen({String? search}) async {
     final response = await _send(
       () => _client.get(
@@ -177,11 +210,89 @@ class AdminMasterDataService {
       ),
     );
     return _listData(response)
-        .map(
-          (json) =>
-              Dosen(nip: _string(json['nip']), nama: _string(json['nama'])),
-        )
+        .map(Dosen.fromAdminApiJson)
         .toList(growable: false);
+  }
+
+  Future<Dosen> getDosen(String nip) async {
+    final response = await _send(
+      () => _client.get(
+        _uri('/admin/dosen/${Uri.encodeComponent(nip)}'),
+        headers: _authHeaders(),
+      ),
+    );
+    return Dosen.fromAdminApiJson(_directObject(response));
+  }
+
+  /// Optional fields dikirim hanya bila terisi, agar tidak lolos validasi
+  /// email backend (string kosong dianggap email invalid).
+  Future<DosenCreateResult> createDosen({
+    required String nip,
+    required String nama,
+    String? email,
+    String? noHp,
+  }) async {
+    final response = await _send(
+      () => _client.post(
+        _uri('/admin/dosen'),
+        headers: _jsonHeaders(),
+        body: jsonEncode(_dosenPayload(
+          nip: nip,
+          nama: nama,
+          email: email,
+          noHp: noHp,
+        )),
+      ),
+      expectedStatus: 201,
+    );
+    return DosenCreateResult.fromAdminApiJson(_decodedMap(response));
+  }
+
+  Future<Dosen> updateDosen({
+    required String nip,
+    required String nama,
+    String? email,
+    String? noHp,
+  }) async {
+    final response = await _send(
+      () => _client.put(
+        _uri('/admin/dosen/${Uri.encodeComponent(nip)}'),
+        headers: _jsonHeaders(),
+        body: jsonEncode(_dosenPayload(
+          nip: nip,
+          nama: nama,
+          email: email,
+          noHp: noHp,
+        )),
+      ),
+    );
+    return Dosen.fromAdminApiJson(_objectData(response));
+  }
+
+  Future<String> deleteDosen(String nip) async {
+    final response = await _send(
+      () => _client.delete(
+        _uri('/admin/dosen/${Uri.encodeComponent(nip)}'),
+        headers: _authHeaders(),
+      ),
+    );
+    return _message(response, 'Dosen berhasil dihapus.');
+  }
+
+  Map<String, dynamic> _dosenPayload({
+    required String nip,
+    required String nama,
+    String? email,
+    String? noHp,
+  }) {
+    final cleanEmail = email?.trim() ?? '';
+    final cleanNoHp = noHp?.trim() ?? '';
+    return {
+      'nip': nip.trim(),
+      'nama': nama.trim(),
+      if (cleanEmail.isNotEmpty) 'email': cleanEmail,
+      if (cleanNoHp.isNotEmpty) 'no_hp': cleanNoHp,
+    };
   }
 
   /// Pilihan program studi untuk form jadwal.
@@ -199,17 +310,68 @@ class AdminMasterDataService {
         .toList(growable: false);
   }
 
-  /// Pilihan ruangan untuk form jadwal.
-  Future<List<Ruangan>> listRuangan() async {
+  /// Daftar ruangan, dengan pencarian opsional lewat query `?search=`.
+  Future<List<Ruangan>> listRuangan({String? search}) async {
     final response = await _send(
-      () => _client.get(_uri('/admin/ruangan'), headers: _authHeaders()),
+      () => _client.get(
+        _uri('/admin/ruangan', _searchQuery(search)),
+        headers: _authHeaders(),
+      ),
     );
     return _listData(response)
-        .map(
-          (json) =>
-              Ruangan(kode: _string(json['kode']), nama: _string(json['nama'])),
-        )
+        .map(Ruangan.fromAdminApiJson)
         .toList(growable: false);
+  }
+
+  Future<Ruangan> getRuangan(String kode) async {
+    final response = await _send(
+      () => _client.get(
+        _uri('/admin/ruangan/${Uri.encodeComponent(kode)}'),
+        headers: _authHeaders(),
+      ),
+    );
+    return Ruangan.fromAdminApiJson(_directObject(response));
+  }
+
+  Future<Ruangan> createRuangan({
+    required String kode,
+    required String nama,
+  }) async {
+    final response = await _send(
+      () => _client.post(
+        _uri('/admin/ruangan'),
+        headers: _jsonHeaders(),
+        body: jsonEncode(Ruangan(kode: kode, nama: nama).toAdminApiJson()),
+      ),
+      expectedStatus: 201,
+    );
+    return Ruangan.fromAdminApiJson(_objectData(response));
+  }
+
+  /// [kodeLama] dipakai pada path; `kode` di body boleh berbeda (rename).
+  Future<Ruangan> updateRuangan({
+    required String kodeLama,
+    required String kode,
+    required String nama,
+  }) async {
+    final response = await _send(
+      () => _client.put(
+        _uri('/admin/ruangan/${Uri.encodeComponent(kodeLama)}'),
+        headers: _jsonHeaders(),
+        body: jsonEncode(Ruangan(kode: kode, nama: nama).toAdminApiJson()),
+      ),
+    );
+    return Ruangan.fromAdminApiJson(_objectData(response));
+  }
+
+  Future<String> deleteRuangan(String kode) async {
+    final response = await _send(
+      () => _client.delete(
+        _uri('/admin/ruangan/${Uri.encodeComponent(kode)}'),
+        headers: _authHeaders(),
+      ),
+    );
+    return _message(response, 'Ruangan berhasil dihapus.');
   }
 
   /// Pilihan sesi kuliah untuk form jadwal.
@@ -248,6 +410,122 @@ class AdminMasterDataService {
         .toList(growable: false);
   }
 
+  /// Daftar kelas untuk master data admin (endpoint `/admin/kelas`) dengan
+  /// filter opsional search, program studi, tahun ajaran, dan status.
+  Future<List<Kelas>> listKelasMaster({
+    String? search,
+    String? programStudiKode,
+    String? tahunAjaranId,
+    KelasStatus? status,
+  }) async {
+    final query = _searchQuery(search);
+    if (programStudiKode != null && programStudiKode.trim().isNotEmpty) {
+      query['program_studi_kode'] = programStudiKode.trim();
+    }
+    if (tahunAjaranId != null && tahunAjaranId.trim().isNotEmpty) {
+      query['tahun_ajaran_id'] = tahunAjaranId.trim();
+    }
+    if (status != null) query['status'] = status.apiValue;
+    final response = await _send(
+      () => _client.get(
+        _uri('/admin/kelas', query),
+        headers: _authHeaders(),
+      ),
+    );
+    return _listData(response)
+        .map(Kelas.fromAdminApiJson)
+        .toList(growable: false);
+  }
+
+  Future<Kelas> getKelas(String id) async {
+    final response = await _send(
+      () => _client.get(
+        _uri('/admin/kelas/${Uri.encodeComponent(id)}'),
+        headers: _authHeaders(),
+      ),
+    );
+    return Kelas.fromAdminApiJson(_directObject(response));
+  }
+
+  Future<Kelas> createKelas({
+    required String nama,
+    required int tingkat,
+    required String programStudiKode,
+    required String tahunAjaranId,
+    int kapasitas = 30,
+    KelasStatus status = KelasStatus.aktif,
+  }) async {
+    final response = await _send(
+      () => _client.post(
+        _uri('/admin/kelas'),
+        headers: _jsonHeaders(),
+        body: jsonEncode(_kelasPayload(
+          nama: nama,
+          tingkat: tingkat,
+          programStudiKode: programStudiKode,
+          tahunAjaranId: tahunAjaranId,
+          kapasitas: kapasitas,
+          status: status,
+        )),
+      ),
+      expectedStatus: 201,
+    );
+    return Kelas.fromAdminApiJson(_objectData(response));
+  }
+
+  Future<Kelas> updateKelas({
+    required String id,
+    required String nama,
+    required int tingkat,
+    required String programStudiKode,
+    required String tahunAjaranId,
+    int kapasitas = 30,
+    KelasStatus status = KelasStatus.aktif,
+  }) async {
+    final response = await _send(
+      () => _client.put(
+        _uri('/admin/kelas/${Uri.encodeComponent(id)}'),
+        headers: _jsonHeaders(),
+        body: jsonEncode(_kelasPayload(
+          nama: nama,
+          tingkat: tingkat,
+          programStudiKode: programStudiKode,
+          tahunAjaranId: tahunAjaranId,
+          kapasitas: kapasitas,
+          status: status,
+        )),
+      ),
+    );
+    return Kelas.fromAdminApiJson(_objectData(response));
+  }
+
+  Future<String> deleteKelas(String id) async {
+    final response = await _send(
+      () => _client.delete(
+        _uri('/admin/kelas/${Uri.encodeComponent(id)}'),
+        headers: _authHeaders(),
+      ),
+    );
+    return _message(response, 'Kelas berhasil dihapus.');
+  }
+
+  Map<String, dynamic> _kelasPayload({
+    required String nama,
+    required int tingkat,
+    required String programStudiKode,
+    required String tahunAjaranId,
+    required int kapasitas,
+    required KelasStatus status,
+  }) => Kelas(
+    id: '',
+    nama: nama,
+    tingkat: tingkat,
+    programStudiKode: programStudiKode,
+    tahunAjaranId: tahunAjaranId,
+    kapasitas: kapasitas,
+    status: status,
+  ).toAdminApiJson();
+
   Map<String, String> _searchQuery(String? search) =>
       search != null && search.trim().isNotEmpty
       ? {'search': search.trim()}
@@ -258,7 +536,10 @@ class AdminMasterDataService {
 
   Map<String, String> _authHeaders() {
     final token = _requireToken();
-    return {'Authorization': 'Bearer $token'};
+    return {
+      'Authorization': 'Bearer $token',
+      'Content-Type': 'application/json',
+    };
   }
 
   Map<String, String> _jsonHeaders() => {
@@ -296,14 +577,18 @@ class AdminMasterDataService {
   }
 
   AdminRemoteApiException _errorFrom(http.Response response) {
+    // 401/403 juga dapat membawa `detail` spesifik dari backend.
+    final detail = _extractDetail(response, 'Operasi master data gagal.');
     if (response.statusCode == 401 || response.statusCode == 403) {
       return AdminRemoteApiException(
-        'Sesi login berakhir. Silakan masuk ulang.',
+        detail == 'Operasi master data gagal.'
+            ? 'Sesi login berakhir. Silakan masuk ulang.'
+            : detail,
         statusCode: response.statusCode,
       );
     }
     return AdminRemoteApiException(
-      _extractDetail(response, 'Operasi master data gagal.'),
+      detail,
       statusCode: response.statusCode,
     );
   }
@@ -338,6 +623,31 @@ class AdminMasterDataService {
       );
     }
     return data;
+  }
+
+  /// Endpoint detail mengembalikan objek item langsung (tanpa wrapper `data`).
+  Map<String, dynamic> _directObject(http.Response response) {
+    final decoded = _decodedMap(response);
+    if (decoded['data'] is Map<String, dynamic>) {
+      return decoded['data'] as Map<String, dynamic>;
+    }
+    return decoded;
+  }
+
+  Map<String, dynamic> _decodedMap(http.Response response) {
+    final decoded = jsonDecode(response.body);
+    if (decoded is! Map<String, dynamic>) {
+      throw const AdminRemoteApiException(
+        'Respons backend tidak berisi objek JSON.',
+      );
+    }
+    return decoded;
+  }
+
+  String _message(http.Response response, String fallback) {
+    final decoded = _decodedMap(response);
+    final message = decoded['message'];
+    return message is String && message.isNotEmpty ? message : fallback;
   }
 
   TahunAjaran _tahunFromJson(Map<String, dynamic> json) {

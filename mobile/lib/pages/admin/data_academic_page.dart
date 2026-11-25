@@ -13,7 +13,7 @@ void _openModule(BuildContext context, String title) {
       context.go(AdminRoutePaths.tahunAjaran);
       break;
     case 'Kelas':
-      context.go(AdminRoutePaths.tambahKelas);
+      context.go(AdminRoutePaths.kelas);
       break;
     case 'Ruangan':
       context.go(AdminRoutePaths.ruangan);
@@ -22,7 +22,7 @@ void _openModule(BuildContext context, String title) {
       context.go(AdminRoutePaths.mataKuliah);
       break;
     case 'Dosen':
-      context.go(AdminRoutePaths.tambahDosen);
+      context.go(AdminRoutePaths.dosen);
       break;
     case 'Whitelist NIM':
       context.go(AdminRoutePaths.whitelistNim);

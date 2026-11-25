@@ -165,12 +165,13 @@ class LabeledTextField extends StatelessWidget {
     this.helper,
     this.hint,
     this.numeric = false,
+    this.enabled = true,
     this.validator,
   });
 
   final String label;
   final TextEditingController controller;
-  final bool required, numeric;
+  final bool required, numeric, enabled;
   final String? helper, hint;
   final String? Function(String?)? validator;
 
@@ -181,6 +182,7 @@ class LabeledTextField extends StatelessWidget {
       required: required,
       child: TextFormField(
         controller: controller,
+        enabled: enabled,
         style: numeric ? Theme.of(context).textTheme.bodyLarge?.tabular : null,
         keyboardType: numeric ? TextInputType.number : TextInputType.text,
         inputFormatters: numeric
