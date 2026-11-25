@@ -16,7 +16,7 @@ void _openModule(BuildContext context, String title) {
       context.go(AdminRoutePaths.tambahKelas);
       break;
     case 'Ruangan':
-      context.go(AdminRoutePaths.tambahRuangan);
+      context.go(AdminRoutePaths.ruangan);
       break;
     case 'Mata Kuliah':
       context.go(AdminRoutePaths.mataKuliah);
@@ -64,7 +64,7 @@ class DataAcademicPage extends StatelessWidget {
     (
       icon: PhosphorIconsRegular.door,
       title: 'Ruangan',
-      subtitle: 'Kelola data ruangan',
+      subtitle: 'QR statis pintu & kelola ruangan',
     ),
     (
       icon: PhosphorIconsRegular.shieldCheck,
