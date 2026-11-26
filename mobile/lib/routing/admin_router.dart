@@ -9,7 +9,6 @@ import '../pages/admin/dosen_list_page.dart';
 import '../pages/admin/jadwal_list_page.dart';
 import '../pages/admin/kelas_list_page.dart';
 import '../pages/admin/mata_kuliah_list_page.dart';
-import '../pages/admin/ruangan_list_page.dart';
 import '../pages/admin/tahun_ajaran_list_page.dart';
 import '../pages/admin/whitelist_nim_page.dart';
 import '../pages/admin/tambah_jadwal_page.dart';
@@ -73,7 +72,6 @@ GoRouter createAdminRouter({bool showOnboarding = false}) => GoRouter(
     ),
     GoRoute(
       path: AdminRoutePaths.ruangan,
-      builder: (context, state) => const RuanganListPage(),
       builder: (context, state) => const RuanganQrPage(),
     ),
     GoRoute(

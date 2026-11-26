@@ -5,7 +5,7 @@ import 'package:mobile/routing/student_router.dart';
 import 'package:mobile/theme/app_theme.dart';
 
 void main() {
-  testWidgets('menu master data membuka list dan form Ruangan/Dosen/Kelas', (
+  testWidgets('menu master data membuka QR Ruangan dan list Dosen/Kelas', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(390, 844);
@@ -31,7 +31,7 @@ void main() {
       AdminRoutePaths.dataAkademik,
     );
 
-    // Ruangan: list -> form -> kembali.
+    // Ruangan: halaman QR -> form tambah -> kembali.
     await tester.ensureVisible(find.text('Ruangan').first);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Ruangan').first);
@@ -101,7 +101,7 @@ void main() {
     );
   });
 
-  testWidgets('default studentRouter memuat rute list Ruangan/Dosen/Kelas', (
+  testWidgets('default studentRouter memuat rute QR Ruangan dan list Dosen/Kelas', (
     tester,
   ) async {
     tester.view.physicalSize = const Size(390, 844);
@@ -110,7 +110,7 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     // Aplikasi-default memakai studentRouter (APP_ROLE=student), yang juga
-    // mendaftarkan seluruh rute admin — termasuk tiga halaman list baru.
+    // mendaftarkan seluruh rute admin — termasuk halaman QR dan list data.
     final router = createStudentRouter();
     addTearDown(router.dispose);
     await tester.pumpWidget(

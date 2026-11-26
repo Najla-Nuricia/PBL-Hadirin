@@ -2,11 +2,14 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_icons/phosphor_icons.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../data/admin/ruangan.dart';
 import '../../routing/admin_route_paths.dart';
+import '../../widgets/widgets.dart';
 import 'tambah_ruangan_page.dart';
+import 'widgets/admin_list.dart';
 
 class RuanganQrPage extends StatefulWidget {
   const RuanganQrPage({super.key});
@@ -99,101 +102,99 @@ class _RuanganQrPageState extends State<RuanganQrPage> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
+    final text = Theme.of(context).textTheme;
 
     return Scaffold(
-      backgroundColor: cs.surfaceContainerLowest,
-      appBar: AppBar(
-        backgroundColor: cs.surface,
-        surfaceTintColor: Colors.transparent,
-        scrolledUnderElevation: 0,
-        centerTitle: true,
-        leading: IconButton(
-          onPressed: _back,
-          icon: Icon(Icons.arrow_back_ios_new_rounded, size: 20, color: cs.primary),
-        ),
-        title: Text(
-          'QR Statis Pintu Ruangan',
-          style: TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            color: cs.onSurface,
-          ),
-        ),
-        actions: [
-          IconButton(
-            onPressed: _showBatchPrintDialog,
-            icon: const Icon(Icons.print_outlined),
-            tooltip: 'Cetak Semua QR Pintu',
-          ),
-          IconButton(
-            onPressed: _openTambahRuangan,
-            icon: const Icon(Icons.add_circle_outline),
-            tooltip: 'Tambah Ruangan',
-          ),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Divider(height: 1, thickness: 1, color: cs.outlineVariant),
-        ),
-      ),
+      backgroundColor: colorScheme.surface,
       body: SafeArea(
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Search & Filter header
-            Container(
-              color: cs.surface,
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-              child: Column(
+            SkyHeader(
+              includeStatusBar: false,
+              child: Row(
                 children: [
-                  TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: 'Cari ruangan (contoh: RPL 1, RT01, J301)...',
-                      prefixIcon: const Icon(Icons.search, size: 20),
-                      suffixIcon: _searchController.text.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear, size: 18),
-                              onPressed: () {
-                                _searchController.clear();
-                                _filterItems('');
-                              },
-                            )
-                          : null,
-                      filled: true,
-                      fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.5),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: cs.outlineVariant),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: cs.outlineVariant),
+                  IconButton(
+                    onPressed: _back,
+                    icon: const Icon(
+                      PhosphorIconsRegular.arrowLeft,
+                      size: 20,
+                    ),
+                    color: AppColors.gownNavy,
+                    tooltip: 'Kembali',
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                  Expanded(
+                    child: Text(
+                      'QR Statis Pintu Ruangan',
+                      style: text.titleLarge?.copyWith(
+                        color: AppColors.gownNavy,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  // Notice Card
+                  IconButton(
+                    onPressed: _showBatchPrintDialog,
+                    icon: const Icon(PhosphorIconsRegular.printer),
+                    color: AppColors.gownNavy,
+                    tooltip: 'Cetak Semua QR Pintu',
+                  ),
+                  FilledButton.icon(
+                    onPressed: _openTambahRuangan,
+                    icon: const Icon(PhosphorIconsRegular.plus, size: 18),
+                    label: const Text('Tambah'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: colorScheme.primary,
+                      foregroundColor: colorScheme.onPrimary,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: AppRadius.control,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.page,
+                AppSpacing.sm,
+                AppSpacing.page,
+                AppSpacing.xs,
+              ),
+              child: Column(
+                children: [
+                  AdminSearchField(
+                    controller: _searchController,
+                    hintText: 'Cari kode atau nama ruangan...',
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
                   Container(
-                    padding: const EdgeInsets.all(12),
+                    padding: const EdgeInsets.all(AppSpacing.md),
                     decoration: BoxDecoration(
-                      color: cs.primaryContainer.withValues(alpha: 0.35),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: cs.primary.withValues(alpha: 0.2)),
+                      color: colorScheme.primaryContainer.withValues(alpha: 0.35),
+                      borderRadius: AppRadius.control,
+                      border: Border.all(
+                        color: colorScheme.primary.withValues(alpha: 0.2),
+                      ),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.info_outline_rounded, color: cs.primary, size: 18),
-                        const SizedBox(width: 10),
+                        Icon(
+                          PhosphorIconsRegular.info,
+                          color: colorScheme.primary,
+                          size: 18,
+                        ),
+                        const SizedBox(width: AppSpacing.sm),
                         Expanded(
                           child: Text(
                             'QR Statis bersifat permanen dan tidak berubah. Cetak dan tempel di pintu kelas. Mahasiswa wajib scan QR ini sebelum kamera presensi wajah terbuka.',
-                            style: TextStyle(
-                              color: cs.onSurface,
-                              fontSize: 12,
-                              height: 1.35,
+                            style: text.bodySmall?.copyWith(
+                              color: colorScheme.onSurface,
                             ),
                           ),
                         ),
@@ -203,39 +204,27 @@ class _RuanganQrPageState extends State<RuanganQrPage> {
                 ],
               ),
             ),
-            // Body List
             Expanded(
               child: _isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : _items.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.meeting_room_outlined, size: 56, color: cs.onSurfaceVariant),
-                          const SizedBox(height: 12),
-                          Text(
-                            'Tidak ada ruangan yang cocok',
-                            style: TextStyle(
-                              color: cs.onSurface,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Tekan tombol + di atas untuk menambah ruangan baru.',
-                            style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
-                          ),
-                        ],
-                      ),
+                  ? const AppEmptyState(
+                      title: 'Tidak ada ruangan yang cocok.',
+                      message: 'Tekan tombol Tambah untuk menambah ruangan baru.',
+                      icon: PhosphorIconsRegular.door,
                     )
                   : RefreshIndicator(
                       onRefresh: _loadData,
                       child: ListView.separated(
-                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.page,
+                          AppSpacing.xs,
+                          AppSpacing.page,
+                          AppSpacing.xxl,
+                        ),
                         itemCount: _items.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 12),
+                        separatorBuilder: (_, _) =>
+                            const SizedBox(height: AppSpacing.md),
                         itemBuilder: (context, index) {
                           final item = _items[index];
                           return _RuanganCard(
@@ -249,11 +238,6 @@ class _RuanganQrPageState extends State<RuanganQrPage> {
             ),
           ],
         ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openTambahRuangan,
-        icon: const Icon(Icons.add),
-        label: const Text('Tambah Ruangan'),
       ),
     );
   }
@@ -385,8 +369,10 @@ class _RuanganCard extends StatelessWidget {
           const Divider(height: 1, thickness: 0.8),
           const SizedBox(height: 8),
           // Actions
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
+          Wrap(
+            alignment: WrapAlignment.end,
+            spacing: 6,
+            runSpacing: 4,
             children: [
               TextButton.icon(
                 onPressed: onCopyToken,
@@ -397,7 +383,6 @@ class _RuanganCard extends StatelessWidget {
                   foregroundColor: cs.onSurfaceVariant,
                 ),
               ),
-              const SizedBox(width: 6),
               FilledButton.icon(
                 onPressed: onTapPoster,
                 icon: const Icon(Icons.print, size: 16),
