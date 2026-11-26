@@ -64,7 +64,7 @@ class DataAcademicPage extends StatelessWidget {
     (
       icon: PhosphorIconsRegular.door,
       title: 'Ruangan',
-      subtitle: 'QR statis pintu & kelola ruangan',
+      subtitle: 'QR statis pintu & cetak poster',
     ),
     (
       icon: PhosphorIconsRegular.shieldCheck,

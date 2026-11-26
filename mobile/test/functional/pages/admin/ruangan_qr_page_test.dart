@@ -31,7 +31,7 @@ void main() {
     expect(find.text('J301'), findsNothing);
 
     // Clear search
-    await tester.tap(find.byIcon(Icons.clear));
+    await tester.tap(find.byTooltip('Hapus pencarian'));
     await tester.pumpAndSettle();
     expect(find.text('J301'), findsWidgets);
 
@@ -50,7 +50,7 @@ void main() {
     expect(find.text('Pratinjau Poster Pintu Kelas'), findsNothing);
 
     // Open batch print dialog
-    await tester.tap(find.byIcon(Icons.print_outlined));
+    await tester.tap(find.byTooltip('Cetak Semua QR Pintu'));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('Cetak Kolektif QR Pintu'), findsOneWidget);
