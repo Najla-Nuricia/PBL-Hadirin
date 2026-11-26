@@ -37,7 +37,6 @@ class _AbsensiPageState extends State<AbsensiPage> with WidgetsBindingObserver {
   bool _faceRegistered = true;
 
   Map<String, dynamic>? _verifiedRoomData;
-  String? _verifiedDoorQrToken;
 
   PresensiFailure? _failure;
   String? _tokenError;
@@ -284,7 +283,6 @@ class _AbsensiPageState extends State<AbsensiPage> with WidgetsBindingObserver {
       if (!mounted) return;
       setState(() {
         _verifiedRoomData = roomResult;
-        _verifiedDoorQrToken = token;
         final sesiId = roomResult['sesi_presensi_id'] as String?;
         if (sesiId != null && sesiId.isNotEmpty) {
           _selectedSessionId = sesiId;
@@ -307,22 +305,9 @@ class _AbsensiPageState extends State<AbsensiPage> with WidgetsBindingObserver {
       await Future<void>.delayed(const Duration(milliseconds: 600));
       if (mounted) await _openFaceScan();
     } catch (doorError) {
-      // 2. Bila bukan format pintu, coba sebagai token presensi langsung dari dosen
-      try {
-        final result = await studentDataService.submitQrAttendance(
-          qrToken: token,
-          latitude: latitude,
-          longitude: longitude,
-          accuracy: accuracy,
-        );
-        if (!mounted) return;
-        await _stopQrScanner();
-        if (mounted) setState(() => _receipt = result);
-      } catch (_) {
-        if (!mounted) return;
-        _handledQrToken = null;
-        setState(() => _failure = PresensiFailure.from(doorError));
-      }
+      if (!mounted) return;
+      _handledQrToken = null;
+      setState(() => _failure = PresensiFailure.from(doorError));
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
@@ -368,7 +353,6 @@ class _AbsensiPageState extends State<AbsensiPage> with WidgetsBindingObserver {
           MaterialPageRoute(
             builder: (_) => FaceVerificationPage(
               sessionId: sessionId,
-              qrToken: _verifiedDoorQrToken,
               courseName: course,
               roomName: room,
               initialLocation: _location,

@@ -18,7 +18,6 @@ class FaceVerificationPage extends StatefulWidget {
     this.sessionId,
     this.courseName,
     this.roomName,
-    this.qrToken,
     this.initialLocation,
     this.bypassLocation = false,
     this.faceRegistered = true,
@@ -28,7 +27,6 @@ class FaceVerificationPage extends StatefulWidget {
   final String? sessionId;
   final String? courseName;
   final String? roomName;
-  final String? qrToken;
   final DeviceLocation? initialLocation;
   final bool bypassLocation;
   final bool faceRegistered;
@@ -133,7 +131,6 @@ class _FaceVerificationPageState extends State<FaceVerificationPage> {
         imageBytes: photo.bytes,
         filename: photo.name,
         sesiPresensiId: widget.sessionId,
-        qrToken: widget.qrToken,
         latitude: location?.latitude,
         longitude: location?.longitude,
         accuracy: location?.accuracy,

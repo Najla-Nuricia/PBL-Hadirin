@@ -348,37 +348,6 @@ class StudentDataService {
     throw Exception(_extractError(res, 'Gagal memuat status data wajah'));
   }
 
-  Future<Map<String, dynamic>> submitQrAttendance({
-    required String qrToken,
-    double? latitude,
-    double? longitude,
-    double? accuracy,
-  }) async {
-    if (!_hasRemoteSession && studentAuthRepository.useRemoteApi) {
-      throw Exception(
-        'Sesi login server belum aktif. Pastikan backend aktif di ${ApiConfig.baseUrl} lalu masuk ulang.',
-      );
-    }
-    final uri = Uri.parse('${ApiConfig.baseUrl}/attendance/qr');
-    final res = await _client
-        .post(
-          uri,
-          headers: _headers,
-          body: jsonEncode({
-            'qr_token': qrToken,
-            'latitude': ?latitude,
-            'longitude': ?longitude,
-            'accuracy': ?accuracy,
-          }),
-        )
-        .timeout(_timeout);
-
-    if (res.statusCode == 200) {
-      return jsonDecode(res.body) as Map<String, dynamic>;
-    }
-    throw Exception(_extractError(res, 'Presensi QR gagal'));
-  }
-
   /// Validasi QR statis pintu ruangan sebelum membuka kamera verifikasi wajah.
   Future<Map<String, dynamic>> validateRoomQr({
     required String qrToken,
@@ -416,7 +385,6 @@ class StudentDataService {
     required Uint8List imageBytes,
     String filename = 'probe.jpg',
     String? sesiPresensiId,
-    String? qrToken,
     double? latitude,
     double? longitude,
     double? accuracy,
@@ -434,9 +402,6 @@ class StudentDataService {
 
     if (sesiPresensiId != null && sesiPresensiId.isNotEmpty) {
       req.fields['sesi_presensi_id'] = sesiPresensiId;
-    }
-    if (qrToken != null && qrToken.isNotEmpty) {
-      req.fields['qr_token'] = qrToken;
     }
     if (latitude != null && longitude != null) {
       req.fields['latitude'] = latitude.toString();
