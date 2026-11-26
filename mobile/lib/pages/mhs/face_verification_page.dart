@@ -20,6 +20,7 @@ class FaceVerificationPage extends StatefulWidget {
     this.roomName,
     this.qrToken,
     this.initialLocation,
+    this.bypassLocation = false,
     this.faceRegistered = true,
     super.key,
   });
@@ -29,6 +30,7 @@ class FaceVerificationPage extends StatefulWidget {
   final String? roomName;
   final String? qrToken;
   final DeviceLocation? initialLocation;
+  final bool bypassLocation;
   final bool faceRegistered;
 
   @override
@@ -52,7 +54,7 @@ class _FaceVerificationPageState extends State<FaceVerificationPage> {
     super.initState();
     _location = widget.initialLocation;
     _scan.start();
-    if (_location == null) _refreshLocation();
+    if (_location == null && !widget.bypassLocation) _refreshLocation();
   }
 
   @override
@@ -111,8 +113,8 @@ class _FaceVerificationPageState extends State<FaceVerificationPage> {
   Future<void> _submit() async {
     final photo = _photo;
     if (photo == null || _submitting) return;
-    final location = _location;
-    if (location == null) {
+    final location = widget.bypassLocation ? null : _location;
+    if (location == null && !widget.bypassLocation) {
       _fail(PresensiFailure.locationMissing);
       return;
     }
@@ -132,9 +134,9 @@ class _FaceVerificationPageState extends State<FaceVerificationPage> {
         filename: photo.name,
         sesiPresensiId: widget.sessionId,
         qrToken: widget.qrToken,
-        latitude: location.latitude,
-        longitude: location.longitude,
-        accuracy: location.accuracy,
+        latitude: location?.latitude,
+        longitude: location?.longitude,
+        accuracy: location?.accuracy,
       );
       if (!mounted) return;
       _scan.setOverride(
@@ -266,6 +268,12 @@ class _FaceVerificationPageState extends State<FaceVerificationPage> {
     final room = widget.roomName;
     final (icon, color, label) = _locating
         ? (PhosphorIconsRegular.crosshair, Colors.white, 'Mencari lokasi…')
+        : widget.bypassLocation
+        ? (
+            PhosphorIconsRegular.gpsSlash,
+            AppColors.ringOk,
+            'Lokasi dilewati (mode test)',
+          )
         : location != null
         ? (
             PhosphorIconsRegular.mapPin,

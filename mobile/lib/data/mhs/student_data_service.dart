@@ -350,8 +350,8 @@ class StudentDataService {
 
   Future<Map<String, dynamic>> submitQrAttendance({
     required String qrToken,
-    required double latitude,
-    required double longitude,
+    double? latitude,
+    double? longitude,
     double? accuracy,
   }) async {
     if (!_hasRemoteSession && studentAuthRepository.useRemoteApi) {
@@ -366,8 +366,8 @@ class StudentDataService {
           headers: _headers,
           body: jsonEncode({
             'qr_token': qrToken,
-            'latitude': latitude,
-            'longitude': longitude,
+            'latitude': ?latitude,
+            'longitude': ?longitude,
             'accuracy': ?accuracy,
           }),
         )
