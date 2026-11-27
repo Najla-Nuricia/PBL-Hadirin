@@ -399,16 +399,19 @@ class OnboardingRolePage extends StatelessWidget {
                                   icon: PhosphorIconsRegular.chalkboardTeacher,
                                   title: 'Dosen',
                                   subtitle: 'Pantau kehadiran dan tinjau izin',
-                                  gradient: const LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      AppColors.ribbonCoral,
-                                      AppColors.ribbonOrange,
-                                    ],
-                                  ),
+                                  gradient: AppColors.brandGradient,
                                   onTap:
                                       onLecturerPressed ??
+                                      () => _showUnavailable(context),
+                                ),
+                                const SizedBox(height: AppSpacing.md),
+                                _RoleTile(
+                                  icon: PhosphorIconsRegular.userGear,
+                                  title: 'Admin',
+                                  subtitle: 'Kelola Jadwal, kelas, dan akun',
+                                  gradient: AppColors.brandGradient,
+                                  onTap:
+                                      onAdminPressed ??
                                       () => _showUnavailable(context),
                                 ),
                                 const SizedBox(height: AppSpacing.xl),
@@ -432,17 +435,11 @@ class OnboardingRolePage extends StatelessWidget {
                   AppSpacing.page,
                   AppSpacing.md,
                 ),
-                child: TextButton.icon(
-                  onPressed: onAdminPressed ?? () => _showUnavailable(context),
-                  icon: const Icon(
-                    PhosphorIconsRegular.userGear,
-                    size: 20,
-                  ),
-                  label: const Text(
-                    'Login Sebagai Sekretaris Jurusan',
-                    textAlign: TextAlign.center,
-                    textWidthBasis: TextWidthBasis.longestLine,
-                  ),
+                child: AppGradientButton(
+                  label: 'Kembali',
+                  trailingIcon: PhosphorIconsRegular.arrowLeft,
+                  gradient: AppColors.brandGradient,
+                  onPressed: () => context.pop(),
                 ),
               ),
             ),
