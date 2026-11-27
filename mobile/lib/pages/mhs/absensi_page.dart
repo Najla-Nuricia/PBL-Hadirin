@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io' show Platform;
 
-import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -51,9 +51,6 @@ class _AbsensiPageState extends State<AbsensiPage> with WidgetsBindingObserver {
   String? _qrScannerError;
   String? _handledQrToken;
   bool _faceScanOpen = false;
-
-  // Mode test (debug only): lewati pembacaan/validasi lokasi.
-  bool _bypassLocation = false;
 
   final _tokenController = TextEditingController();
 
@@ -257,14 +254,11 @@ class _AbsensiPageState extends State<AbsensiPage> with WidgetsBindingObserver {
     }
 
     final location = _location;
-    if (location == null && !_bypassLocation) {
+    if (location == null) {
       _handledQrToken = null;
       setState(() => _failure = PresensiFailure.locationMissing);
       return;
     }
-    final latitude = _bypassLocation ? null : location?.latitude;
-    final longitude = _bypassLocation ? null : location?.longitude;
-    final accuracy = _bypassLocation ? null : location?.accuracy;
 
     setState(() {
       _failure = null;
@@ -275,9 +269,9 @@ class _AbsensiPageState extends State<AbsensiPage> with WidgetsBindingObserver {
       // 1. Coba validasi sebagai QR statis pintu ruangan
       final roomResult = await studentDataService.validateRoomQr(
         qrToken: token,
-        latitude: latitude,
-        longitude: longitude,
-        accuracy: accuracy,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        accuracy: location.accuracy,
       );
 
       if (!mounted) return;
@@ -356,7 +350,6 @@ class _AbsensiPageState extends State<AbsensiPage> with WidgetsBindingObserver {
               courseName: course,
               roomName: room,
               initialLocation: _location,
-              bypassLocation: _bypassLocation,
               faceRegistered:
                   _faceRegistered || !studentAuthRepository.hasRemoteSession,
             ),
@@ -541,29 +534,12 @@ class _AbsensiPageState extends State<AbsensiPage> with WidgetsBindingObserver {
         ],
       ),
       const SizedBox(height: AppSpacing.md),
-      if (kDebugMode)
-        SwitchListTile(
-          value: _bypassLocation,
-          onChanged: (value) => setState(() {
-            _bypassLocation = value;
-            _failure = null;
-            _tokenError = null;
-          }),
-          title: const Text('Lewati lokasi (mode test)'),
-          subtitle: const Text('Presensi tanpa GPS / di luar area kampus.'),
-        ),
-      if (_bypassLocation)
-        AppBanner(
-          tone: StatusTone.neutral,
-          message: 'Mode test: pengecekan lokasi dilewati.',
-        )
-      else
-        LocationStatusRow(
-          location: _location,
-          error: _locationError,
-          locating: _isLocating,
-          onRefresh: _refreshLocation,
-        ),
+      LocationStatusRow(
+        location: _location,
+        error: _locationError,
+        locating: _isLocating,
+        onRefresh: _refreshLocation,
+      ),
       if (failure != null) ...[
         const SizedBox(height: AppSpacing.md),
         AppBanner(

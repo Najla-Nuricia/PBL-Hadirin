@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_icons/phosphor_icons.dart';
 
+import '../../data/dosen/dosen_data_service.dart';
 import '../../data/dosen/lecturer_providers.dart';
 import '../../data/dosen/presensi_options.dart';
 import '../../models/dosen/dosen_dashboard.dart';
@@ -48,6 +49,44 @@ class _CekPresensiPageState extends ConsumerState<CekPresensiPage> {
   DateTime _tanggal = DateTime.now();
   bool _tanggalDipilih = false;
   MatkulOption? _selectedMatkul;
+  bool _bypassLocation = false;
+  bool _savingBypass = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLocationBypass();
+  }
+
+  Future<void> _loadLocationBypass() async {
+    try {
+      final enabled = await dosenDataService.loadLocationBypass();
+      if (!mounted) return;
+      setState(() => _bypassLocation = enabled);
+    } catch (_) {
+      // Mode demo / backend tidak tersedia: biarkan nilai bawaan.
+    }
+  }
+
+  Future<void> _onBypassChanged(bool value) async {
+    setState(() {
+      _bypassLocation = value;
+      _savingBypass = true;
+    });
+    try {
+      final saved = await dosenDataService.setLocationBypass(value);
+      if (!mounted) return;
+      setState(() => _bypassLocation = saved);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _bypassLocation = !value);
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text('$error')));
+    } finally {
+      if (mounted) setState(() => _savingBypass = false);
+    }
+  }
 
   bool _isDemo(DosenDashboard? dashboard) =>
       dashboard == null || dashboard.isDemo || dashboard.jadwal.isEmpty;
@@ -360,6 +399,18 @@ class _CekPresensiPageState extends ConsumerState<CekPresensiPage> {
                           'contoh.',
                     ),
                   ],
+                  const SizedBox(height: AppSpacing.md),
+                  SectionCard(
+                    child: SwitchListTile(
+                      value: _bypassLocation,
+                      onChanged: _savingBypass ? null : _onBypassChanged,
+                      title: const Text('Lewati validasi lokasi (mode test)'),
+                      subtitle: const Text(
+                        'Berlaku untuk sesi kelas Anda. Mahasiswa tidak perlu '
+                        'berada di area kampus.',
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),

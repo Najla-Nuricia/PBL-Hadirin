@@ -134,6 +134,42 @@ class DosenDataService {
     return LecturerDummyData.session;
   }
 
+  /// `GET /dosen/testing/lokasi-bypass` — status toggle testing milik dosen.
+  Future<bool> loadLocationBypass() async {
+    if (!lecturerAuthRepository.hasRemoteSession) return false;
+    final uri = Uri.parse('${ApiConfig.baseUrl}/dosen/testing/lokasi-bypass');
+    final res = await _client.get(uri, headers: _headers).timeout(_timeout);
+    if (res.statusCode == 200) {
+      final decoded = jsonDecode(res.body) as Map<String, dynamic>;
+      return decoded['location_bypass'] as bool? ?? false;
+    }
+    if (res.statusCode == 401) {
+      throw Exception('Sesi login berakhir. Silakan masuk ulang.');
+    }
+    throw Exception(_extractError(res, 'Gagal memuat pengaturan testing'));
+  }
+
+  /// `PUT /dosen/testing/lokasi-bypass` — aktif/nonaktif bypass lokasi.
+  Future<bool> setLocationBypass(bool enabled) async {
+    if (!lecturerAuthRepository.hasRemoteSession) return enabled;
+    final uri = Uri.parse('${ApiConfig.baseUrl}/dosen/testing/lokasi-bypass');
+    final res = await _client
+        .put(
+          uri,
+          headers: _headers,
+          body: jsonEncode({'enabled': enabled}),
+        )
+        .timeout(_timeout);
+    if (res.statusCode == 200) {
+      final decoded = jsonDecode(res.body) as Map<String, dynamic>;
+      return decoded['location_bypass'] as bool? ?? enabled;
+    }
+    if (res.statusCode == 401) {
+      throw Exception('Sesi login berakhir. Silakan masuk ulang.');
+    }
+    throw Exception(_extractError(res, 'Gagal menyimpan pengaturan testing'));
+  }
+
   DosenDashboard _demoDashboard() {
     final session = LecturerDummyData.session;
     return DosenDashboard(
